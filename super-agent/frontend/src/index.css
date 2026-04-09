@@ -1,0 +1,357 @@
+@import 'tailwindcss';
+@plugin "@tailwindcss/typography";
+
+/* ============================================================
+   THEME SYSTEM: CSS-level palette swap + brand color remap
+   
+   The app was built dark-first with hardcoded Tailwind classes
+   like bg-gray-900, text-white, border-gray-800, etc.
+   
+   Instead of adding dark: variants to 90+ components, we remap
+   the color palette at the CSS level. In light mode, dark colors
+   become light and vice versa — a full palette inversion.
+   
+   Brand remap: blue-* → indigo values, purple-* → violet values
+   so the primary accent is a cohesive indigo and secondary is
+   a complementary violet. This avoids the blue+purple clash.
+   
+   .dark class = original dark palette (no changes)
+   no .dark    = inverted palette for light mode
+   ============================================================ */
+
+@theme {
+  /* Gray palette — remapped for light mode */
+  --color-gray-50:  var(--th-gray-50);
+  --color-gray-100: var(--th-gray-100);
+  --color-gray-200: var(--th-gray-200);
+  --color-gray-300: var(--th-gray-300);
+  --color-gray-400: var(--th-gray-400);
+  --color-gray-500: var(--th-gray-500);
+  --color-gray-600: var(--th-gray-600);
+  --color-gray-700: var(--th-gray-700);
+  --color-gray-800: var(--th-gray-800);
+  --color-gray-900: var(--th-gray-900);
+  --color-gray-950: var(--th-gray-950);
+
+  /* Slate palette — remapped for light mode */
+  --color-slate-50:  var(--th-slate-50);
+  --color-slate-100: var(--th-slate-100);
+  --color-slate-200: var(--th-slate-200);
+  --color-slate-300: var(--th-slate-300);
+  --color-slate-400: var(--th-slate-400);
+  --color-slate-500: var(--th-slate-500);
+  --color-slate-600: var(--th-slate-600);
+  --color-slate-700: var(--th-slate-700);
+  --color-slate-800: var(--th-slate-800);
+  --color-slate-900: var(--th-slate-900);
+  --color-slate-950: var(--th-slate-950);
+
+  /* White/black swap */
+  --color-white: var(--th-white);
+  --color-black: var(--th-black);
+
+  /* ── Brand: remap blue-* → indigo ── */
+  --color-blue-50:  var(--th-blue-50);
+  --color-blue-100: var(--th-blue-100);
+  --color-blue-200: var(--th-blue-200);
+  --color-blue-300: var(--th-blue-300);
+  --color-blue-400: var(--th-blue-400);
+  --color-blue-500: var(--th-blue-500);
+  --color-blue-600: var(--th-blue-600);
+  --color-blue-700: var(--th-blue-700);
+  --color-blue-800: var(--th-blue-800);
+  --color-blue-900: var(--th-blue-900);
+  --color-blue-950: var(--th-blue-950);
+
+  /* ── Secondary: remap purple-* → softer violet ── */
+  --color-purple-50:  var(--th-purple-50);
+  --color-purple-100: var(--th-purple-100);
+  --color-purple-200: var(--th-purple-200);
+  --color-purple-300: var(--th-purple-300);
+  --color-purple-400: var(--th-purple-400);
+  --color-purple-500: var(--th-purple-500);
+  --color-purple-600: var(--th-purple-600);
+  --color-purple-700: var(--th-purple-700);
+  --color-purple-800: var(--th-purple-800);
+  --color-purple-900: var(--th-purple-900);
+  --color-purple-950: var(--th-purple-950);
+}
+
+/* ---- Dark mode: indigo brand palette ---- */
+.dark {
+  color-scheme: dark;
+
+  --th-gray-50:  #f9fafb;
+  --th-gray-100: #f3f4f6;
+  --th-gray-200: #e5e7eb;
+  --th-gray-300: #d1d5db;
+  --th-gray-400: #9ca3af;
+  --th-gray-500: #6b7280;
+  --th-gray-600: #4b5563;
+  --th-gray-700: #374151;
+  --th-gray-800: #1f2937;
+  --th-gray-900: #111827;
+  --th-gray-950: #030712;
+
+  --th-slate-50:  #f8fafc;
+  --th-slate-100: #f1f5f9;
+  --th-slate-200: #e2e8f0;
+  --th-slate-300: #cbd5e1;
+  --th-slate-400: #94a3b8;
+  --th-slate-500: #64748b;
+  --th-slate-600: #475569;
+  --th-slate-700: #334155;
+  --th-slate-800: #1e293b;
+  --th-slate-900: #0f172a;
+  --th-slate-950: #020617;
+
+  --th-white: #ffffff;
+  --th-black: #000000;
+
+  /* blue-* → Tailwind indigo (dark mode) */
+  --th-blue-50:  #eef2ff;
+  --th-blue-100: #e0e7ff;
+  --th-blue-200: #c7d2fe;
+  --th-blue-300: #a5b4fc;
+  --th-blue-400: #818cf8;
+  --th-blue-500: #6366f1;
+  --th-blue-600: #4f46e5;
+  --th-blue-700: #4338ca;
+  --th-blue-800: #3730a3;
+  --th-blue-900: #312e81;
+  --th-blue-950: #1e1b4b;
+
+  /* purple-* → softer violet (dark mode) */
+  --th-purple-50:  #f5f3ff;
+  --th-purple-100: #ede9fe;
+  --th-purple-200: #ddd6fe;
+  --th-purple-300: #c4b5fd;
+  --th-purple-400: #a78bfa;
+  --th-purple-500: #8b5cf6;
+  --th-purple-600: #7c3aed;
+  --th-purple-700: #6d28d9;
+  --th-purple-800: #5b21b6;
+  --th-purple-900: #4c1d95;
+  --th-purple-950: #2e1065;
+}
+
+/* ---- Light mode: inverted palette + indigo brand ---- */
+:root:not(.dark) {
+  color-scheme: light;
+
+  /* gray: dark shades → light, light shades → dark */
+  --th-gray-50:  #111827;
+  --th-gray-100: #1f2937;
+  --th-gray-200: #374151;
+  --th-gray-300: #4b5563;
+  --th-gray-400: #6b7280;
+  --th-gray-500: #9ca3af;
+  --th-gray-600: #d1d5db;
+  --th-gray-700: #e5e7eb;
+  --th-gray-800: #f3f4f6;
+  --th-gray-900: #f9fafb;
+  --th-gray-950: #ffffff;
+
+  /* slate: same inversion */
+  --th-slate-50:  #0f172a;
+  --th-slate-100: #1e293b;
+  --th-slate-200: #334155;
+  --th-slate-300: #475569;
+  --th-slate-400: #64748b;
+  --th-slate-500: #94a3b8;
+  --th-slate-600: #cbd5e1;
+  --th-slate-700: #e2e8f0;
+  --th-slate-800: #f1f5f9;
+  --th-slate-900: #f8fafc;
+  --th-slate-950: #ffffff;
+
+  --th-white: #111827;
+  --th-black: #ffffff;
+
+  /* blue-* → indigo (light mode — same values, Tailwind handles contrast) */
+  --th-blue-50:  #eef2ff;
+  --th-blue-100: #e0e7ff;
+  --th-blue-200: #c7d2fe;
+  --th-blue-300: #a5b4fc;
+  --th-blue-400: #818cf8;
+  --th-blue-500: #6366f1;
+  --th-blue-600: #4f46e5;
+  --th-blue-700: #4338ca;
+  --th-blue-800: #3730a3;
+  --th-blue-900: #312e81;
+  --th-blue-950: #1e1b4b;
+
+  /* purple-* → violet (light mode) */
+  --th-purple-50:  #f5f3ff;
+  --th-purple-100: #ede9fe;
+  --th-purple-200: #ddd6fe;
+  --th-purple-300: #c4b5fd;
+  --th-purple-400: #a78bfa;
+  --th-purple-500: #8b5cf6;
+  --th-purple-600: #7c3aed;
+  --th-purple-700: #6d28d9;
+  --th-purple-800: #5b21b6;
+  --th-purple-900: #4c1d95;
+  --th-purple-950: #2e1065;
+}
+
+/* ============================================================ */
+
+:root {
+  font-family:
+    Inter,
+    system-ui,
+    Avenir,
+    Helvetica,
+    Arial,
+    sans-serif;
+  line-height: 1.5;
+  font-weight: 400;
+
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+body {
+  margin: 0;
+  min-width: 320px;
+  min-height: 100vh;
+}
+
+/* Custom animations */
+@keyframes fade-in {
+  from {
+    opacity: 0;
+    transform: translateX(-50%) translateY(-10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(-50%) translateY(0);
+  }
+}
+
+.animate-fade-in {
+  animation: fade-in 0.3s ease-out;
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* Flying card animation for casino dashboard */
+@keyframes fly-card {
+  0% {
+    opacity: 0;
+    transform: translate(var(--sx), var(--sy)) rotate(0deg) scale(0.5);
+  }
+  20% {
+    opacity: 1;
+    transform: translate(var(--sx), var(--sy)) rotate(10deg) scale(1);
+  }
+  80% {
+    opacity: 1;
+    transform: translate(0, 0) rotate(360deg) scale(1);
+  }
+  100% {
+    opacity: 0;
+    transform: translate(0, 0) rotate(720deg) scale(0.5);
+  }
+}
+
+.animate-fly-card {
+  animation: fly-card 2.5s ease-in-out infinite;
+}
+
+/* Workflow connection dash animation */
+@keyframes dash {
+  to {
+    stroke-dashoffset: -20;
+  }
+}
+
+.animate-dash {
+  animation: dash 0.5s linear infinite;
+}
+
+/* Custom scrollbar for quick questions */
+.scrollbar-thin {
+  scrollbar-width: thin;
+}
+
+.scrollbar-thumb-gray-700::-webkit-scrollbar-thumb {
+  background-color: #374151;
+  border-radius: 4px;
+}
+
+.scrollbar-track-transparent::-webkit-scrollbar-track {
+  background-color: transparent;
+}
+
+.scrollbar-thin::-webkit-scrollbar {
+  height: 6px;
+  width: 6px;
+}
+
+/* Canvas styles */
+.react-flow__node {
+  cursor: grab;
+}
+
+.react-flow__node:active {
+  cursor: grabbing;
+}
+
+.react-flow__handle {
+  transition: all 0.2s ease;
+}
+
+.react-flow__handle:hover {
+  transform: scale(1.2);
+}
+
+.react-flow__edge-path {
+  stroke-dasharray: 5;
+}
+
+.react-flow__edge.animated .react-flow__edge-path {
+  animation: dash 0.5s linear infinite;
+}
+
+.react-flow__controls {
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.3);
+}
+
+.react-flow__controls button {
+  background-color: #1f2937;
+  border-color: #374151;
+  color: #9ca3af;
+}
+
+.react-flow__controls button:hover {
+  background-color: #374151;
+  color: #f3f4f6;
+}
+
+.react-flow__minimap {
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.3);
+}
+
+/* Selection styles — indigo accent */
+.react-flow__selection {
+  background: rgba(99, 102, 241, 0.1) !important;
+  border: 1px solid rgba(99, 102, 241, 0.5) !important;
+}
+
+.react-flow__nodesselection-rect {
+  background: rgba(99, 102, 241, 0.1) !important;
+  border: 1px solid rgba(99, 102, 241, 0.5) !important;
+}
