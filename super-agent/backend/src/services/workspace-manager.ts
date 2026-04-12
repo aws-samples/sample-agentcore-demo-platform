@@ -452,6 +452,24 @@ export class WorkspaceManager {
     lines.push(`- The workspace root is: ${workspacePath}`);
     lines.push('- If a user asks to access files outside this workspace, politely decline and explain the restriction.');
 
+    // AgentCore tools configuration
+    if (config.agentRuntime === 'agentcore') {
+      const agentcoreRegion = config.agentcore.runtimeArn?.split(':')[3] || config.aws.region;
+      const browserId = process.env.AGENTCORE_BROWSER_ID || '';
+      const codeInterpreterId = process.env.AGENTCORE_CODE_INTERPRETER_ID || '';
+      lines.push('');
+      lines.push('## AgentCore Tools Configuration', '');
+      lines.push(`- When calling any browser tool (start_browser_session, get_browser_session, list_browser_sessions, stop_browser_session, browser_navigate, browser_click, browser_type, browser_snapshot, browser_take_screenshot, etc.), you MUST always pass \`region="${agentcoreRegion}"\`.`);
+      if (browserId) {
+        lines.push(`- For start_browser_session, you MUST pass \`browser_id="${browserId}"\` to use the custom browser with Web Bot Auth enabled.`);
+      }
+      lines.push(`- When calling any code interpreter tool (start_code_interpreter_session, invoke_code_interpreter, stop_code_interpreter_session, etc.), you MUST always pass \`region="${agentcoreRegion}"\`.`);
+      if (codeInterpreterId) {
+        lines.push(`- For start_code_interpreter_session, you MUST pass \`code_interpreter_id="${codeInterpreterId}"\` to use the custom code interpreter with public internet access.`);
+      }
+      lines.push(`- NEVER omit the region parameter. NEVER use us-east-1. Always use region="${agentcoreRegion}".`);
+    }
+
     // Inject scope memories
     const { scopeMemoryRepository } = await import('../repositories/scope-memory.repository.js');
     const memories = await scopeMemoryRepository.findForContext(scope.id);
@@ -580,6 +598,8 @@ export class WorkspaceManager {
         args: ['awslabs.amazon-bedrock-agentcore-mcp-server@latest'],
         env: {
           AWS_REGION: agentcoreRegion,
+          AWS_DEFAULT_REGION: agentcoreRegion,
+          BEDROCK_AGENTCORE_REGION: agentcoreRegion,
           FASTMCP_LOG_LEVEL: 'ERROR',
         },
       };

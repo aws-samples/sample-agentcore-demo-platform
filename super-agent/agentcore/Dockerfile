@@ -17,8 +17,8 @@ RUN pip3 install --break-system-packages uv
 RUN npm install -g @anthropic-ai/claude-code
 
 # Claude Code Bedrock configuration
-ENV CLAUDE_CODE_USE_BEDROCK=1 \
-    ANTHROPIC_MODEL=us.anthropic.claude-sonnet-4-20250514-v1:0
+# ANTHROPIC_MODEL is set at runtime by deploy script based on region
+ENV CLAUDE_CODE_USE_BEDROCK=1
 
 # Install Node.js dependencies (include dev for TypeScript build)
 COPY package*.json ./
@@ -35,7 +35,8 @@ RUN npm prune --omit=dev
 # Create workspace and user directories (node user is UID 1000 in base image)
 RUN mkdir -p /workspace
 RUN mkdir -p /home/node/.claude/skills
-RUN chown -R node:node /workspace /home/node/.claude /app
+RUN mkdir -p /home/node/.aws
+RUN chown -R node:node /workspace /home/node/.claude /home/node/.aws /app
 
 # Run as non-root
 USER node
@@ -44,4 +45,8 @@ WORKDIR /workspace
 # AgentCore protocol requires port 8080
 EXPOSE 8080
 
-CMD ["node", "/app/dist/index.js"]
+# Entrypoint: write ~/.aws/config from AWS_REGION env var at startup,
+# then run the app. This ensures boto3 (used by MCP tools like Browser)
+# picks up the correct region even if AWS_REGION/AWS_DEFAULT_REGION are
+# not respected by all code paths.
+CMD ["sh", "-c", "echo '[default]\nregion = '${AWS_REGION:-us-west-2} > /home/node/.aws/config && exec node /app/dist/index.js"]

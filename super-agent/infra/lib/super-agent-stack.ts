@@ -1,380 +1,294 @@
 import * as cdk from 'aws-cdk-lib';
 import * as ec2 from 'aws-cdk-lib/aws-ec2';
+import * as ecr from 'aws-cdk-lib/aws-ecr';
+import * as ecs from 'aws-cdk-lib/aws-ecs';
+import * as ecs_patterns from 'aws-cdk-lib/aws-ecs-patterns';
 import * as iam from 'aws-cdk-lib/aws-iam';
 import * as s3 from 'aws-cdk-lib/aws-s3';
 import * as rds from 'aws-cdk-lib/aws-rds';
-import * as cognito from 'aws-cdk-lib/aws-cognito';
+import * as elasticache from 'aws-cdk-lib/aws-elasticache';
 import * as cloudfront from 'aws-cdk-lib/aws-cloudfront';
 import * as origins from 'aws-cdk-lib/aws-cloudfront-origins';
-import * as acm from 'aws-cdk-lib/aws-certificatemanager';
-import * as route53 from 'aws-cdk-lib/aws-route53';
-import * as route53targets from 'aws-cdk-lib/aws-route53-targets';
+import * as logs from 'aws-cdk-lib/aws-logs';
 import { Construct } from 'constructs';
-import * as fs from 'fs';
-import * as path from 'path';
 
 /**
- * SuperAgentStack — unified deployment with optional CloudFront CDN.
+ * SuperAgentStack — production-ready serverless deployment.
  *
- * Core resources (always created):
- *   VPC (default), Security Groups, EC2 (t4g.small), EIP, RDS PostgreSQL,
- *   S3 avatar bucket, IAM role, Nginx, Redis, systemd service.
+ * Architecture:
+ *   Frontend:  S3 + CloudFront (OAC, BLOCK_ALL public access)
+ *   Backend:   ECS Fargate (ARM64) behind ALB
+ *   Database:  Aurora PostgreSQL Serverless v2
+ *   Cache:     ElastiCache Redis 7.1
+ *   Agents:    Bedrock AgentCore Runtime (VPC mode)
+ *   Browser:   Custom Browser Tool (Web Bot Auth, public network)
+ *   Code:      Custom Code Interpreter (public network)
  *
- * Optional Cognito (authMode=cognito):
- *   User Pool + App Client + initial admin user.
- *
- * Optional CDN layer (enableCdn=true):
- *   S3 frontend bucket, CloudFront distribution, ACM certificate,
- *   Route53 ALIAS record, OAC.
- *
- * Context parameters:
- *   enableCdn     - "true" to deploy CloudFront (default: "false")
- *   domainName    - custom domain, e.g. "app.example.com" (required if enableCdn)
- *   hostedZoneId  - Route53 hosted zone ID (required if enableCdn)
- *   authMode      - "cognito" | "local" (default: "local")
+ * ECS starts with desiredCount=0 — the deploy script pushes images then scales up.
  */
 export class SuperAgentStack extends cdk.Stack {
   constructor(scope: Construct, id: string, props?: cdk.StackProps) {
     super(scope, id, props);
 
-    const enableCdn = this.node.tryGetContext('enableCdn') === 'true';
-    const domainName = this.node.tryGetContext('domainName') as string | undefined;
-    const hostedZoneId = this.node.tryGetContext('hostedZoneId') as string | undefined;
-    const authMode = (this.node.tryGetContext('authMode') as string) || 'local';
-
-    if (enableCdn && (!domainName || !hostedZoneId)) {
-      throw new Error('enableCdn=true requires domainName and hostedZoneId context values');
-    }
-
-    // =========================================================================
-    // Parameters
-    // =========================================================================
-    const keyPairName = new cdk.CfnParameter(this, 'KeyPairName', {
-      type: 'String',
-      description: 'EC2 Key Pair name for SSH via SSM port-forward',
-    });
-
-    const allowedCidr = new cdk.CfnParameter(this, 'AllowedCidr', {
-      type: 'String',
-      default: '0.0.0.0/0',
-      description: 'CIDR allowed to access HTTP/HTTPS',
-    });
-
-    // Cognito parameters (only used when authMode=cognito)
-    const adminEmail = new cdk.CfnParameter(this, 'AdminEmail', {
-      type: 'String',
-      default: 'admin@example.com',
-      description: 'Initial admin email (Cognito mode only)',
-    });
-
-    const cognitoDomainPrefix = new cdk.CfnParameter(this, 'CognitoDomainPrefix', {
-      type: 'String',
-      default: 'super-agent-unused',
-      description: 'Cognito domain prefix (Cognito mode only)',
-    });
-
     // =========================================================================
     // VPC
     // =========================================================================
-    const vpc = ec2.Vpc.fromLookup(this, 'DefaultVpc', { isDefault: true });
+    const vpc = new ec2.Vpc(this, 'Vpc', {
+      maxAzs: 2,
+      natGateways: 1,
+      subnetConfiguration: [
+        { name: 'Public', subnetType: ec2.SubnetType.PUBLIC, cidrMask: 24 },
+        { name: 'Private', subnetType: ec2.SubnetType.PRIVATE_WITH_EGRESS, cidrMask: 24 },
+      ],
+    });
 
     // =========================================================================
     // Security Groups
     // =========================================================================
-    const ec2Sg = new ec2.SecurityGroup(this, 'EC2SG', {
-      vpc,
-      description: 'Super Agent EC2',
-      allowAllOutbound: true,
-    });
-    ec2Sg.addIngressRule(
-      ec2.Peer.ipv4(allowedCidr.valueAsString),
-      ec2.Port.tcp(80), 'HTTP',
-    );
-    ec2Sg.addIngressRule(
-      ec2.Peer.ipv4(allowedCidr.valueAsString),
-      ec2.Port.tcp(443), 'HTTPS',
-    );
+    const albSg = new ec2.SecurityGroup(this, 'ALBSG', { vpc, description: 'ALB', allowAllOutbound: true });
+    albSg.addIngressRule(ec2.Peer.anyIpv4(), ec2.Port.tcp(80), 'HTTP');
 
-    const dbSg = new ec2.SecurityGroup(this, 'DBSG', {
-      vpc,
-      description: 'RDS PostgreSQL',
-      allowAllOutbound: false,
-    });
-    dbSg.addIngressRule(ec2Sg, ec2.Port.tcp(5432), 'PostgreSQL from EC2');
+    const ecsSg = new ec2.SecurityGroup(this, 'ECSSG', { vpc, description: 'ECS Fargate', allowAllOutbound: true });
+    ecsSg.addIngressRule(albSg, ec2.Port.tcp(3000), 'From ALB');
+
+    const dbSg = new ec2.SecurityGroup(this, 'DBSG', { vpc, description: 'Aurora', allowAllOutbound: false });
+    dbSg.addIngressRule(ecsSg, ec2.Port.tcp(5432), 'From ECS');
+
+    const redisSg = new ec2.SecurityGroup(this, 'RedisSG', { vpc, description: 'Redis', allowAllOutbound: false });
+    redisSg.addIngressRule(ecsSg, ec2.Port.tcp(6379), 'From ECS');
+
+    const agentcoreSg = new ec2.SecurityGroup(this, 'AgentCoreSG', { vpc, description: 'AgentCore', allowAllOutbound: false });
+    agentcoreSg.addEgressRule(ec2.Peer.anyIpv4(), ec2.Port.tcp(443), 'HTTPS');
+    dbSg.addIngressRule(agentcoreSg, ec2.Port.tcp(5432), 'From AgentCore');
+    redisSg.addIngressRule(agentcoreSg, ec2.Port.tcp(6379), 'From AgentCore');
 
     // =========================================================================
-    // RDS PostgreSQL
+    // Aurora PostgreSQL Serverless v2
     // =========================================================================
-    const dbInstance = new rds.DatabaseInstance(this, 'DB', {
-      engine: rds.DatabaseInstanceEngine.postgres({
-        version: rds.PostgresEngineVersion.VER_16_6,
-      }),
-      instanceType: ec2.InstanceType.of(ec2.InstanceClass.T4G, ec2.InstanceSize.MICRO),
+    const dbCluster = new rds.DatabaseCluster(this, 'AuroraDB', {
+      engine: rds.DatabaseClusterEngine.auroraPostgres({ version: rds.AuroraPostgresEngineVersion.VER_16_6 }),
+      serverlessV2MinCapacity: 0.5,
+      serverlessV2MaxCapacity: 4,
+      writer: rds.ClusterInstance.serverlessV2('Writer', { publiclyAccessible: false }),
       vpc,
-      vpcSubnets: { subnetType: ec2.SubnetType.PUBLIC },
+      vpcSubnets: { subnetType: ec2.SubnetType.PRIVATE_WITH_EGRESS },
       securityGroups: [dbSg],
-      databaseName: 'super_agent',
-      credentials: rds.Credentials.fromGeneratedSecret('superagent', {
-        secretName: `${id}/db-credentials`,
-      }),
-      allocatedStorage: 20,
-      maxAllocatedStorage: 50,
-      storageType: rds.StorageType.GP3,
+      defaultDatabaseName: 'super_agent',
+      credentials: rds.Credentials.fromGeneratedSecret('superagent', { secretName: `${id}/db-credentials` }),
       storageEncrypted: true,
-      multiAz: false,
-      publiclyAccessible: false,
-      backupRetention: cdk.Duration.days(7),
+      backup: { retention: cdk.Duration.days(7) },
       removalPolicy: cdk.RemovalPolicy.SNAPSHOT,
     });
 
     // =========================================================================
-    // IAM Role for EC2
+    // ElastiCache Redis
     // =========================================================================
-    const role = new iam.Role(this, 'EC2Role', {
-      assumedBy: new iam.ServicePrincipal('ec2.amazonaws.com'),
-      managedPolicies: [
-        iam.ManagedPolicy.fromAwsManagedPolicyName('AmazonSSMManagedInstanceCore'),
+    const redisSubnetGroup = new elasticache.CfnSubnetGroup(this, 'RedisSubnets', {
+      description: 'Redis subnets',
+      subnetIds: vpc.selectSubnets({ subnetType: ec2.SubnetType.PRIVATE_WITH_EGRESS }).subnetIds,
+    });
+
+    const redis = new elasticache.CfnReplicationGroup(this, 'Redis', {
+      replicationGroupDescription: `${id} Redis`,
+      engine: 'redis', engineVersion: '7.1',
+      cacheNodeType: 'cache.t4g.micro', numCacheClusters: 1,
+      automaticFailoverEnabled: false,
+      cacheSubnetGroupName: redisSubnetGroup.ref,
+      securityGroupIds: [redisSg.securityGroupId],
+      atRestEncryptionEnabled: true, transitEncryptionEnabled: false,
+    });
+
+    // =========================================================================
+    // S3 Buckets (all BLOCK_ALL)
+    // =========================================================================
+    const bucketDefaults = { blockPublicAccess: s3.BlockPublicAccess.BLOCK_ALL, encryption: s3.BucketEncryption.S3_MANAGED };
+    const avatarBucket = new s3.Bucket(this, 'AvatarBucket', { ...bucketDefaults, removalPolicy: cdk.RemovalPolicy.RETAIN });
+    const workspaceBucket = new s3.Bucket(this, 'WorkspaceBucket', {
+      ...bucketDefaults, removalPolicy: cdk.RemovalPolicy.DESTROY, autoDeleteObjects: true,
+      lifecycleRules: [{ expiration: cdk.Duration.days(30) }],
+    });
+    const frontendBucket = new s3.Bucket(this, 'FrontendBucket', {
+      ...bucketDefaults, removalPolicy: cdk.RemovalPolicy.DESTROY, autoDeleteObjects: true,
+    });
+
+    // =========================================================================
+    // ECR Repositories (created externally by deploy script, referenced here)
+    // =========================================================================
+    const backendRepo = ecr.Repository.fromRepositoryName(this, 'BackendRepo', `${id.toLowerCase()}-backend`);
+    const agentcoreRepo = ecr.Repository.fromRepositoryName(this, 'AgentCoreRepo', `${id.toLowerCase()}-agentcore`);
+
+    // =========================================================================
+    // IAM — ECS Task Role
+    // =========================================================================
+    const ecsTaskRole = new iam.Role(this, 'ECSTaskRole', { assumedBy: new iam.ServicePrincipal('ecs-tasks.amazonaws.com') });
+    ecsTaskRole.addToPolicy(new iam.PolicyStatement({ actions: ['bedrock:InvokeModel', 'bedrock:InvokeModelWithResponseStream'], resources: ['*'] }));
+    ecsTaskRole.addToPolicy(new iam.PolicyStatement({ actions: ['bedrock-agentcore:InvokeAgentRuntime'], resources: [`arn:aws:bedrock-agentcore:${this.region}:${this.account}:runtime/*`] }));
+    ecsTaskRole.addToPolicy(new iam.PolicyStatement({ actions: ['secretsmanager:GetSecretValue', 'secretsmanager:DescribeSecret'], resources: [dbCluster.secret!.secretArn, `${dbCluster.secret!.secretArn}*`] }));
+    ecsTaskRole.addToPolicy(new iam.PolicyStatement({ actions: ['logs:CreateLogGroup', 'logs:CreateLogStream', 'logs:PutLogEvents'], resources: ['*'] }));
+    avatarBucket.grantReadWrite(ecsTaskRole);
+    workspaceBucket.grantReadWrite(ecsTaskRole);
+
+    // =========================================================================
+    // IAM — AgentCore Execution Role (Browser, Code Interpreter, Bedrock)
+    // =========================================================================
+    const agentcoreRole = new iam.Role(this, 'AgentCoreRole', {
+      // No roleName — let CDK auto-generate a unique name to avoid cross-region collisions
+      assumedBy: new iam.CompositePrincipal(
+        new iam.ServicePrincipal('bedrock-agentcore.amazonaws.com'),
+        new iam.ServicePrincipal('bedrock.amazonaws.com'),
+      ),
+    });
+    agentcoreRole.addToPolicy(new iam.PolicyStatement({ actions: ['bedrock:InvokeModel', 'bedrock:InvokeModelWithResponseStream'], resources: ['*'] }));
+    agentcoreRole.addToPolicy(new iam.PolicyStatement({ actions: ['ecr:GetDownloadUrlForLayer', 'ecr:BatchGetImage', 'ecr:GetAuthorizationToken'], resources: ['*'] }));
+    workspaceBucket.grantReadWrite(agentcoreRole);
+    agentcoreRole.addToPolicy(new iam.PolicyStatement({ actions: ['logs:CreateLogGroup', 'logs:CreateLogStream', 'logs:PutLogEvents', 'logs:DescribeLogStreams', 'logs:DescribeLogGroups'], resources: ['*'] }));
+    agentcoreRole.addToPolicy(new iam.PolicyStatement({ actions: ['secretsmanager:GetSecretValue'], resources: [dbCluster.secret!.secretArn, `${dbCluster.secret!.secretArn}*`] }));
+    // Workload Identity
+    agentcoreRole.addToPolicy(new iam.PolicyStatement({ actions: ['bedrock-agentcore:GetWorkloadAccessToken', 'bedrock-agentcore:GetWorkloadAccessTokenForJWT', 'bedrock-agentcore:GetWorkloadAccessTokenForUserId'], resources: [`arn:aws:bedrock-agentcore:${this.region}:${this.account}:workload-identity-directory/*`] }));
+    // Browser (full)
+    agentcoreRole.addToPolicy(new iam.PolicyStatement({ actions: ['bedrock-agentcore:CreateBrowser', 'bedrock-agentcore:ListBrowsers', 'bedrock-agentcore:GetBrowser', 'bedrock-agentcore:DeleteBrowser', 'bedrock-agentcore:StartBrowserSession', 'bedrock-agentcore:ListBrowserSessions', 'bedrock-agentcore:GetBrowserSession', 'bedrock-agentcore:StopBrowserSession', 'bedrock-agentcore:UpdateBrowserStream', 'bedrock-agentcore:ConnectBrowserAutomationStream', 'bedrock-agentcore:ConnectBrowserLiveViewStream'], resources: ['*'] }));
+    // Code Interpreter (full)
+    agentcoreRole.addToPolicy(new iam.PolicyStatement({ actions: ['bedrock-agentcore:CreateCodeInterpreter', 'bedrock-agentcore:ListCodeInterpreters', 'bedrock-agentcore:GetCodeInterpreter', 'bedrock-agentcore:DeleteCodeInterpreter', 'bedrock-agentcore:StartCodeInterpreterSession', 'bedrock-agentcore:InvokeCodeInterpreter', 'bedrock-agentcore:StopCodeInterpreterSession', 'bedrock-agentcore:GetCodeInterpreterSession', 'bedrock-agentcore:ListCodeInterpreterSessions'], resources: ['*'] }));
+    // X-Ray + CloudWatch metrics
+    agentcoreRole.addToPolicy(new iam.PolicyStatement({ actions: ['xray:PutTraceSegments', 'xray:PutTelemetryRecords', 'xray:GetSamplingRules', 'xray:GetSamplingTargets'], resources: ['*'] }));
+    agentcoreRole.addToPolicy(new iam.PolicyStatement({ actions: ['cloudwatch:PutMetricData'], resources: ['*'], conditions: { StringEquals: { 'cloudwatch:namespace': 'bedrock-agentcore' } } }));
+
+    // =========================================================================
+    // ECS Cluster + Fargate Service (starts at 0, scaled up after image push)
+    // =========================================================================
+    const cluster = new ecs.Cluster(this, 'Cluster', { vpc });
+
+    const backendLogs = new logs.LogGroup(this, 'BackendLogs', {
+      logGroupName: `/super-agent/${id}/backend`,
+      retention: logs.RetentionDays.ONE_MONTH,
+      removalPolicy: cdk.RemovalPolicy.DESTROY,
+    });
+
+    const taskDef = new ecs.FargateTaskDefinition(this, 'BackendTask', {
+      memoryLimitMiB: 2048, cpu: 1024,
+      runtimePlatform: { cpuArchitecture: ecs.CpuArchitecture.ARM64, operatingSystemFamily: ecs.OperatingSystemFamily.LINUX },
+      taskRole: ecsTaskRole,
+    });
+
+    taskDef.addContainer('backend', {
+      image: ecs.ContainerImage.fromEcrRepository(backendRepo, 'latest'),
+      logging: ecs.LogDrivers.awsLogs({ logGroup: backendLogs, streamPrefix: 'ecs' }),
+      environment: {
+        PORT: '3000', HOST: '0.0.0.0', NODE_ENV: 'production',
+        AWS_REGION: this.region,
+        REDIS_HOST: redis.attrPrimaryEndPointAddress,
+        REDIS_PORT: redis.attrPrimaryEndPointPort,
+        REDIS_PASSWORD: '',
+        AUTH_MODE: 'local',
+        S3_BUCKET_NAME: avatarBucket.bucketName,
+        S3_PRESIGNED_URL_EXPIRES: '3600',
+        CLAUDE_CODE_USE_BEDROCK: '1',
+        CLAUDE_MODEL: 'claude-sonnet-4-6',
+        AGENT_RUNTIME: 'agentcore',
+        AGENTCORE_WORKSPACE_S3_BUCKET: workspaceBucket.bucketName,
+        LOG_LEVEL: 'info',
+        // DATABASE_URL is injected by deploy script after CDK creates the DB
+        DATABASE_URL: 'placeholder://will-be-set-by-deploy-script',
+      },
+      healthCheck: {
+        command: ['CMD-SHELL', 'curl -f http://localhost:3000/health || exit 1'],
+        interval: cdk.Duration.seconds(30), timeout: cdk.Duration.seconds(10),
+        retries: 3, startPeriod: cdk.Duration.seconds(120),
+      },
+      portMappings: [{ containerPort: 3000 }],
+    });
+
+    const fargateService = new ecs_patterns.ApplicationLoadBalancedFargateService(this, 'BackendService', {
+      cluster, taskDefinition: taskDef,
+      desiredCount: 1,
+      publicLoadBalancer: true, assignPublicIp: false,
+      taskSubnets: { subnetType: ec2.SubnetType.PRIVATE_WITH_EGRESS },
+      securityGroups: [ecsSg],
+      healthCheckGracePeriod: cdk.Duration.seconds(600),
+      // No circuit breaker — deploy script will fix the task def with real DATABASE_URL
+    });
+
+    fargateService.targetGroup.configureHealthCheck({
+      path: '/health', interval: cdk.Duration.seconds(30),
+      healthyThresholdCount: 2, unhealthyThresholdCount: 3,
+    });
+
+    // =========================================================================
+    // CloudFront — S3 frontend (OAC) + ALB backend (/api/*, /health)
+    // OAC created explicitly with region in name to avoid global name collisions
+    // =========================================================================
+    const albOrigin = new origins.LoadBalancerV2Origin(fargateService.loadBalancer, {
+      protocolPolicy: cloudfront.OriginProtocolPolicy.HTTP_ONLY,
+    });
+
+    const s3Origin = origins.S3BucketOrigin.withOriginAccessControl(frontendBucket);
+
+    const distribution = new cloudfront.Distribution(this, 'CDN', {
+      defaultBehavior: {
+        origin: s3Origin,
+        viewerProtocolPolicy: cloudfront.ViewerProtocolPolicy.REDIRECT_TO_HTTPS,
+        cachePolicy: cloudfront.CachePolicy.CACHING_OPTIMIZED,
+      },
+      additionalBehaviors: {
+        '/api/*': {
+          origin: albOrigin,
+          viewerProtocolPolicy: cloudfront.ViewerProtocolPolicy.REDIRECT_TO_HTTPS,
+          cachePolicy: cloudfront.CachePolicy.CACHING_DISABLED,
+          originRequestPolicy: cloudfront.OriginRequestPolicy.ALL_VIEWER,
+          allowedMethods: cloudfront.AllowedMethods.ALLOW_ALL,
+        },
+        '/health': {
+          origin: albOrigin,
+          viewerProtocolPolicy: cloudfront.ViewerProtocolPolicy.REDIRECT_TO_HTTPS,
+          cachePolicy: cloudfront.CachePolicy.CACHING_DISABLED,
+          originRequestPolicy: cloudfront.OriginRequestPolicy.ALL_VIEWER,
+          allowedMethods: cloudfront.AllowedMethods.ALLOW_ALL,
+        },
+      },
+      defaultRootObject: 'index.html',
+      errorResponses: [
+        { httpStatus: 403, responseHttpStatus: 200, responsePagePath: '/index.html', ttl: cdk.Duration.seconds(0) },
+        { httpStatus: 404, responseHttpStatus: 200, responsePagePath: '/index.html', ttl: cdk.Duration.seconds(0) },
       ],
     });
 
-    role.addToPolicy(new iam.PolicyStatement({
-      actions: ['bedrock:InvokeModel', 'bedrock:InvokeModelWithResponseStream'],
-      resources: ['*'],
-    }));
-
-    role.addToPolicy(new iam.PolicyStatement({
-      actions: ['secretsmanager:GetSecretValue', 'secretsmanager:DescribeSecret'],
-      resources: [dbInstance.secret!.secretArn, `${dbInstance.secret!.secretArn}*`],
-    }));
-
-    role.addToPolicy(new iam.PolicyStatement({
-      actions: ['logs:CreateLogGroup', 'logs:CreateLogStream', 'logs:PutLogEvents', 'logs:DescribeLogStreams'],
-      resources: [`arn:aws:logs:${this.region}:${this.account}:log-group:/super-agent/*`],
-    }));
-
-    // AgentCore invoke permission (wildcard — covers any runtime created later)
-    role.addToPolicy(new iam.PolicyStatement({
-      actions: ['bedrock-agentcore:InvokeAgentRuntime'],
-      resources: [`arn:aws:bedrock-agentcore:${this.region}:${this.account}:runtime/*`],
-    }));
-
-    // =========================================================================
-    // S3 Buckets
-    // =========================================================================
-    const avatarBucket = new s3.Bucket(this, 'AvatarBucket', {
-      removalPolicy: cdk.RemovalPolicy.RETAIN,
-      blockPublicAccess: s3.BlockPublicAccess.BLOCK_ALL,
-      encryption: s3.BucketEncryption.S3_MANAGED,
-    });
-    avatarBucket.grantReadWrite(role);
-
-    // Workspace bucket (for AgentCore S3 sync)
-    const workspaceBucket = new s3.Bucket(this, 'WorkspaceBucket', {
-      removalPolicy: cdk.RemovalPolicy.DESTROY,
-      autoDeleteObjects: true,
-      blockPublicAccess: s3.BlockPublicAccess.BLOCK_ALL,
-      encryption: s3.BucketEncryption.S3_MANAGED,
-      lifecycleRules: [{ expiration: cdk.Duration.days(30) }],
-    });
-    workspaceBucket.grantReadWrite(role);
-
-    // =========================================================================
-    // Optional: Cognito (authMode=cognito)
-    // =========================================================================
-    let userPool: cognito.UserPool | undefined;
-    let appClient: cognito.UserPoolClient | undefined;
-    let cognitoDomainFull: string | undefined;
-
-    if (authMode === 'cognito') {
-      userPool = new cognito.UserPool(this, 'UserPool', {
-        userPoolName: `${id}-users`,
-        selfSignUpEnabled: false,
-        signInAliases: { email: true },
-        autoVerify: { email: true },
-        standardAttributes: {
-          email: { required: true, mutable: true },
-          fullname: { required: false, mutable: true },
-        },
-        customAttributes: {
-          orgId: new cognito.StringAttribute({ mutable: true }),
-          role: new cognito.StringAttribute({ mutable: true }),
-        },
-        passwordPolicy: {
-          minLength: 8, requireLowercase: true, requireUppercase: true,
-          requireDigits: true, requireSymbols: false,
-        },
-        accountRecovery: cognito.AccountRecovery.EMAIL_ONLY,
-        removalPolicy: cdk.RemovalPolicy.RETAIN,
-      });
-
-      userPool.addDomain('CognitoDomain', {
-        cognitoDomain: { domainPrefix: cognitoDomainPrefix.valueAsString },
-      });
-
-      appClient = userPool.addClient('AppClient', {
-        userPoolClientName: `${id}-web`,
-        generateSecret: false,
-        authFlows: { userSrp: true },
-        oAuth: {
-          flows: { authorizationCodeGrant: true },
-          scopes: [cognito.OAuthScope.OPENID, cognito.OAuthScope.EMAIL, cognito.OAuthScope.PROFILE],
-          callbackUrls: ['http://localhost:5173/auth/callback'],
-          logoutUrls: ['http://localhost:5173/login'],
-        },
-        preventUserExistenceErrors: true,
-      });
-
-      new cognito.CfnUserPoolUser(this, 'AdminUser', {
-        userPoolId: userPool.userPoolId,
-        username: adminEmail.valueAsString,
-        userAttributes: [
-          { name: 'email', value: adminEmail.valueAsString },
-          { name: 'email_verified', value: 'true' },
-        ],
-        desiredDeliveryMediums: ['EMAIL'],
-      });
-
-      cognitoDomainFull = `${cognitoDomainPrefix.valueAsString}.auth.${this.region}.amazoncognito.com`;
-
-      role.addToPolicy(new iam.PolicyStatement({
-        actions: ['cognito-idp:UpdateUserPoolClient', 'cognito-idp:DescribeUserPoolClient'],
-        resources: [userPool.userPoolArn],
-      }));
-    }
-
-    // =========================================================================
-    // Optional: CloudFront CDN (enableCdn=true)
-    // =========================================================================
-    let frontendBucket: s3.Bucket | undefined;
-    let distribution: cloudfront.Distribution | undefined;
-
-    if (enableCdn) {
-      // S3 bucket for frontend static files
-      frontendBucket = new s3.Bucket(this, 'FrontendBucket', {
-        removalPolicy: cdk.RemovalPolicy.DESTROY,
-        autoDeleteObjects: true,
-        blockPublicAccess: s3.BlockPublicAccess.BLOCK_ALL,
-        encryption: s3.BucketEncryption.S3_MANAGED,
-      });
-      frontendBucket.grantReadWrite(role); // for deploy script S3 sync
-
-      // ACM certificate (must be us-east-1 for CloudFront)
-      const hostedZone = route53.HostedZone.fromHostedZoneAttributes(this, 'HostedZone', {
-        hostedZoneId: hostedZoneId!,
-        zoneName: domainName!.split('.').slice(1).join('.'), // extract parent domain
-      });
-
-      const certificate = new acm.DnsValidatedCertificate(this, 'Certificate', {
-        domainName: domainName!,
-        hostedZone,
-        region: 'us-east-1', // CloudFront requires us-east-1
-      });
-
-      // OAC for S3
-      const oac = new cloudfront.CfnOriginAccessControl(this, 'OAC', {
-        originAccessControlConfig: {
-          name: `${id}-oac`,
-          originAccessControlOriginType: 's3',
-          signingBehavior: 'always',
-          signingProtocol: 'sigv4',
-        },
-      });
-
-      // CloudFront distribution
-      distribution = new cloudfront.Distribution(this, 'CDN', {
-        defaultBehavior: {
-          origin: origins.S3BucketOrigin.withOriginAccessControl(frontendBucket),
-          viewerProtocolPolicy: cloudfront.ViewerProtocolPolicy.REDIRECT_TO_HTTPS,
-          cachePolicy: cloudfront.CachePolicy.CACHING_OPTIMIZED,
-        },
-        domainNames: [domainName!],
-        certificate,
-        defaultRootObject: 'index.html',
-        errorResponses: [
-          { httpStatus: 403, responseHttpStatus: 200, responsePagePath: '/index.html', ttl: cdk.Duration.seconds(0) },
-          { httpStatus: 404, responseHttpStatus: 200, responsePagePath: '/index.html', ttl: cdk.Duration.seconds(0) },
-        ],
-      });
-
-      // Add API/WS behavior → EC2 origin
-      const ec2Origin = new origins.HttpOrigin(`ec2-origin.${domainName}`, {
-        // This will be overridden by post-deploy to use the actual EIP
-        // For now, use a placeholder — the deploy script patches it
-        protocolPolicy: cloudfront.OriginProtocolPolicy.HTTP_ONLY,
-        httpPort: 80,
-      });
-
-      // Route53 ALIAS → CloudFront
-      new route53.ARecord(this, 'DnsAlias', {
-        zone: hostedZone,
-        recordName: domainName!,
-        target: route53.RecordTarget.fromAlias(new route53targets.CloudFrontTarget(distribution)),
-      });
-    }
-
-    // =========================================================================
-    // EC2 Instance
-    // =========================================================================
-    const userData = ec2.UserData.forLinux();
-    const userDataScript = fs.readFileSync(
-      path.join(__dirname, '..', 'scripts', 'user-data.sh'), 'utf-8',
+    // Override the auto-generated OAC name to include region — prevents
+    // global name collisions when deploying the same stack name in multiple regions.
+    const cfnDist = distribution.node.defaultChild as cloudfront.CfnDistribution;
+    const oacNodes = distribution.node.findAll().filter(
+      c => (c as any).cfnResourceType === 'AWS::CloudFront::OriginAccessControl'
     );
-    userData.addCommands(userDataScript);
-
-    const instance = new ec2.Instance(this, 'Instance', {
-      vpc,
-      vpcSubnets: { subnetType: ec2.SubnetType.PUBLIC },
-      instanceType: ec2.InstanceType.of(ec2.InstanceClass.T4G, ec2.InstanceSize.SMALL),
-      machineImage: ec2.MachineImage.fromSsmParameter(
-        '/aws/service/canonical/ubuntu/server/22.04/stable/current/arm64/hvm/ebs-gp2/ami-id',
-      ),
-      securityGroup: ec2Sg,
-      role,
-      keyPair: ec2.KeyPair.fromKeyPairName(this, 'KeyPair', keyPairName.valueAsString),
-      blockDevices: [{
-        deviceName: '/dev/sda1',
-        volume: ec2.BlockDeviceVolume.ebs(30, {
-          volumeType: ec2.EbsDeviceVolumeType.GP3, iops: 3000, encrypted: true,
-        }),
-      }],
-      userData,
-    });
-
-    const eip = new ec2.CfnEIP(this, 'EIP');
-    new ec2.CfnEIPAssociation(this, 'EIPAssoc', {
-      allocationId: eip.attrAllocationId,
-      instanceId: instance.instanceId,
-    });
+    for (const node of oacNodes) {
+      (node as cloudfront.CfnOriginAccessControl).addPropertyOverride(
+        'OriginAccessControlConfig.Name',
+        `${id}-${this.region}-s3-oac`,
+      );
+    }
 
     // =========================================================================
-    // Outputs — always
+    // Outputs — everything the deploy script needs
     // =========================================================================
-    new cdk.CfnOutput(this, 'InstanceId', { value: instance.instanceId });
-    new cdk.CfnOutput(this, 'PublicIP', { value: eip.attrPublicIp });
-    new cdk.CfnOutput(this, 'DBEndpoint', { value: dbInstance.dbInstanceEndpointAddress });
-    new cdk.CfnOutput(this, 'DBSecretArn', { value: dbInstance.secret!.secretArn });
+    new cdk.CfnOutput(this, 'VpcId', { value: vpc.vpcId });
+    new cdk.CfnOutput(this, 'PrivateSubnet1', { value: vpc.privateSubnets[0].subnetId });
+    new cdk.CfnOutput(this, 'PrivateSubnet2', { value: vpc.privateSubnets[1].subnetId });
+    new cdk.CfnOutput(this, 'AgentCoreSGId', { value: agentcoreSg.securityGroupId });
+    new cdk.CfnOutput(this, 'EcsSGId', { value: ecsSg.securityGroupId });
+    new cdk.CfnOutput(this, 'BackendRepoUri', { value: backendRepo.repositoryUri });
+    new cdk.CfnOutput(this, 'AgentCoreRepoUri', { value: agentcoreRepo.repositoryUri });
+    new cdk.CfnOutput(this, 'AgentCoreRoleArn', { value: agentcoreRole.roleArn });
+    new cdk.CfnOutput(this, 'EcsClusterName', { value: cluster.clusterName });
+    new cdk.CfnOutput(this, 'EcsServiceName', { value: fargateService.service.serviceName });
+    new cdk.CfnOutput(this, 'TaskDefFamily', { value: taskDef.family });
+    new cdk.CfnOutput(this, 'ALBDnsName', { value: fargateService.loadBalancer.loadBalancerDnsName });
+    new cdk.CfnOutput(this, 'DBSecretArn', { value: dbCluster.secret!.secretArn });
+    new cdk.CfnOutput(this, 'DBEndpoint', { value: dbCluster.clusterEndpoint.hostname });
+    new cdk.CfnOutput(this, 'RedisEndpoint', { value: redis.attrPrimaryEndPointAddress });
+    new cdk.CfnOutput(this, 'RedisPort', { value: redis.attrPrimaryEndPointPort });
+    new cdk.CfnOutput(this, 'FrontendBucketName', { value: frontendBucket.bucketName });
     new cdk.CfnOutput(this, 'AvatarBucketName', { value: avatarBucket.bucketName });
     new cdk.CfnOutput(this, 'WorkspaceBucketName', { value: workspaceBucket.bucketName });
-    new cdk.CfnOutput(this, 'AuthMode', { value: authMode });
-    new cdk.CfnOutput(this, 'EnableCdn', { value: enableCdn ? 'true' : 'false' });
-
-    // Outputs — Cognito (only when authMode=cognito)
-    if (userPool && appClient && cognitoDomainFull) {
-      new cdk.CfnOutput(this, 'CognitoUserPoolId', { value: userPool.userPoolId });
-      new cdk.CfnOutput(this, 'CognitoClientId', { value: appClient.userPoolClientId });
-      new cdk.CfnOutput(this, 'CognitoDomainUrl', { value: cognitoDomainFull });
-    }
-
-    // Outputs — CDN (only when enableCdn=true)
-    if (frontendBucket) {
-      new cdk.CfnOutput(this, 'FrontendBucketName', { value: frontendBucket.bucketName });
-    }
-    if (distribution) {
-      new cdk.CfnOutput(this, 'CloudFrontDistributionId', { value: distribution.distributionId });
-      new cdk.CfnOutput(this, 'CloudFrontDomainName', { value: distribution.distributionDomainName });
-    }
-    if (domainName) {
-      new cdk.CfnOutput(this, 'DomainName', { value: domainName });
-    }
+    new cdk.CfnOutput(this, 'CloudFrontDistId', { value: distribution.distributionId });
+    new cdk.CfnOutput(this, 'CloudFrontDomain', { value: distribution.distributionDomainName });
+    new cdk.CfnOutput(this, 'CloudFrontUrl', { value: `https://${distribution.distributionDomainName}` });
   }
 }

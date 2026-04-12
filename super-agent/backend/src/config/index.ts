@@ -42,7 +42,7 @@ const envSchema = z.object({
   COGNITO_ADMIN_SUB: z.string().optional(),
 
   // AWS
-  AWS_REGION: z.string().default('us-east-1'),
+  AWS_REGION: z.string().default('us-west-2'),
   AWS_ACCESS_KEY_ID: z.string().optional(),
   AWS_SECRET_ACCESS_KEY: z.string().optional(),
 
@@ -65,7 +65,7 @@ const envSchema = z.object({
   // Claude Agent SDK
   ANTHROPIC_API_KEY: z.string().optional(),
   CLAUDE_CODE_USE_BEDROCK: z.string().optional().default('false'),
-  CLAUDE_MODEL: z.string().optional().default('claude-sonnet-4-5-20250929'),
+  CLAUDE_MODEL: z.string().optional().default('claude-sonnet-4-6'),
   // Separate Bedrock credentials — only injected into the SDK subprocess,
   // so the main process keeps using the EC2 instance role for S3/Secrets/etc.
   BEDROCK_AWS_ACCESS_KEY_ID: z.string().optional(),
