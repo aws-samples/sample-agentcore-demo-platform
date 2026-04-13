@@ -1,0 +1,1849 @@
+[
+  {
+    "id": "public-opinion-monitoring",
+    "title": "舆情监测分析",
+    "description": "企业舆情监测与分析平台。多 Agent 协作实现从采集到研判的全链路自动化。",
+    "category": "enterprise",
+    "subcategory": "PR",
+    "icon": "📡",
+    "demoType": "interactive",
+    "demoUrl": "https://agent.thinkloop.me/agents",
+    "agentcoreServices": [
+      "Runtime"
+    ],
+    "awsServices": [
+      "Amazon Bedrock",
+      "RDS",
+      "S3",
+      "Cognito",
+      "EC2",
+      "CloudWatch"
+    ],
+    "framework": "Claude Agent SDK",
+    "status": "ready",
+    "sourceUrl": "https://github.com/aws-samples/sample-agentcore-demo-platform/tree/main/super-agent",
+    "agents": [
+      {
+        "name": "舆情采集专员",
+        "role": "负责舆情数据采集、筛选过滤与统计汇总",
+        "demoUrl": "https://agent.thinkloop.me/agents?id=78d37b88-0171-4260-b811-c6a9e0861df1"
+      },
+      {
+        "name": "舆情分析师",
+        "role": "负责舆情深度分析、风险研判与报告撰写",
+        "demoUrl": "https://agent.thinkloop.me/agents?id=119c1117-5fec-41fe-aaaa-a241f32edd4d"
+      }
+    ]
+  },
+  {
+    "id": "legal-department",
+    "title": "Legal Department",
+    "description": "企业法务部门全流程智能化。6 个 Agent 覆盖合同、知识产权、公司治理、合规、劳动法务和诉讼。",
+    "category": "enterprise",
+    "subcategory": "法务",
+    "icon": "⚖️",
+    "demoType": "interactive",
+    "demoUrl": "https://agent.thinkloop.me/agents",
+    "agentcoreServices": [
+      "Runtime"
+    ],
+    "awsServices": [
+      "Amazon Bedrock",
+      "RDS",
+      "S3",
+      "Cognito",
+      "EC2",
+      "CloudWatch"
+    ],
+    "framework": "Claude Agent SDK",
+    "status": "ready",
+    "sourceUrl": "https://github.com/aws-samples/sample-agentcore-demo-platform/tree/main/super-agent",
+    "agents": [
+      {
+        "name": "Contract Lifecycle Manager",
+        "role": "合同起草、审查、谈判与合规管理",
+        "demoUrl": "https://agent.thinkloop.me/agents?id=42a0eb08-a0c3-46af-88d8-494201fa760f"
+      },
+      {
+        "name": "Intellectual Property Counsel",
+        "role": "IP 组合策略、保护与开源合规",
+        "demoUrl": "https://agent.thinkloop.me/agents?id=a2ae5dff-6eca-4b30-b462-e0b3f3f0edbc"
+      },
+      {
+        "name": "Corporate Governance & Securities Advisor",
+        "role": "董事会运营、实体管理与公司交易",
+        "demoUrl": "https://agent.thinkloop.me/agents?id=66b31d6a-1444-4138-8781-810e39b436d7"
+      },
+      {
+        "name": "Regulatory Compliance & Privacy Counsel",
+        "role": "监管合规、数据隐私与政策遵从",
+        "demoUrl": "https://agent.thinkloop.me/agents?id=10528f6d-d2ed-446b-954d-d602dae3ece0"
+      },
+      {
+        "name": "Employment Law & HR Legal Advisor",
+        "role": "劳动法、职场政策与劳动合规",
+        "demoUrl": "https://agent.thinkloop.me/agents?id=3d55b8f1-d07e-475e-9774-fcd3b2e4397f"
+      },
+      {
+        "name": "Litigation & Dispute Resolution Counsel",
+        "role": "诉讼事务、争议调查与法律保全",
+        "demoUrl": "https://agent.thinkloop.me/agents?id=e6c62962-5eb0-4f46-b187-5a72853eee00"
+      }
+    ]
+  },
+  {
+    "id": "devops-ai-review",
+    "title": "DevOps AI Review",
+    "description": "智能代码审查与 DevOps 自动化。5 个 Agent 覆盖代码审查、安全扫描、CI/CD、规范治理和发布管理。",
+    "category": "enterprise",
+    "subcategory": "IT",
+    "icon": "🔍",
+    "demoType": "interactive",
+    "demoUrl": "https://agent.thinkloop.me/agents",
+    "agentcoreServices": [
+      "Runtime"
+    ],
+    "awsServices": [
+      "Amazon Bedrock",
+      "RDS",
+      "S3",
+      "Cognito",
+      "EC2",
+      "CloudWatch"
+    ],
+    "framework": "Claude Agent SDK",
+    "status": "ready",
+    "sourceUrl": "https://github.com/aws-samples/sample-agentcore-demo-platform/tree/main/super-agent",
+    "agents": [
+      {
+        "name": "Code Review Engine",
+        "role": "AI 代码审查",
+        "demoUrl": "https://agent.thinkloop.me/agents?id=f25cd457-bd7c-4ea8-8a2d-9a3e72d1a258"
+      },
+      {
+        "name": "Security Scanner",
+        "role": "安全漏洞、密钥泄露和依赖风险检测",
+        "demoUrl": "https://agent.thinkloop.me/agents?id=cecdb970-600f-4f57-8d3d-7e4c01df2deb"
+      },
+      {
+        "name": "CI/CD Integrator",
+        "role": "流水线集成、合并门控",
+        "demoUrl": "https://agent.thinkloop.me/agents?id=43054d5b-3165-42ca-b6b0-02e5e3295977"
+      },
+      {
+        "name": "Standards & Compliance Governor",
+        "role": "编码规范、提交约定和架构规则",
+        "demoUrl": "https://agent.thinkloop.me/agents?id=0077c287-9415-45df-a613-02b8334ce66a"
+      },
+      {
+        "name": "Rollout & Operations Manager",
+        "role": "分阶段发布、指标仪表盘",
+        "demoUrl": "https://agent.thinkloop.me/agents?id=f4209f23-d5ae-4f39-8ce4-450321eb9680"
+      }
+    ]
+  },
+  {
+    "id": "customer-support",
+    "title": "智能客服",
+    "description": "全渠道智能客服：咨询处理、故障排查、工单分类与升级。",
+    "category": "enterprise",
+    "subcategory": "客服",
+    "icon": "🎧",
+    "demoType": "interactive",
+    "agentcoreServices": [
+      "Runtime"
+    ],
+    "awsServices": [
+      "Amazon Bedrock"
+    ],
+    "framework": "Claude Agent SDK",
+    "status": "coming-soon",
+    "sourceUrl": "https://github.com/aws-samples/sample-agentcore-demo-platform/tree/main/super-agent"
+  },
+  {
+    "id": "sales-assistant",
+    "title": "销售智能助手",
+    "description": "销售线索管理、客户跟进、竞品分析、商务报价。",
+    "category": "enterprise",
+    "subcategory": "销售",
+    "icon": "💰",
+    "demoType": "interactive",
+    "agentcoreServices": [
+      "Runtime"
+    ],
+    "awsServices": [
+      "Amazon Bedrock"
+    ],
+    "framework": "Claude Agent SDK",
+    "status": "coming-soon",
+    "sourceUrl": "https://github.com/aws-samples/sample-agentcore-demo-platform/tree/main/super-agent"
+  },
+  {
+    "id": "marketing-content",
+    "title": "营销/广告",
+    "description": "个性化内容创作、广告文案生成、营销洞察分析。",
+    "category": "enterprise",
+    "subcategory": "营销/广告",
+    "icon": "📢",
+    "demoType": "interactive",
+    "agentcoreServices": [
+      "Runtime"
+    ],
+    "awsServices": [
+      "Amazon Bedrock"
+    ],
+    "framework": "Claude Agent SDK",
+    "status": "coming-soon",
+    "sourceUrl": "https://github.com/aws-samples/sample-agentcore-demo-platform/tree/main/super-agent"
+  },
+  {
+    "id": "hr-assistant",
+    "title": "HR 智能助手",
+    "description": "智能招聘筛选、员工服务、入职自动化。",
+    "category": "enterprise",
+    "subcategory": "HR",
+    "icon": "👥",
+    "demoType": "interactive",
+    "agentcoreServices": [
+      "Runtime"
+    ],
+    "awsServices": [
+      "Amazon Bedrock"
+    ],
+    "framework": "Claude Agent SDK",
+    "status": "coming-soon",
+    "sourceUrl": "https://github.com/aws-samples/sample-agentcore-demo-platform/tree/main/super-agent"
+  },
+  {
+    "id": "operations-assistant",
+    "title": "运营辅助",
+    "description": "合同审核、投标助手、运营数据自动化。",
+    "category": "enterprise",
+    "subcategory": "运营辅助",
+    "icon": "📋",
+    "demoType": "interactive",
+    "agentcoreServices": [
+      "Runtime"
+    ],
+    "awsServices": [
+      "Amazon Bedrock"
+    ],
+    "framework": "Claude Agent SDK",
+    "status": "coming-soon",
+    "sourceUrl": "https://github.com/aws-samples/sample-agentcore-demo-platform/tree/main/super-agent"
+  },
+  {
+    "id": "logistics-management",
+    "title": "物流管理",
+    "description": "智能物流调度、自动化仓储管理、配送路径优化。",
+    "category": "enterprise",
+    "subcategory": "物流管理",
+    "icon": "🚚",
+    "demoType": "interactive",
+    "agentcoreServices": [
+      "Runtime"
+    ],
+    "awsServices": [
+      "Amazon Bedrock"
+    ],
+    "framework": "Claude Agent SDK",
+    "status": "coming-soon",
+    "sourceUrl": "https://github.com/aws-samples/sample-agentcore-demo-platform/tree/main/super-agent"
+  },
+  {
+    "id": "supply-chain",
+    "title": "供应链管理",
+    "description": "采购助手、供应链报价处理、风险预警。",
+    "category": "enterprise",
+    "subcategory": "供应链",
+    "icon": "🔗",
+    "demoType": "interactive",
+    "agentcoreServices": [
+      "Runtime"
+    ],
+    "awsServices": [
+      "Amazon Bedrock"
+    ],
+    "framework": "Claude Agent SDK",
+    "status": "coming-soon",
+    "sourceUrl": "https://github.com/aws-samples/sample-agentcore-demo-platform/tree/main/super-agent"
+  },
+  {
+    "id": "finance",
+    "title": "财务",
+    "description": "企业财务规划、数据分析、会计自动化、合规报告。",
+    "category": "enterprise",
+    "subcategory": "财务",
+    "icon": "💹",
+    "demoType": "interactive",
+    "agentcoreServices": [
+      "Runtime"
+    ],
+    "awsServices": [
+      "Amazon Bedrock"
+    ],
+    "framework": "Claude Agent SDK",
+    "status": "coming-soon",
+    "sourceUrl": "https://github.com/aws-samples/sample-agentcore-demo-platform/tree/main/super-agent"
+  },
+  {
+    "id": "game-studio",
+    "title": "游戏工作室",
+    "description": "游戏研发团队多 Agent 协作：主策、主美、主程、制作人。",
+    "category": "industry",
+    "subcategory": "游戏",
+    "icon": "🎮",
+    "demoType": "interactive",
+    "demoUrl": "https://agent.thinkloop.me/agents",
+    "agentcoreServices": [
+      "Runtime"
+    ],
+    "awsServices": [
+      "Amazon Bedrock",
+      "RDS",
+      "S3",
+      "Cognito",
+      "EC2",
+      "CloudWatch"
+    ],
+    "framework": "Claude Agent SDK",
+    "status": "ready",
+    "sourceUrl": "https://github.com/aws-samples/sample-agentcore-demo-platform/tree/main/super-agent",
+    "agents": [
+      {
+        "name": "主策",
+        "role": "核心玩法设计与游戏体验架构师",
+        "demoUrl": "https://agent.thinkloop.me/agents?id=b17f32ba-e053-4d38-8574-d65f8c166b2a"
+      },
+      {
+        "name": "主美",
+        "role": "美术风格定义与视觉品质把控负责人",
+        "demoUrl": "https://agent.thinkloop.me/agents?id=9764439e-c18d-4766-9b1a-f986d16c2a36"
+      },
+      {
+        "name": "主程",
+        "role": "技术架构设计与程序团队技术负责人",
+        "demoUrl": "https://agent.thinkloop.me/agents?id=7a40ddf2-d394-4910-90ce-04bac152fc86"
+      },
+      {
+        "name": "制作人",
+        "role": "项目全局把控与团队协调决策领导者",
+        "demoUrl": "https://agent.thinkloop.me/agents?id=dd3061cf-a900-4153-8225-49704a5da4d2"
+      }
+    ]
+  },
+  {
+    "id": "slg-gaming-ops",
+    "title": "SLG Gaming Ops",
+    "description": "SLG 游戏运营：广告投放、数据分析、战争系统、促销策略、ROI 分析。",
+    "category": "industry",
+    "subcategory": "游戏",
+    "icon": "⚔️",
+    "demoType": "interactive",
+    "demoUrl": "https://agent.thinkloop.me/agents",
+    "agentcoreServices": [
+      "Runtime"
+    ],
+    "awsServices": [
+      "Amazon Bedrock",
+      "RDS",
+      "S3",
+      "Cognito",
+      "EC2",
+      "CloudWatch"
+    ],
+    "framework": "Claude Agent SDK",
+    "status": "ready",
+    "sourceUrl": "https://github.com/aws-samples/sample-agentcore-demo-platform/tree/main/super-agent",
+    "agents": [
+      {
+        "name": "Ads & Data Analyst",
+        "role": "广告创意设计与游戏数据分析",
+        "demoUrl": "https://agent.thinkloop.me/agents?id=4e71a382-995b-49c7-8526-2db58d929255"
+      },
+      {
+        "name": "Warfare & Campaign Designer",
+        "role": "战争系统与活动内容设计",
+        "demoUrl": "https://agent.thinkloop.me/agents?id=c48fbd10-18db-4be4-b5b1-5aa94e19f4ef"
+      },
+      {
+        "name": "Promotion Designer",
+        "role": "促销、活动与优惠策略设计",
+        "demoUrl": "https://agent.thinkloop.me/agents?id=3d21a1ba-573d-4168-9d56-20a896c1add6"
+      },
+      {
+        "name": "ROI Analyst",
+        "role": "收入与 ROI 分析",
+        "demoUrl": "https://agent.thinkloop.me/agents?id=2d959a8f-5742-4464-bdf6-a3dcdd99ea5d"
+      }
+    ]
+  },
+  {
+    "id": "game-data-analytics",
+    "title": "Game Data Analytics",
+    "description": "游戏数据分析：玩家行为、变现、性能监控、设计洞察、数据报告。",
+    "category": "industry",
+    "subcategory": "游戏",
+    "icon": "📊",
+    "demoType": "interactive",
+    "demoUrl": "https://agent.thinkloop.me/agents",
+    "agentcoreServices": [
+      "Runtime"
+    ],
+    "awsServices": [
+      "Amazon Bedrock",
+      "RDS",
+      "S3",
+      "Cognito",
+      "EC2",
+      "CloudWatch"
+    ],
+    "framework": "Claude Agent SDK",
+    "status": "ready",
+    "sourceUrl": "https://github.com/aws-samples/sample-agentcore-demo-platform/tree/main/super-agent",
+    "agents": [
+      {
+        "name": "Player Analytics Specialist",
+        "role": "玩家行为与用户分群",
+        "demoUrl": "https://agent.thinkloop.me/agents?id=5376e76c-8a64-42c6-b7c5-1cd46a566239"
+      },
+      {
+        "name": "Monetization Analyst",
+        "role": "收入流与定价策略",
+        "demoUrl": "https://agent.thinkloop.me/agents?id=3c187e74-3730-4d99-9646-7d22637a9116"
+      },
+      {
+        "name": "Performance Metrics Engineer",
+        "role": "性能 KPI 与系统优化",
+        "demoUrl": "https://agent.thinkloop.me/agents?id=344d4466-424e-44d6-9e9a-688a638ecb37"
+      },
+      {
+        "name": "Game Design Insights Analyst",
+        "role": "数据驱动的设计建议",
+        "demoUrl": "https://agent.thinkloop.me/agents?id=57a6f1fa-d9b9-41c5-9bee-b2792cdb06c6"
+      },
+      {
+        "name": "Data Reporting Specialist",
+        "role": "报告、仪表盘与可视化",
+        "demoUrl": "https://agent.thinkloop.me/agents?id=b63ba970-dcb0-4ece-870d-8d0e177834d7"
+      }
+    ]
+  },
+  {
+    "id": "game-promotion-hub",
+    "title": "Game Promotion Hub",
+    "description": "游戏推广运营：推广数据分析、KOL 合作管理、内容创作。",
+    "category": "industry",
+    "subcategory": "游戏",
+    "icon": "📣",
+    "demoType": "interactive",
+    "demoUrl": "https://agent.thinkloop.me/agents",
+    "agentcoreServices": [
+      "Runtime"
+    ],
+    "awsServices": [
+      "Amazon Bedrock",
+      "RDS",
+      "S3",
+      "Cognito",
+      "EC2",
+      "CloudWatch"
+    ],
+    "framework": "Claude Agent SDK",
+    "status": "ready",
+    "sourceUrl": "https://github.com/aws-samples/sample-agentcore-demo-platform/tree/main/super-agent",
+    "agents": [
+      {
+        "name": "Promotion Data Analyst",
+        "role": "推广活动数据分析与优化",
+        "demoUrl": "https://agent.thinkloop.me/agents?id=ec80f6b4-97e0-4fba-bdfc-734368f51c63"
+      },
+      {
+        "name": "KOL Partnership Manager",
+        "role": "KOL 识别、招募与关系管理",
+        "demoUrl": "https://agent.thinkloop.me/agents?id=94969e8f-2168-40b7-86e4-3a9254af0d5f"
+      },
+      {
+        "name": "Content Creator Specialist",
+        "role": "多渠道推广内容创作",
+        "demoUrl": "https://agent.thinkloop.me/agents?id=ec35dae6-8d62-469b-9fc5-f65baa3148a9"
+      }
+    ]
+  },
+  {
+    "id": "game-company-ops",
+    "title": "Game Company Operations",
+    "description": "游戏公司运营：运营策略、内容审核、玩家支持、直播运营、社区管理。",
+    "category": "industry",
+    "subcategory": "游戏",
+    "icon": "🏢",
+    "demoType": "interactive",
+    "demoUrl": "https://agent.thinkloop.me/agents",
+    "agentcoreServices": [
+      "Runtime"
+    ],
+    "awsServices": [
+      "Amazon Bedrock",
+      "RDS",
+      "S3",
+      "Cognito",
+      "EC2",
+      "CloudWatch"
+    ],
+    "framework": "Claude Agent SDK",
+    "status": "ready",
+    "sourceUrl": "https://github.com/aws-samples/sample-agentcore-demo-platform/tree/main/super-agent",
+    "agents": [
+      {
+        "name": "Operations Strategist",
+        "role": "运营策略与跨团队协调",
+        "demoUrl": "https://agent.thinkloop.me/agents?id=f21157da-fd2f-4690-a671-b160de9a2208"
+      },
+      {
+        "name": "Content Moderation Manager",
+        "role": "社区规范与内容审核",
+        "demoUrl": "https://agent.thinkloop.me/agents?id=853692cd-1532-4ebb-a2fe-3a2d70ae0570"
+      },
+      {
+        "name": "Player Support Lead",
+        "role": "客户支持与问题解决",
+        "demoUrl": "https://agent.thinkloop.me/agents?id=4d4af0a1-ebba-477b-8941-84261430f801"
+      },
+      {
+        "name": "Live Operations Coordinator",
+        "role": "直播运营与赛季内容",
+        "demoUrl": "https://agent.thinkloop.me/agents?id=5cac530d-14c3-4984-9f33-9461782dec9d"
+      },
+      {
+        "name": "Community Manager",
+        "role": "玩家社区与社交运营",
+        "demoUrl": "https://agent.thinkloop.me/agents?id=b50790af-433a-4803-bea0-cb91f42beb49"
+      }
+    ]
+  },
+  {
+    "id": "fashion-ecommerce",
+    "title": "Fashion E-Commerce",
+    "description": "时尚电商智能运营：商业分析、内容营销、库存管理、客户支持。",
+    "category": "industry",
+    "subcategory": "零售",
+    "icon": "👗",
+    "demoType": "interactive",
+    "demoUrl": "https://agent.thinkloop.me/agents",
+    "agentcoreServices": [
+      "Runtime"
+    ],
+    "awsServices": [
+      "Amazon Bedrock",
+      "RDS",
+      "S3",
+      "Cognito",
+      "EC2",
+      "CloudWatch"
+    ],
+    "framework": "Claude Agent SDK",
+    "status": "ready",
+    "sourceUrl": "https://github.com/aws-samples/sample-agentcore-demo-platform/tree/main/super-agent",
+    "agents": [
+      {
+        "name": "Analytics & Insights Agent",
+        "role": "商业指标分析与增长洞察",
+        "demoUrl": "https://agent.thinkloop.me/agents?id=3313d529-b2c9-4636-8860-b5186e6a9daa"
+      },
+      {
+        "name": "Content & Marketing Agent",
+        "role": "产品内容创作与营销素材",
+        "demoUrl": "https://agent.thinkloop.me/agents?id=9395538a-f217-4a18-8be7-0ab9425efbeb"
+      },
+      {
+        "name": "Inventory Manager Agent",
+        "role": "库存监控与多渠道管理",
+        "demoUrl": "https://agent.thinkloop.me/agents?id=c79d6abd-3e91-4807-84e4-82bba374ef41"
+      },
+      {
+        "name": "Customer Support Agent",
+        "role": "客户咨询与产品协助",
+        "demoUrl": "https://agent.thinkloop.me/agents?id=f9e92513-a786-4708-b8b1-b12cbd85aa94"
+      }
+    ]
+  },
+  {
+    "id": "financial-support-ops",
+    "title": "FinancialSupport Ops",
+    "description": "金融催收与风控：合规质检、智能外呼、风险分配、用户画像评分。",
+    "category": "industry",
+    "subcategory": "金融",
+    "icon": "🏦",
+    "demoType": "interactive",
+    "demoUrl": "https://agent.thinkloop.me/agents",
+    "agentcoreServices": [
+      "Runtime"
+    ],
+    "awsServices": [
+      "Amazon Bedrock",
+      "RDS",
+      "S3",
+      "Cognito",
+      "EC2",
+      "CloudWatch"
+    ],
+    "framework": "Claude Agent SDK",
+    "status": "ready",
+    "sourceUrl": "https://github.com/aws-samples/sample-agentcore-demo-platform/tree/main/super-agent",
+    "agents": [
+      {
+        "name": "Compliance & Quality Inspector",
+        "role": "通话质检、违规检测",
+        "demoUrl": "https://agent.thinkloop.me/agents?id=0d88671e-9f38-44be-a888-8c699e82690a"
+      },
+      {
+        "name": "Intelligent Outreach Architect",
+        "role": "外呼执行与渠道路由",
+        "demoUrl": "https://agent.thinkloop.me/agents?id=78c93c56-97e9-4f7c-90fc-ce669f6483cb"
+      },
+      {
+        "name": "Risk & Allocation Strategist",
+        "role": "分配规则与催收策略",
+        "demoUrl": "https://agent.thinkloop.me/agents?id=a87f4a98-fa30-4f72-b3c3-9b8040bae3ee"
+      },
+      {
+        "name": "Profile & Scoring Analyst",
+        "role": "用户画像与信用评分",
+        "demoUrl": "https://agent.thinkloop.me/agents?id=f01994b2-6e46-4b48-a54f-e8757795b8c7"
+      }
+    ]
+  },
+  {
+    "id": "medical-registration",
+    "title": "医疗注册文档",
+    "description": "医疗产品注册申报：法规文档撰写与合规审核。",
+    "category": "industry",
+    "subcategory": "医疗",
+    "icon": "🏥",
+    "demoType": "interactive",
+    "demoUrl": "https://agent.thinkloop.me/agents",
+    "agentcoreServices": [
+      "Runtime"
+    ],
+    "awsServices": [
+      "Amazon Bedrock",
+      "RDS",
+      "S3",
+      "Cognito",
+      "EC2",
+      "CloudWatch"
+    ],
+    "framework": "Claude Agent SDK",
+    "status": "ready",
+    "sourceUrl": "https://github.com/aws-samples/sample-agentcore-demo-platform/tree/main/super-agent",
+    "agents": [
+      {
+        "name": "法规文档撰写专家",
+        "role": "负责医疗产品注册申报文档的起草与编写",
+        "demoUrl": "https://agent.thinkloop.me/agents?id=85969237-e053-4bf9-9f22-2e66391a97ae"
+      },
+      {
+        "name": "合规审核顾问",
+        "role": "负责注册文档的法规符合性审查与质量把控",
+        "demoUrl": "https://agent.thinkloop.me/agents?id=c932a4bf-74da-42a1-95c5-a3f5d28d4269"
+      }
+    ]
+  },
+  {
+    "id": "automotive",
+    "title": "汽车行业",
+    "description": "车辆估值、售后服务知识搜索、智能座舱助手。",
+    "category": "industry",
+    "subcategory": "汽车",
+    "icon": "🚗",
+    "demoType": "interactive",
+    "agentcoreServices": [
+      "Runtime"
+    ],
+    "awsServices": [
+      "Amazon Bedrock"
+    ],
+    "framework": "Claude Agent SDK",
+    "status": "coming-soon",
+    "sourceUrl": "https://github.com/aws-samples/sample-agentcore-demo-platform/tree/main/super-agent"
+  },
+  {
+    "id": "manufacturing",
+    "title": "制造业",
+    "description": "智能控制设备、客户反馈分析、IoT 设备管理与质量管控。",
+    "category": "industry",
+    "subcategory": "制造",
+    "icon": "🏭",
+    "demoType": "interactive",
+    "agentcoreServices": [
+      "Runtime"
+    ],
+    "awsServices": [
+      "Amazon Bedrock"
+    ],
+    "framework": "Claude Agent SDK",
+    "status": "coming-soon",
+    "sourceUrl": "https://github.com/aws-samples/sample-agentcore-demo-platform/tree/main/super-agent"
+  },
+  {
+    "id": "media",
+    "title": "媒体行业",
+    "description": "赛事内容分析、个性化推荐与智能赛事解读。",
+    "category": "industry",
+    "subcategory": "媒体",
+    "icon": "📺",
+    "demoType": "interactive",
+    "agentcoreServices": [
+      "Runtime"
+    ],
+    "awsServices": [
+      "Amazon Bedrock"
+    ],
+    "framework": "Claude Agent SDK",
+    "status": "coming-soon",
+    "sourceUrl": "https://github.com/aws-samples/sample-agentcore-demo-platform/tree/main/super-agent"
+  },
+  {
+    "id": "education",
+    "title": "教育行业",
+    "description": "智能客服、课程管理、FAQ 知识库、投诉升级。",
+    "category": "industry",
+    "subcategory": "教育",
+    "icon": "🎓",
+    "demoType": "interactive",
+    "agentcoreServices": [
+      "Runtime"
+    ],
+    "awsServices": [
+      "Amazon Bedrock"
+    ],
+    "framework": "Claude Agent SDK",
+    "status": "coming-soon",
+    "sourceUrl": "https://github.com/aws-samples/sample-agentcore-demo-platform/tree/main/super-agent"
+  },
+  {
+    "id": "smart-payment",
+    "title": "智能支付风控",
+    "description": "智能支付处理、自主交易风控。",
+    "category": "capability",
+    "subcategory": "支付",
+    "icon": "💳",
+    "demoType": "interactive",
+    "agentcoreServices": [
+      "Runtime"
+    ],
+    "awsServices": [
+      "Amazon Bedrock"
+    ],
+    "framework": "Any",
+    "status": "coming-soon",
+    "sourceUrl": "https://github.com/aws-samples/sample-agentcore-demo-platform/tree/main/super-agent"
+  },
+  {
+    "id": "smart-search",
+    "title": "智能搜索",
+    "description": "企业知识管理、语义搜索引擎。",
+    "category": "capability",
+    "subcategory": "智能搜索",
+    "icon": "🔎",
+    "demoType": "interactive",
+    "agentcoreServices": [
+      "Runtime"
+    ],
+    "awsServices": [
+      "Amazon Bedrock"
+    ],
+    "framework": "Any",
+    "status": "coming-soon",
+    "sourceUrl": "https://github.com/aws-samples/sample-agentcore-demo-platform/tree/main/super-agent"
+  },
+  {
+    "id": "content-generation",
+    "title": "内容生成/审核",
+    "description": "多代理内容创作、合规审核、智能修图、语音控制图像生成。",
+    "category": "capability",
+    "subcategory": "内容生成/审核",
+    "icon": "✍️",
+    "demoType": "interactive",
+    "agentcoreServices": [
+      "Runtime"
+    ],
+    "awsServices": [
+      "Amazon Bedrock"
+    ],
+    "framework": "Any",
+    "status": "coming-soon",
+    "sourceUrl": "https://github.com/aws-samples/sample-agentcore-demo-platform/tree/main/super-agent"
+  },
+  {
+    "id": "document-processing",
+    "title": "文档信息处理",
+    "description": "法律/文献/文档自动化分析、多通道语音交互、语言理解与情感分析。",
+    "category": "capability",
+    "subcategory": "文档信息处理",
+    "icon": "📄",
+    "demoType": "interactive",
+    "agentcoreServices": [
+      "Runtime"
+    ],
+    "awsServices": [
+      "Amazon Bedrock"
+    ],
+    "framework": "Any",
+    "status": "coming-soon",
+    "sourceUrl": "https://github.com/aws-samples/sample-agentcore-demo-platform/tree/main/super-agent"
+  },
+  {
+    "id": "tutorial-runtime",
+    "title": "01 — AgentCore Runtime",
+    "description": "安全的无服务器运行时，支持任何框架和模型部署 AI Agent。",
+    "category": "tutorial",
+    "subcategory": "Runtime",
+    "icon": "▸",
+    "demoType": "notebook",
+    "agentcoreServices": [
+      "Runtime"
+    ],
+    "awsServices": [
+      "Amazon Bedrock"
+    ],
+    "framework": "Any",
+    "status": "ready",
+    "sourceUrl": "https://github.com/awslabs/agentcore-samples/tree/main/01-tutorials/01-AgentCore-runtime",
+    "frameworks": [
+      "Strands",
+      "LangChain",
+      "LangGraph",
+      "CrewAI"
+    ],
+    "architectureImage": "https://raw.githubusercontent.com/awslabs/agentcore-samples/main/01-tutorials/01-AgentCore-runtime/images/runtime_overview.png",
+    "labs": [
+      {
+        "step": 1,
+        "title": "Hosting Agent",
+        "description": "托管 AI Agent 到 Runtime",
+        "url": "https://github.com/awslabs/agentcore-samples/tree/main/01-tutorials/01-AgentCore-runtime/01-hosting-agent"
+      },
+      {
+        "step": 2,
+        "title": "Hosting MCP Server",
+        "description": "托管 MCP 服务器",
+        "url": "https://github.com/awslabs/agentcore-samples/tree/main/01-tutorials/01-AgentCore-runtime/02-hosting-MCP-server"
+      },
+      {
+        "step": 3,
+        "title": "Advanced Concepts",
+        "description": "高级概念与配置",
+        "url": "https://github.com/awslabs/agentcore-samples/tree/main/01-tutorials/01-AgentCore-runtime/03-advanced-concepts"
+      },
+      {
+        "step": 4,
+        "title": "Hosting TS MCP Server",
+        "description": "托管 TypeScript MCP 服务器",
+        "url": "https://github.com/awslabs/agentcore-samples/tree/main/01-tutorials/01-AgentCore-runtime/04-hosting-ts-MCP-server"
+      },
+      {
+        "step": 5,
+        "title": "Hosting A2A",
+        "description": "Agent-to-Agent 通信",
+        "url": "https://github.com/awslabs/agentcore-samples/tree/main/01-tutorials/01-AgentCore-runtime/05-hosting-a2a"
+      },
+      {
+        "step": 6,
+        "title": "Bi-directional Streaming",
+        "description": "双向流式通信",
+        "url": "https://github.com/awslabs/agentcore-samples/tree/main/01-tutorials/01-AgentCore-runtime/06-bi-directional-streaming"
+      },
+      {
+        "step": 7,
+        "title": "MCP Dynamic Client Registration",
+        "description": "MCP 动态客户端注册",
+        "url": "https://github.com/awslabs/agentcore-samples/tree/main/01-tutorials/01-AgentCore-runtime/07-mcp-dynamic-client-registration"
+      },
+      {
+        "step": 8,
+        "title": "MCP E2E",
+        "description": "MCP 端到端示例",
+        "url": "https://github.com/awslabs/agentcore-samples/tree/main/01-tutorials/01-AgentCore-runtime/08-mcp-e2e"
+      },
+      {
+        "step": 9,
+        "title": "Execute Command",
+        "description": "命令执行",
+        "url": "https://github.com/awslabs/agentcore-samples/tree/main/01-tutorials/01-AgentCore-runtime/09-execute-command"
+      },
+      {
+        "step": 10,
+        "title": "Managed Session Storage",
+        "description": "托管会话存储",
+        "url": "https://github.com/awslabs/agentcore-samples/tree/main/01-tutorials/01-AgentCore-runtime/10-managed-session-storage"
+      },
+      {
+        "step": 11,
+        "title": "AG-UI Examples",
+        "description": "AG-UI 协议示例",
+        "url": "https://github.com/awslabs/agentcore-samples/tree/main/01-tutorials/01-AgentCore-runtime/11-ag-ui-examples"
+      }
+    ]
+  },
+  {
+    "id": "tutorial-gateway",
+    "title": "02 — AgentCore Gateway",
+    "description": "将现有 API 和 Lambda 函数转换为完全托管的 MCP 服务器。",
+    "category": "tutorial",
+    "subcategory": "Gateway",
+    "icon": "▸",
+    "demoType": "notebook",
+    "agentcoreServices": [
+      "Gateway"
+    ],
+    "awsServices": [
+      "Lambda",
+      "API Gateway"
+    ],
+    "framework": "Strands Agents",
+    "status": "ready",
+    "sourceUrl": "https://github.com/awslabs/agentcore-samples/tree/main/01-tutorials/02-AgentCore-gateway",
+    "frameworks": [
+      "Strands"
+    ],
+    "architectureImage": "https://raw.githubusercontent.com/awslabs/agentcore-samples/main/01-tutorials/02-AgentCore-gateway/images/gateway-end-end-overview.png",
+    "labs": [
+      {
+        "step": 1,
+        "title": "Lambda → MCP Tools",
+        "description": "将 Lambda 转换为 MCP 工具",
+        "url": "https://github.com/awslabs/agentcore-samples/tree/main/01-tutorials/02-AgentCore-gateway/01-transform-lambda-into-mcp-tools"
+      },
+      {
+        "step": 2,
+        "title": "APIs → MCP Tools",
+        "description": "将 API 转换为 MCP 工具",
+        "url": "https://github.com/awslabs/agentcore-samples/tree/main/01-tutorials/02-AgentCore-gateway/02-transform-apis-into-mcp-tools"
+      },
+      {
+        "step": 3,
+        "title": "Search Tools",
+        "description": "语义搜索工具发现",
+        "url": "https://github.com/awslabs/agentcore-samples/tree/main/01-tutorials/02-AgentCore-gateway/03-search-tools"
+      },
+      {
+        "step": 4,
+        "title": "Integration",
+        "description": "框架集成",
+        "url": "https://github.com/awslabs/agentcore-samples/tree/main/01-tutorials/02-AgentCore-gateway/04-integration"
+      },
+      {
+        "step": 5,
+        "title": "MCP Server as Target",
+        "description": "MCP 服务器作为目标",
+        "url": "https://github.com/awslabs/agentcore-samples/tree/main/01-tutorials/02-AgentCore-gateway/05-mcp-server-as-a-target"
+      },
+      {
+        "step": 6,
+        "title": "Gateway Observability",
+        "description": "Gateway 可观测性",
+        "url": "https://github.com/awslabs/agentcore-samples/tree/main/01-tutorials/02-AgentCore-gateway/06-gateway-observability"
+      },
+      {
+        "step": 7,
+        "title": "Bearer Token Injection",
+        "description": "Bearer Token 注入",
+        "url": "https://github.com/awslabs/agentcore-samples/tree/main/01-tutorials/02-AgentCore-gateway/07-bearer-token-injection"
+      },
+      {
+        "step": 8,
+        "title": "Custom Header Propagation",
+        "description": "自定义 Header 传播",
+        "url": "https://github.com/awslabs/agentcore-samples/tree/main/01-tutorials/02-AgentCore-gateway/08-custom-header-propagation"
+      },
+      {
+        "step": 9,
+        "title": "Fine-Grained Access Control",
+        "description": "细粒度访问控制",
+        "url": "https://github.com/awslabs/agentcore-samples/tree/main/01-tutorials/02-AgentCore-gateway/09-fine-grained-access-control"
+      },
+      {
+        "step": 10,
+        "title": "Sensitive Data Masking",
+        "description": "敏感数据脱敏",
+        "url": "https://github.com/awslabs/agentcore-samples/tree/main/01-tutorials/02-AgentCore-gateway/10-sensitive-data-masking"
+      },
+      {
+        "step": 11,
+        "title": "API Gateway as Target",
+        "description": "API Gateway 作为目标",
+        "url": "https://github.com/awslabs/agentcore-samples/tree/main/01-tutorials/02-AgentCore-gateway/11-api-gateway-as-a-target"
+      },
+      {
+        "step": 12,
+        "title": "Agents as Tools via MCP",
+        "description": "通过 MCP 将 Agent 作为工具",
+        "url": "https://github.com/awslabs/agentcore-samples/tree/main/01-tutorials/02-AgentCore-gateway/12-agents-as-tools-using-mcp"
+      },
+      {
+        "step": 13,
+        "title": "Outbound Auth Code Grant",
+        "description": "出站授权码授权",
+        "url": "https://github.com/awslabs/agentcore-samples/tree/main/01-tutorials/02-AgentCore-gateway/13-outbound-auth-code-grant"
+      },
+      {
+        "step": 14,
+        "title": "Token Exchange Interceptor",
+        "description": "Token 交换拦截器",
+        "url": "https://github.com/awslabs/agentcore-samples/tree/main/01-tutorials/02-AgentCore-gateway/14-token-exchange-at-request-interceptor"
+      },
+      {
+        "step": 15,
+        "title": "Prevent SQL Injection",
+        "description": "防止 SQL 注入",
+        "url": "https://github.com/awslabs/agentcore-samples/tree/main/01-tutorials/02-AgentCore-gateway/15-prevent-sql-injection"
+      },
+      {
+        "step": 16,
+        "title": "VPC Egress",
+        "description": "VPC 出站流量",
+        "url": "https://github.com/awslabs/agentcore-samples/tree/main/01-tutorials/02-AgentCore-gateway/16-vpc-egress"
+      }
+    ]
+  },
+  {
+    "id": "tutorial-identity",
+    "title": "03 — AgentCore Identity",
+    "description": "专为 AI Agent 设计的综合身份和凭证管理服务。",
+    "category": "tutorial",
+    "subcategory": "Identity",
+    "icon": "▸",
+    "demoType": "notebook",
+    "agentcoreServices": [
+      "Identity"
+    ],
+    "awsServices": [
+      "Cognito",
+      "IAM"
+    ],
+    "framework": "Any",
+    "status": "ready",
+    "sourceUrl": "https://github.com/awslabs/agentcore-samples/tree/main/01-tutorials/03-AgentCore-identity",
+    "frameworks": [
+      "Strands",
+      "LangGraph",
+      "CrewAI"
+    ],
+    "architectureImage": "https://raw.githubusercontent.com/awslabs/agentcore-samples/main/01-tutorials/03-AgentCore-identity/images/how_it_works.png",
+    "labs": [
+      {
+        "step": 1,
+        "title": "Inbound Auth",
+        "description": "入站认证示例",
+        "url": "https://github.com/awslabs/agentcore-samples/tree/main/01-tutorials/03-AgentCore-identity/03-Inbound Auth example"
+      },
+      {
+        "step": 2,
+        "title": "Outbound Auth",
+        "description": "出站认证示例",
+        "url": "https://github.com/awslabs/agentcore-samples/tree/main/01-tutorials/03-AgentCore-identity/04-Outbound Auth example"
+      },
+      {
+        "step": 3,
+        "title": "Outbound Auth 3LO",
+        "description": "三方 OAuth 出站认证",
+        "url": "https://github.com/awslabs/agentcore-samples/tree/main/01-tutorials/03-AgentCore-identity/05-Outbound_Auth_3lo"
+      },
+      {
+        "step": 4,
+        "title": "GitHub OAuth",
+        "description": "GitHub 出站认证",
+        "url": "https://github.com/awslabs/agentcore-samples/tree/main/01-tutorials/03-AgentCore-identity/06-Outbound_Auth_Github"
+      },
+      {
+        "step": 5,
+        "title": "ECS Fargate 3LO",
+        "description": "ECS Fargate 三方 OAuth",
+        "url": "https://github.com/awslabs/agentcore-samples/tree/main/01-tutorials/03-AgentCore-identity/07-Outbound_Auth_3LO_ECS_Fargate"
+      },
+      {
+        "step": 6,
+        "title": "IDP Examples",
+        "description": "EntraID / Okta 集成",
+        "url": "https://github.com/awslabs/agentcore-samples/tree/main/01-tutorials/03-AgentCore-identity/08-IDP-examples"
+      },
+      {
+        "step": 7,
+        "title": "Self-Hosted Outbound Auth",
+        "description": "自托管出站认证",
+        "url": "https://github.com/awslabs/agentcore-samples/tree/main/01-tutorials/03-AgentCore-identity/09-Outbound_Auth_Self_Hosted"
+      },
+      {
+        "step": 8,
+        "title": "Runtime Inbound/Outbound",
+        "description": "Runtime 入站出站认证",
+        "url": "https://github.com/awslabs/agentcore-samples/tree/main/01-tutorials/03-AgentCore-identity/10-runtime-inbound-outbound-auth"
+      },
+      {
+        "step": 9,
+        "title": "Gateway Inbound/Outbound",
+        "description": "Gateway 入站出站认证",
+        "url": "https://github.com/awslabs/agentcore-samples/tree/main/01-tutorials/03-AgentCore-identity/11-gateway-inbound-outbound-auth"
+      },
+      {
+        "step": 10,
+        "title": "M2M 3LO Runtime",
+        "description": "机器对机器三方 OAuth",
+        "url": "https://github.com/awslabs/agentcore-samples/tree/main/01-tutorials/03-AgentCore-identity/12-m2m-3lo-runtime"
+      }
+    ]
+  },
+  {
+    "id": "tutorial-memory",
+    "title": "04 — AgentCore Memory",
+    "description": "托管记忆服务：短期、长期、分支记忆，跨会话维护上下文。",
+    "category": "tutorial",
+    "subcategory": "Memory",
+    "icon": "▸",
+    "demoType": "notebook",
+    "agentcoreServices": [
+      "Memory"
+    ],
+    "awsServices": [
+      "Amazon Bedrock",
+      "DynamoDB"
+    ],
+    "framework": "Any",
+    "status": "ready",
+    "sourceUrl": "https://github.com/awslabs/agentcore-samples/tree/main/01-tutorials/04-AgentCore-memory",
+    "frameworks": [
+      "Strands",
+      "LangGraph",
+      "LlamaIndex"
+    ],
+    "architectureImage": "https://raw.githubusercontent.com/awslabs/agentcore-samples/main/01-tutorials/04-AgentCore-memory/images/high_level_memory.png",
+    "labs": [
+      {
+        "step": 1,
+        "title": "Short-Term Memory",
+        "description": "短期记忆：会话内上下文",
+        "url": "https://github.com/awslabs/agentcore-samples/tree/main/01-tutorials/04-AgentCore-memory/01-short-term-memory"
+      },
+      {
+        "step": 2,
+        "title": "Long-Term Memory",
+        "description": "长期记忆：跨会话持久化",
+        "url": "https://github.com/awslabs/agentcore-samples/tree/main/01-tutorials/04-AgentCore-memory/02-long-term-memory"
+      },
+      {
+        "step": 3,
+        "title": "Advanced Patterns",
+        "description": "Guardrails 集成、Memory Browser",
+        "url": "https://github.com/awslabs/agentcore-samples/tree/main/01-tutorials/04-AgentCore-memory/03-advanced-patterns"
+      },
+      {
+        "step": 4,
+        "title": "Memory Branching",
+        "description": "记忆分支与并行执行",
+        "url": "https://github.com/awslabs/agentcore-samples/tree/main/01-tutorials/04-AgentCore-memory/04-memory-branching"
+      },
+      {
+        "step": 5,
+        "title": "Security Patterns",
+        "description": "IAM 策略、Cognito 身份集成",
+        "url": "https://github.com/awslabs/agentcore-samples/tree/main/01-tutorials/04-AgentCore-memory/05-memory-security-patterns"
+      }
+    ]
+  },
+  {
+    "id": "tutorial-tools",
+    "title": "05 — AgentCore Tools",
+    "description": "企业级工具套件：Code Interpreter 安全沙箱 + Browser Tool 网页浏览。",
+    "category": "tutorial",
+    "subcategory": "Tools",
+    "icon": "▸",
+    "demoType": "notebook",
+    "agentcoreServices": [
+      "Tools"
+    ],
+    "awsServices": [
+      "Amazon Bedrock",
+      "S3",
+      "Lambda"
+    ],
+    "framework": "Any",
+    "status": "ready",
+    "sourceUrl": "https://github.com/awslabs/agentcore-samples/tree/main/01-tutorials/05-AgentCore-tools",
+    "frameworks": [
+      "Strands",
+      "LangGraph",
+      "CrewAI"
+    ],
+    "labs": [
+      {
+        "step": 1,
+        "title": "Code Interpreter",
+        "description": "安全代码执行沙箱",
+        "url": "https://github.com/awslabs/agentcore-samples/tree/main/01-tutorials/05-AgentCore-tools/01-Agent-Core-code-interpreter"
+      },
+      {
+        "step": 2,
+        "title": "Browser Tool",
+        "description": "网页浏览与自动化",
+        "url": "https://github.com/awslabs/agentcore-samples/tree/main/01-tutorials/05-AgentCore-tools/02-Agent-Core-browser-tool"
+      }
+    ]
+  },
+  {
+    "id": "tutorial-observability",
+    "title": "06 — AgentCore Observability",
+    "description": "使用 CloudWatch 和 OpenTelemetry 实现 Agent 全链路可观测性。",
+    "category": "tutorial",
+    "subcategory": "Observability",
+    "icon": "▸",
+    "demoType": "notebook",
+    "agentcoreServices": [
+      "Observability"
+    ],
+    "awsServices": [
+      "CloudWatch",
+      "X-Ray"
+    ],
+    "framework": "Any",
+    "status": "ready",
+    "sourceUrl": "https://github.com/awslabs/agentcore-samples/tree/main/01-tutorials/06-AgentCore-observability",
+    "frameworks": [
+      "Strands",
+      "CrewAI",
+      "LangGraph",
+      "LlamaIndex"
+    ],
+    "labs": [
+      {
+        "step": 0,
+        "title": "Enable Transaction Search",
+        "description": "启用 CloudWatch Transaction Search",
+        "url": "https://github.com/awslabs/agentcore-samples/tree/main/01-tutorials/06-AgentCore-observability/00-enable-transaction-search-template"
+      },
+      {
+        "step": 1,
+        "title": "Runtime Hosted Agent",
+        "description": "Runtime 托管 Agent 可观测性",
+        "url": "https://github.com/awslabs/agentcore-samples/tree/main/01-tutorials/06-AgentCore-observability/01-Agentcore-runtime-hosted"
+      },
+      {
+        "step": 2,
+        "title": "Non-Runtime Agent",
+        "description": "非 Runtime 托管 Agent",
+        "url": "https://github.com/awslabs/agentcore-samples/tree/main/01-tutorials/06-AgentCore-observability/02-Agent-not-hosted-on-runtime"
+      },
+      {
+        "step": 3,
+        "title": "Advanced Concepts",
+        "description": "自定义 Span 创建",
+        "url": "https://github.com/awslabs/agentcore-samples/tree/main/01-tutorials/06-AgentCore-observability/03-advanced-concepts"
+      },
+      {
+        "step": 4,
+        "title": "Partner Observability",
+        "description": "Arize、Datadog、Langfuse 等",
+        "url": "https://github.com/awslabs/agentcore-samples/tree/main/01-tutorials/06-AgentCore-observability/04-Agentcore-runtime-partner-observability"
+      },
+      {
+        "step": 5,
+        "title": "Lambda Invocation",
+        "description": "Lambda AgentCore 调用",
+        "url": "https://github.com/awslabs/agentcore-samples/tree/main/01-tutorials/06-AgentCore-observability/05-Lambda-AgentCore-invocation"
+      },
+      {
+        "step": 6,
+        "title": "EKS Hosted Agent",
+        "description": "EKS 托管 Agent 可观测性",
+        "url": "https://github.com/awslabs/agentcore-samples/tree/main/01-tutorials/06-AgentCore-observability/06-Agentcore-observability-for-eks-hosted-agent"
+      }
+    ]
+  },
+  {
+    "id": "tutorial-evaluations",
+    "title": "07 — AgentCore Evaluations",
+    "description": "13 个内置评估器 + 自定义评估器，基于真实交互优化 Agent 质量。",
+    "category": "tutorial",
+    "subcategory": "Evaluations",
+    "icon": "▸",
+    "demoType": "notebook",
+    "agentcoreServices": [
+      "Evaluations"
+    ],
+    "awsServices": [
+      "Amazon Bedrock",
+      "CloudWatch"
+    ],
+    "framework": "Any",
+    "status": "ready",
+    "sourceUrl": "https://github.com/awslabs/agentcore-samples/tree/main/01-tutorials/07-AgentCore-evaluations",
+    "labs": [
+      {
+        "step": 0,
+        "title": "Prerequisites",
+        "description": "前置条件与环境准备",
+        "url": "https://github.com/awslabs/agentcore-samples/tree/main/01-tutorials/07-AgentCore-evaluations/00-prereqs"
+      },
+      {
+        "step": 1,
+        "title": "Custom Evaluators",
+        "description": "创建自定义评估器",
+        "url": "https://github.com/awslabs/agentcore-samples/tree/main/01-tutorials/07-AgentCore-evaluations/01-creating-custom-evaluators"
+      },
+      {
+        "step": 2,
+        "title": "Running Evaluations",
+        "description": "按需评估与在线评估",
+        "url": "https://github.com/awslabs/agentcore-samples/tree/main/01-tutorials/07-AgentCore-evaluations/02-running-evaluations"
+      },
+      {
+        "step": 3,
+        "title": "Advanced",
+        "description": "高级评估功能",
+        "url": "https://github.com/awslabs/agentcore-samples/tree/main/01-tutorials/07-AgentCore-evaluations/03-advanced"
+      },
+      {
+        "step": 4,
+        "title": "Using Results",
+        "description": "评估结果使用与可视化",
+        "url": "https://github.com/awslabs/agentcore-samples/tree/main/01-tutorials/07-AgentCore-evaluations/04-using-evaluation-results"
+      },
+      {
+        "step": 5,
+        "title": "Ground Truth Evaluations",
+        "description": "基于真值的评估",
+        "url": "https://github.com/awslabs/agentcore-samples/tree/main/01-tutorials/07-AgentCore-evaluations/05-groundtruth-based-evalautions"
+      },
+      {
+        "step": 6,
+        "title": "Programmatic Evaluators",
+        "description": "编程式评估器",
+        "url": "https://github.com/awslabs/agentcore-samples/tree/main/01-tutorials/07-AgentCore-evaluations/06-programmatic_evaluators"
+      }
+    ]
+  },
+  {
+    "id": "tutorial-policy",
+    "title": "08 — AgentCore Policy",
+    "description": "使用 Cedar 语言定义和执行安全策略，细粒度访问控制。",
+    "category": "tutorial",
+    "subcategory": "Policy",
+    "icon": "▸",
+    "demoType": "notebook",
+    "agentcoreServices": [
+      "Policy"
+    ],
+    "awsServices": [
+      "IAM",
+      "CloudWatch"
+    ],
+    "framework": "Any",
+    "status": "ready",
+    "sourceUrl": "https://github.com/awslabs/agentcore-samples/tree/main/01-tutorials/08-AgentCore-policy",
+    "labs": [
+      {
+        "step": 1,
+        "title": "Getting Started",
+        "description": "入门与基础概念",
+        "url": "https://github.com/awslabs/agentcore-samples/tree/main/01-tutorials/08-AgentCore-policy/01-Getting-Started"
+      },
+      {
+        "step": 2,
+        "title": "Natural Language Authoring",
+        "description": "自然语言策略编写",
+        "url": "https://github.com/awslabs/agentcore-samples/tree/main/01-tutorials/08-AgentCore-policy/02-Natural-Language-Policy-Authoring"
+      },
+      {
+        "step": 3,
+        "title": "Fine-Grained Access Control",
+        "description": "细粒度访问控制",
+        "url": "https://github.com/awslabs/agentcore-samples/tree/main/01-tutorials/08-AgentCore-policy/03-Fine-Grained-Access-Control"
+      }
+    ]
+  },
+  {
+    "id": "tutorial-e2e",
+    "title": "09 — 端到端实战",
+    "description": "从原型到生产构建完整的客户支持 Agent，6 个实验室逐步实践。",
+    "category": "tutorial",
+    "subcategory": "研发",
+    "icon": "▸",
+    "demoType": "walkthrough",
+    "estimatedTime": "约 45 分钟",
+    "estimatedCost": "< $10 / 天",
+    "agentcoreServices": [
+      "Runtime"
+    ],
+    "awsServices": [
+      "Amazon Bedrock",
+      "Lambda",
+      "DynamoDB",
+      "CloudWatch",
+      "Cognito"
+    ],
+    "framework": "Strands Agents",
+    "status": "ready",
+    "sourceUrl": "https://github.com/awslabs/agentcore-samples/tree/main/01-tutorials/09-AgentCore-E2E",
+    "frameworks": [
+      "Strands"
+    ],
+    "labs": [
+      {
+        "step": 1,
+        "title": "Strands Agents",
+        "description": "使用 Strands 框架构建",
+        "url": "https://github.com/awslabs/agentcore-samples/tree/main/01-tutorials/09-AgentCore-E2E/strands-agents"
+      },
+      {
+        "step": 2,
+        "title": "Google ADK",
+        "description": "使用 Google ADK 构建（即将推出）",
+        "url": "https://github.com/awslabs/agentcore-samples/tree/main/01-tutorials/09-AgentCore-E2E/google-adk"
+      },
+      {
+        "step": 3,
+        "title": "LangGraph",
+        "description": "使用 LangGraph 构建（即将推出）",
+        "url": "https://github.com/awslabs/agentcore-samples/tree/main/01-tutorials/09-AgentCore-E2E/langgraph"
+      }
+    ]
+  },
+  {
+    "id": "agent-ticket",
+    "title": "Agent Ticket",
+    "description": "工单自动处理系统，双 Agent（Ticket Agent + Data Agent）协作处理工单升级流程。前端 React + TypeScript 部署在 CloudFront + S3，后端 Python Lambda + API Gateway，数据库 Aurora PostgreSQL Serverless，认证 Amazon Cognito。",
+    "category": "enterprise",
+    "subcategory": "IT",
+    "icon": "🎫",
+    "demoType": "interactive",
+    "demoUrl": "https://d2ic29y1hc1eco.cloudfront.net/",
+    "agentcoreServices": [
+      "Runtime"
+    ],
+    "awsServices": [
+      "Amazon Bedrock",
+      "Lambda",
+      "API Gateway",
+      "Aurora PostgreSQL",
+      "CloudFront",
+      "S3",
+      "Cognito"
+    ],
+    "framework": "Strands Agents",
+    "status": "ready",
+    "sourceUrl": "https://github.com/milan9527/agentticket"
+  },
+  {
+    "id": "cpa-customer-agent",
+    "title": "CPA 客服 Agent",
+    "description": "航空客服 Agent 自动化系统，基于 Strands Agent 框架，演示三个核心业务场景：IROP 退款（航班取消强制全额退款）、高额退款（超阈值需人工审批）、忠诚度改签（会员豁免改签费）。集成 AgentCore Runtime + Policy + Identity，14 个工具函数覆盖完整航空业务操作，Streamlit Web UI 交互式演示。",
+    "category": "enterprise",
+    "subcategory": "客服",
+    "icon": "🤖",
+    "demoType": "opensource",
+    "agentcoreServices": [
+      "Runtime",
+      "Policy",
+      "Identity"
+    ],
+    "awsServices": [
+      "Amazon Bedrock",
+      "Cognito"
+    ],
+    "framework": "Strands Agents",
+    "status": "ready",
+    "sourceUrl": "https://gitlab.aws.dev/jxj/agentcore-air-agent"
+  },
+  {
+    "id": "health-agent",
+    "title": "Health Agent",
+    "description": "智能过敏源报告分析系统，处理过敏检测报告并生成个性化卡通可视化，帮助患者理解螨虫过敏情况。使用 Nova Pro 分析、Nova Canvas 生图、Nova Premium 方案推荐，Aurora PostgreSQL + pgVector 实现 RAG，Next.js 前端分患者端和管理端。",
+    "category": "industry",
+    "subcategory": "医疗",
+    "icon": "💊",
+    "demoType": "interactive",
+    "demoUrl": "http://healthagent.zhangwangshu.com/",
+    "agentcoreServices": [
+      "Runtime"
+    ],
+    "awsServices": [
+      "Amazon Bedrock",
+      "Aurora PostgreSQL",
+      "S3",
+      "Cognito",
+      "ECS Fargate"
+    ],
+    "framework": "Strands Agents",
+    "status": "ready",
+    "sourceUrl": "https://github.com/milan9527/healcareagent"
+  },
+  {
+    "id": "overdue-agent",
+    "title": "Overdue Agent",
+    "description": "金融逾期自动处理 Multi-Agent 系统，5 个 Agent 协作：Orchestrator 协调全流程、Data Agent 管理数据库、Scoring Agent 风险评估、Allocation Agent 分配策略、Outreach Agent 执行外呼（邮件 + 语音）。Aurora PostgreSQL Serverless 存储，SNS 邮件通知，Amazon Connect 语音外呼。",
+    "category": "industry",
+    "subcategory": "金融",
+    "icon": "📋",
+    "demoType": "interactive",
+    "demoUrl": "https://diqqd1weur5ut.cloudfront.net/",
+    "agentcoreServices": [
+      "Runtime"
+    ],
+    "awsServices": [
+      "Amazon Bedrock",
+      "Aurora PostgreSQL",
+      "SNS",
+      "Amazon Connect",
+      "ECS Fargate",
+      "CloudFront",
+      "S3",
+      "Cognito",
+      "Secrets Manager"
+    ],
+    "framework": "Strands Agents",
+    "status": "ready",
+    "sourceUrl": "https://github.com/milan9527/overdueagent"
+  },
+  {
+    "id": "gaming-mcp-gateway",
+    "title": "Gaming MCP Gateway",
+    "description": "游戏微服务转 MCP 网关演示，将传统 REST 游戏 API（12 个端点：玩家、背包、匹配、排行榜、公会）通过 AgentCore Gateway 转为 MCP 工具。集成 AgentCore Identity 实现端到端认证（Cognito → Identity Token → Gateway Bearer JWT → API Key 出站认证），Strands + Claude Sonnet 4 驱动 AI Agent，React 前端展示完整认证流程和 MCP 工具调用。",
+    "category": "industry",
+    "subcategory": "游戏",
+    "icon": "🕹️",
+    "demoType": "interactive",
+    "demoUrl": "https://d13yoie0jyw18e.cloudfront.net/",
+    "agentcoreServices": [
+      "Gateway",
+      "Identity"
+    ],
+    "awsServices": [
+      "Amazon Bedrock",
+      "Cognito",
+      "API Gateway",
+      "S3",
+      "CloudFront",
+      "EC2",
+      "NLB"
+    ],
+    "framework": "Strands Agents",
+    "status": "ready",
+    "sourceUrl": "https://github.com/milan9527/AgentcoreGateway",
+    "architectureImage": "https://raw.githubusercontent.com/milan9527/AgentcoreGateway/main/architecture.png"
+  },
+  {
+    "id": "smart-home-assistant",
+    "title": "Smart Home Assistant",
+    "description": "AI 智能家居控制系统，自然语言聊天机器人控制模拟 IoT 设备（LED 矩阵、电饭煲、风扇、烤箱）。Strands Agent 部署在 AgentCore Runtime，通过 AgentCore Gateway 远程控制，AWS IoT Core MQTT 实时通信。包含设备模拟器、聊天前端和管理控制台三个 React 应用，CDK 一键部署。",
+    "category": "industry",
+    "subcategory": "制造",
+    "icon": "🏠",
+    "demoType": "opensource",
+    "agentcoreServices": [
+      "Runtime",
+      "Memory",
+      "Gateway"
+    ],
+    "awsServices": [
+      "Amazon Bedrock",
+      "IoT Core",
+      "Lambda",
+      "DynamoDB",
+      "API Gateway",
+      "S3",
+      "CloudFront",
+      "Cognito"
+    ],
+    "framework": "Strands Agents",
+    "status": "ready",
+    "sourceUrl": "https://github.com/aws-samples/sample-smart-home-assistant-agent-on-agentcore",
+    "architectureImage": "https://raw.githubusercontent.com/aws-samples/sample-smart-home-assistant-agent-on-agentcore/main/docs/screenshots/smarthomeassistant-chat.png"
+  },
+  {
+    "id": "connect-agentcore-gateway",
+    "title": "Connect AgentCore Gateway",
+    "description": "维修服务 API 通过 AgentCore Gateway 连接的演示，包含工单管理（创建/查询）和 FAQ 查询功能。API Gateway + API Key 认证，Lambda 处理业务逻辑，DynamoDB 存储工单数据，内置 10 条常见问题。CloudFormation 模板 + OpenAPI 规范，一键部署，成本约 $5/月。",
+    "category": "industry",
+    "subcategory": "汽车",
+    "icon": "🔧",
+    "demoType": "opensource",
+    "agentcoreServices": [
+      "Gateway"
+    ],
+    "awsServices": [
+      "Amazon Bedrock",
+      "API Gateway",
+      "Lambda",
+      "DynamoDB"
+    ],
+    "framework": "Any",
+    "status": "ready",
+    "sourceUrl": "https://github.com/huanghang111/connect-agentcore-gateway-newtargets",
+    "architectureImage": "https://github.com/user-attachments/assets/cd0cc9c4-ef83-4de3-a27a-5a8a131f2356"
+  },
+  {
+    "id": "crawl-on-agentcore",
+    "title": "Crawl on AgentCore",
+    "description": "智能爬虫 Agent，根据自然语言描述自动生成爬虫 Python 代码并在 AgentCore Code Interpreter 中执行。内置 6 种爬虫技能（通用、电商、新闻、API、文档、社交），支持中英文，完整的 Unicode/CJK 编码管道。Strands Agent + Code Interpreter（PUBLIC 网络模式），73 个单元测试覆盖。",
+    "category": "capability",
+    "subcategory": "内容生成/审核",
+    "icon": "🕷️",
+    "demoType": "opensource",
+    "agentcoreServices": [
+      "Runtime",
+      "Tools"
+    ],
+    "awsServices": [
+      "Amazon Bedrock"
+    ],
+    "framework": "Strands Agents",
+    "status": "ready",
+    "sourceUrl": "https://github.com/milan9527/CrawlAgentcore"
+  },
+  {
+    "id": "ai-agents-platform",
+    "title": "AI Agents Platform",
+    "description": "企业级 AI Agents 管理平台，后端 Python FastAPI + SQLAlchemy + MySQL（DDD + Clean Architecture），前端 React 19 + TypeScript + TailwindCSS 4（Feature-Sliced Design），基础设施 AWS CDK TypeScript。支持 Agent 创建、部署和管理的完整生命周期。",
+    "category": "enterprise",
+    "subcategory": "研发",
+    "icon": "🏗️",
+    "demoType": "opensource",
+    "agentcoreServices": [
+      "Runtime"
+    ],
+    "awsServices": [
+      "Amazon Bedrock",
+      "CDK"
+    ],
+    "framework": "FastAPI + React",
+    "status": "ready",
+    "sourceUrl": "https://github.com/arch-team/ai-agents-platform"
+  },
+  {
+    "id": "agentic-ai-platform",
+    "title": "Agentic AI Platform",
+    "description": "企业级 AI 平台，基于 AgentCore 和 Strands SDK 构建。核心功能：MCP 注册中心（内部部署/外部连接/OpenAPI 自动生成）、Agent 管理（多 LLM 支持、工具绑定、本地测试）、知识库（S3 文档摄入 + OpenSearch 向量检索 + RAG）、Playground（AI 辅助 Agent 代码生成 + 一键部署）。",
+    "category": "enterprise",
+    "subcategory": "研发",
+    "icon": "🧩",
+    "demoType": "opensource",
+    "agentcoreServices": [
+      "Runtime",
+      "Gateway"
+    ],
+    "awsServices": [
+      "Amazon Bedrock",
+      "OpenSearch Serverless",
+      "S3",
+      "Lambda",
+      "ECR",
+      "DynamoDB"
+    ],
+    "framework": "Strands Agents",
+    "status": "ready",
+    "sourceUrl": "https://github.com/aws-samples/sample-agentic-ai-platform-with-agentcore",
+    "architectureImage": "https://raw.githubusercontent.com/aws-samples/sample-agentic-ai-platform-with-agentcore/main/docs/images/architecture.png"
+  },
+  {
+    "id": "tutorial-agentcore-shell",
+    "title": "AgentCore Shell",
+    "description": "演示 AgentCore Runtime 的 InvokeAgentRuntimeCommand API，在运行中的 Runtime 会话内执行 Shell 命令并流式返回输出。包含交互式 Shell、文件传输（上传/下载）、脚本化 Demo 和 Coding Agent 工作流示例。",
+    "category": "enterprise",
+    "subcategory": "研发",
+    "icon": "▸",
+    "demoType": "opensource",
+    "agentcoreServices": [
+      "Runtime"
+    ],
+    "awsServices": [
+      "Amazon Bedrock"
+    ],
+    "framework": "Strands Agents",
+    "status": "ready",
+    "sourceUrl": "https://github.com/milan9527/AgentcoreShell"
+  },
+  {
+    "id": "tutorial-efs-on-agentcore",
+    "title": "EFS on AgentCore",
+    "description": "AgentCore Runtime + EFS 持久化存储方案。通过 Lambda 函数桥接 EFS，实现跨会话文件持久化（写入/读取/列表/删除）。包含完整的部署脚本（EFS + Lambda + Agent）、跨会话持久化测试和清理脚本。",
+    "category": "enterprise",
+    "subcategory": "研发",
+    "icon": "▸",
+    "demoType": "opensource",
+    "agentcoreServices": [
+      "Runtime"
+    ],
+    "awsServices": [
+      "Amazon Bedrock",
+      "Lambda",
+      "EFS"
+    ],
+    "framework": "Strands Agents",
+    "status": "ready",
+    "sourceUrl": "https://github.com/milan9527/AgentcoreEFS"
+  },
+  {
+    "id": "tutorial-codespace",
+    "title": "CodeSpace",
+    "description": "实时协作编码平台（\"Google Docs for coding\"），Monaco 编辑器 + WebSocket 多人协作 + AI 代码生成。AgentCore Runtime 持久化会话存储（/mnt/workspace），AgentCore Memory 保存对话历史（STM + 语义搜索），支持实时预览、Ctrl+S 保存、角色协作。",
+    "category": "enterprise",
+    "subcategory": "研发",
+    "icon": "▸",
+    "demoType": "opensource",
+    "agentcoreServices": [
+      "Runtime",
+      "Memory"
+    ],
+    "awsServices": [
+      "Amazon Bedrock"
+    ],
+    "framework": "Strands Agents",
+    "status": "ready",
+    "sourceUrl": "https://github.com/milan9527/CollabCoding"
+  },
+  {
+    "id": "tutorial-agui-stateful-mcp",
+    "title": "AgentCore AG-UI Stateful MCP",
+    "description": "AG-UI（CopilotKit 前端）与 MCP Elicitation/Sampling 集成演示。MCP Elicitation 让服务端逐步向用户收集输入，MCP Sampling 让服务端委托客户端进行 LLM 推理。支持本地开发和 AgentCore Runtime 生产部署，Cognito OAuth2 JWT 认证，CloudFormation 一键部署。",
+    "category": "enterprise",
+    "subcategory": "研发",
+    "icon": "▸",
+    "demoType": "opensource",
+    "agentcoreServices": [
+      "Runtime"
+    ],
+    "awsServices": [
+      "Amazon Bedrock",
+      "Cognito",
+      "DynamoDB"
+    ],
+    "framework": "Strands Agents + CopilotKit",
+    "status": "ready",
+    "sourceUrl": "https://github.com/aws-samples/sample-agentcore-runtime-agui-stateful-mcp-demo"
+  },
+  {
+    "id": "tutorial-crewai-agui",
+    "title": "CrewAI-AGUI on AgentCore",
+    "description": "CopilotKit + CrewAI 部署到 AgentCore Runtime 的可行性分析与实现。探索 CopilotKit（AG-UI 协议）与 CrewAI Flow 在 AgentCore Runtime 上的集成方案，解决双层请求/响应包装的兼容性问题。Next.js 前端 + FastAPI 后端 + CrewAI Flow + Bedrock Claude。",
+    "category": "enterprise",
+    "subcategory": "研发",
+    "icon": "▸",
+    "demoType": "opensource",
+    "agentcoreServices": [
+      "Runtime"
+    ],
+    "awsServices": [
+      "Amazon Bedrock"
+    ],
+    "framework": "CrewAI + CopilotKit",
+    "status": "ready",
+    "sourceUrl": "https://gitlab.aws.dev/jxj/copilotkit-crewai-on-agentcore-runtime"
+  },
+  {
+    "id": "tutorial-wazuh",
+    "title": "Wazuh on AgentCore",
+    "description": "在 AgentCore Runtime 容器内运行 Wazuh Agent 实现 AI Agent 行为的实时安全监控。利用容器 root 启动机制运行 Wazuh（FIM 文件监控、进程监控、Rootkit 检测、SCA 合规扫描），AI Agent 以 non-root 运行无法篡改监控。TCP 连接到 VPC 内的 Wazuh Manager。",
+    "category": "enterprise",
+    "subcategory": "IT",
+    "icon": "▸",
+    "demoType": "opensource",
+    "agentcoreServices": [
+      "Runtime"
+    ],
+    "awsServices": [
+      "Amazon Bedrock",
+      "EC2"
+    ],
+    "framework": "Any",
+    "status": "ready",
+    "sourceUrl": "https://gitlab.aws.dev/jxj/wazuh-on-agentcore"
+  },
+  {
+    "id": "tutorial-strands-code-interpreter-s3",
+    "title": "Strands Code Interpreter with S3",
+    "description": "S3 数据分析工具，结合 AgentCore Code Interpreter 与 S3 访问能力。支持自然语言查询 S3 中的数据文件，实时 Python 代码执行与验证，生成可视化图表并上传回 S3。中英文双语支持，Rich 终端交互界面。",
+    "category": "enterprise",
+    "subcategory": "研发",
+    "icon": "▸",
+    "demoType": "opensource",
+    "agentcoreServices": [
+      "Tools"
+    ],
+    "awsServices": [
+      "Amazon Bedrock",
+      "S3"
+    ],
+    "framework": "Strands Agents",
+    "status": "ready",
+    "sourceUrl": "https://gitlab.aws.dev/jxj/strands-using-code-interpreter-with-s3"
+  },
+  {
+    "id": "tutorial-claude-code-eval",
+    "title": "Claude Code Evaluation",
+    "description": "Claude Code 对话日志收集与评估方案。通过 Hook 拦截 Claude Code 工具调用，转换为 OpenTelemetry 格式写入 CloudWatch Logs，再运行 AgentCore Evaluation 或自定义评估。包含 OTEL 格式实现、CloudWatch 集成、自定义评估指标（Helpfulness/GoalSuccess/Efficiency）。",
+    "category": "enterprise",
+    "subcategory": "研发",
+    "icon": "▸",
+    "demoType": "opensource",
+    "agentcoreServices": [
+      "Evaluations"
+    ],
+    "awsServices": [
+      "CloudWatch",
+      "Amazon Bedrock"
+    ],
+    "framework": "Any",
+    "status": "ready",
+    "sourceUrl": "https://github.com/milan9527/cceval"
+  },
+  {
+    "id": "tutorial-e2e-solution",
+    "title": "AgentCore End2End Solution",
+    "description": "AgentCore 端到端可视化演示，一键部署方案。集成 Memory（用户偏好 + 语义记忆）、Gateway（工具共享 + MCP 协议）、Policy Engine（代金券金额控制）、Runtime（生产级部署 + Streaming）、Knowledge Base（技术支持文档）、Lambda 工具（保修查询 + 网页搜索 + 优惠券），React 前端实时工作流可视化，Cognito 登录。",
+    "category": "enterprise",
+    "subcategory": "研发",
+    "icon": "▸",
+    "demoType": "opensource",
+    "agentcoreServices": [
+      "Runtime",
+      "Memory",
+      "Gateway",
+      "Policy"
+    ],
+    "awsServices": [
+      "Amazon Bedrock",
+      "Lambda",
+      "DynamoDB",
+      "Cognito",
+      "S3",
+      "CloudFront"
+    ],
+    "framework": "Strands Agents",
+    "status": "ready",
+    "sourceUrl": "https://github.com/aws-samples/sample-AgentCore-End2End-Solution-with-Visualization",
+    "architectureImage": "https://raw.githubusercontent.com/aws-samples/sample-AgentCore-End2End-Solution-with-Visualization/main/screenshots/chatbot-whoareyou.png"
+  },
+  {
+    "id": "tutorial-claude-sdk-agentcore",
+    "title": "Claude Agent SDK on AgentCore",
+    "description": "基于 Claude Agent SDK 的聊天应用，部署在 AgentCore Runtime 隔离 MicroVM 中。集成 AgentCore Identity（OAuth JWT 认证）、AgentCore Memory（STM 短期记忆 + LTM 语义长期记忆），支持 HTTP 会话管理和 WebSocket 实时聊天，React 前端。",
+    "category": "enterprise",
+    "subcategory": "研发",
+    "icon": "▸",
+    "demoType": "opensource",
+    "agentcoreServices": [
+      "Runtime",
+      "Memory",
+      "Identity"
+    ],
+    "awsServices": [
+      "Amazon Bedrock",
+      "Cognito",
+      "CloudFront"
+    ],
+    "framework": "Claude Agent SDK",
+    "status": "ready",
+    "sourceUrl": "https://github.com/aws-samples/sample-AgentCore-make-Claude_Agent_SDK-production_ready",
+    "architectureImage": "https://raw.githubusercontent.com/aws-samples/sample-AgentCore-make-Claude_Agent_SDK-production_ready/main/diagram.png"
+  }
+]

@@ -1,0 +1,185 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 720" font-family="'Segoe UI','Helvetica Neue',Arial,sans-serif">
+  <defs>
+    <linearGradient id="orangeGrad" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#FF9900" stop-opacity="0.08"/>
+      <stop offset="100%" stop-color="#FF9900" stop-opacity="0.02"/>
+    </linearGradient>
+    <linearGradient id="blueGrad" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#1976D2" stop-opacity="0.06"/>
+      <stop offset="100%" stop-color="#1976D2" stop-opacity="0.02"/>
+    </linearGradient>
+    <linearGradient id="greenGrad" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#2E7D32" stop-opacity="0.06"/>
+      <stop offset="100%" stop-color="#2E7D32" stop-opacity="0.02"/>
+    </linearGradient>
+  </defs>
+
+  <!-- Background -->
+  <rect width="960" height="720" fill="#f8f9fc" rx="16"/>
+
+  <!-- Title -->
+  <text x="460" y="42" text-anchor="middle" fill="#d97706" font-size="14" font-weight="700">⬡</text>
+  <text x="480" y="42" text-anchor="start" fill="#1e293b" font-size="15" font-weight="700" letter-spacing="0.3">AgentCore Demo Platform — 架构概览</text>
+
+  <!-- ════════════════════════════════════════════ -->
+  <!-- Layer 1: Demo Platform -->
+  <!-- ════════════════════════════════════════════ -->
+  <rect x="260" y="62" width="440" height="88" rx="10" fill="url(#blueGrad)" stroke="#1976D2" stroke-opacity="0.25" stroke-width="1"/>
+  <text x="480" y="86" text-anchor="middle" fill="#1e293b" font-size="13" font-weight="700">Demo Platform</text>
+  <text x="480" y="103" text-anchor="middle" fill="#64748b" font-size="10">React + Vite · 静态前端 · 展示与导航</text>
+  <!-- Category chips -->
+  <rect x="310" y="115" width="72" height="22" rx="11" fill="#1976D2" fill-opacity="0.08" stroke="#1976D2" stroke-opacity="0.3" stroke-width="0.8"/>
+  <text x="346" y="130" text-anchor="middle" fill="#1565C0" font-size="9" font-weight="600">通用场景</text>
+  <rect x="394" y="115" width="72" height="22" rx="11" fill="#FF9900" fill-opacity="0.08" stroke="#d97706" stroke-opacity="0.3" stroke-width="0.8"/>
+  <text x="430" y="130" text-anchor="middle" fill="#b45309" font-size="9" font-weight="600">行业场景</text>
+  <rect x="478" y="115" width="72" height="22" rx="11" fill="#2E7D32" fill-opacity="0.08" stroke="#2E7D32" stroke-opacity="0.3" stroke-width="0.8"/>
+  <text x="514" y="130" text-anchor="middle" fill="#1b5e20" font-size="9" font-weight="600">功能教程</text>
+  <rect x="570" y="115" width="110" height="22" rx="11" fill="#d97706" fill-opacity="0.06" stroke="#d97706" stroke-opacity="0.2" stroke-width="0.8"/>
+  <text x="625" y="130" text-anchor="middle" fill="#b45309" font-size="8" font-weight="500" opacity="0.8">Powered by AgentCore</text>
+
+  <!-- Arrows down -->
+  <line x1="200" y1="158" x2="200" y2="198" stroke="#1976D2" stroke-width="1.2" stroke-dasharray="4 3" opacity="0.4"/>
+  <polygon points="196,196 200,204 204,196" fill="#1976D2" opacity="0.5"/>
+  <line x1="480" y1="158" x2="480" y2="198" stroke="#d97706" stroke-width="1.2" stroke-dasharray="4 3" opacity="0.4"/>
+  <polygon points="476,196 480,204 484,196" fill="#d97706" opacity="0.5"/>
+  <line x1="770" y1="158" x2="770" y2="198" stroke="#2E7D32" stroke-width="1.2" stroke-dasharray="4 3" opacity="0.4"/>
+  <polygon points="766,196 770,204 774,196" fill="#2E7D32" opacity="0.5"/>
+  <rect x="388" y="168" width="184" height="18" rx="9" fill="#f8f9fc"/>
+  <text x="480" y="181" text-anchor="middle" fill="#94a3b8" font-size="8">链接跳转 · 未来：内嵌 Chat + Runtime 按需启动</text>
+
+  <!-- ════════════════════════════════════════════ -->
+  <!-- Layer 2: Three columns -->
+  <!-- ════════════════════════════════════════════ -->
+
+  <!-- Column 1: General Agents -->
+  <rect x="60" y="208" width="260" height="200" rx="10" fill="url(#blueGrad)" stroke="#1976D2" stroke-opacity="0.2" stroke-width="1"/>
+  <text x="190" y="232" text-anchor="middle" fill="#1e293b" font-size="12" font-weight="700">通用场景 Agents</text>
+  <text x="190" y="248" text-anchor="middle" fill="#64748b" font-size="9">独立部署 · 各自仓库 · 多框架</text>
+  <g fill="#1565C0" font-size="9" font-weight="500">
+    <rect x="82" y="262" width="96" height="24" rx="5" fill="#1976D2" fill-opacity="0.06"/>
+    <text x="130" y="278" text-anchor="middle">客服助手</text>
+    <rect x="186" y="262" width="96" height="24" rx="5" fill="#1976D2" fill-opacity="0.06"/>
+    <text x="234" y="278" text-anchor="middle">AWS 运维 Agent</text>
+    <rect x="82" y="294" width="96" height="24" rx="5" fill="#1976D2" fill-opacity="0.06"/>
+    <text x="130" y="310" text-anchor="middle">DB 性能分析</text>
+    <rect x="186" y="294" width="96" height="24" rx="5" fill="#1976D2" fill-opacity="0.06"/>
+    <text x="234" y="310" text-anchor="middle">SRE Agent</text>
+    <rect x="82" y="326" width="96" height="24" rx="5" fill="#1976D2" fill-opacity="0.06"/>
+    <text x="130" y="342" text-anchor="middle">网络情报</text>
+    <rect x="186" y="326" width="96" height="24" rx="5" fill="#1976D2" fill-opacity="0.06"/>
+    <text x="234" y="342" text-anchor="middle">成本优化</text>
+  </g>
+  <text x="190" y="382" text-anchor="middle" fill="#94a3b8" font-size="8">Strands Agents · LangGraph · CrewAI</text>
+
+  <!-- Column 2: Super Agent (Industry) -->
+  <rect x="340" y="208" width="280" height="200" rx="10" fill="url(#orangeGrad)" stroke="#d97706" stroke-opacity="0.35" stroke-width="1.2"/>
+  <text x="365" y="232" fill="#d97706" font-size="12" font-weight="700">⬡</text>
+  <text x="382" y="232" fill="#1e293b" font-size="12" font-weight="700">Super Agent 平台</text>
+  <text x="480" y="248" text-anchor="middle" fill="#64748b" font-size="9">统一多智能体平台 · 多租户 · Business Scope</text>
+  <g fill="#b45309" font-size="9" font-weight="500">
+    <rect x="358" y="262" width="76" height="24" rx="5" fill="#FF9900" fill-opacity="0.07"/>
+    <text x="396" y="278" text-anchor="middle">👥 HR</text>
+    <rect x="442" y="262" width="76" height="24" rx="5" fill="#FF9900" fill-opacity="0.07"/>
+    <text x="480" y="278" text-anchor="middle">💻 IT 运维</text>
+    <rect x="526" y="262" width="76" height="24" rx="5" fill="#FF9900" fill-opacity="0.07"/>
+    <text x="564" y="278" text-anchor="middle">📢 营销</text>
+    <rect x="388" y="294" width="86" height="24" rx="5" fill="#FF9900" fill-opacity="0.07"/>
+    <text x="431" y="310" text-anchor="middle">💰 销售</text>
+    <rect x="482" y="294" width="96" height="24" rx="5" fill="#FF9900" fill-opacity="0.07"/>
+    <text x="530" y="310" text-anchor="middle">🎧 客户服务</text>
+  </g>
+  <g fill="#64748b" font-size="8">
+    <text x="480" y="340" text-anchor="middle">Chat · MCP 工具 · 知识库 RAG · Langfuse 可观测</text>
+    <text x="480" y="354" text-anchor="middle">Slack / 钉钉 / 飞书多渠道 · Cognito 认证</text>
+  </g>
+  <line x1="360" y1="366" x2="600" y2="366" stroke="#d97706" stroke-opacity="0.15" stroke-width="0.8"/>
+  <text x="480" y="382" text-anchor="middle" fill="#94a3b8" font-size="8">Fastify · PostgreSQL · Redis · Claude Agent SDK · AWS CDK</text>
+  <text x="480" y="398" text-anchor="middle" fill="#d97706" font-size="7.5" opacity="0.7">github.com/vorale/super-agent</text>
+
+  <!-- Column 3: Tutorials -->
+  <rect x="640" y="208" width="260" height="200" rx="10" fill="url(#greenGrad)" stroke="#2E7D32" stroke-opacity="0.2" stroke-width="1"/>
+  <text x="770" y="232" text-anchor="middle" fill="#1e293b" font-size="12" font-weight="700">功能教程</text>
+  <text x="770" y="248" text-anchor="middle" fill="#64748b" font-size="9">Notebook · GitHub 仓库</text>
+  <g fill="#1b5e20" font-size="9" font-weight="500">
+    <rect x="662" y="262" width="76" height="24" rx="5" fill="#2E7D32" fill-opacity="0.06"/>
+    <text x="700" y="278" text-anchor="middle">Runtime</text>
+    <rect x="746" y="262" width="76" height="24" rx="5" fill="#2E7D32" fill-opacity="0.06"/>
+    <text x="784" y="278" text-anchor="middle">Gateway</text>
+    <rect x="830" y="262" width="56" height="24" rx="5" fill="#2E7D32" fill-opacity="0.06"/>
+    <text x="858" y="278" text-anchor="middle">Identity</text>
+    <rect x="662" y="294" width="76" height="24" rx="5" fill="#2E7D32" fill-opacity="0.06"/>
+    <text x="700" y="310" text-anchor="middle">Memory</text>
+    <rect x="746" y="294" width="56" height="24" rx="5" fill="#2E7D32" fill-opacity="0.06"/>
+    <text x="774" y="310" text-anchor="middle">Tools</text>
+    <rect x="810" y="294" width="76" height="24" rx="5" fill="#2E7D32" fill-opacity="0.06"/>
+    <text x="848" y="310" text-anchor="middle">Observability</text>
+    <rect x="662" y="326" width="76" height="24" rx="5" fill="#2E7D32" fill-opacity="0.06"/>
+    <text x="700" y="342" text-anchor="middle">Policy</text>
+    <rect x="746" y="326" width="96" height="24" rx="5" fill="#2E7D32" fill-opacity="0.06"/>
+    <text x="794" y="342" text-anchor="middle">端到端实战</text>
+  </g>
+  <text x="770" y="382" text-anchor="middle" fill="#94a3b8" font-size="8">AgentCore 各项能力的动手实践</text>
+
+  <!-- ════════════════════════════════════════════ -->
+  <!-- Arrow: Layer 2 → Layer 3 -->
+  <!-- ════════════════════════════════════════════ -->
+  <line x1="480" y1="416" x2="480" y2="460" stroke="#d97706" stroke-width="1.5" stroke-dasharray="4 3" opacity="0.4"/>
+  <polygon points="476,458 480,466 484,458" fill="#d97706" opacity="0.5"/>
+  <text x="480" y="444" text-anchor="middle" fill="#94a3b8" font-size="8">AgentCore Runtime API</text>
+
+  <!-- ════════════════════════════════════════════ -->
+  <!-- Layer 3: AgentCore -->
+  <!-- ════════════════════════════════════════════ -->
+  <rect x="160" y="470" width="640" height="90" rx="10" fill="url(#orangeGrad)" stroke="#d97706" stroke-opacity="0.3" stroke-width="1.2"/>
+  <text x="200" y="494" fill="#d97706" font-size="14" font-weight="700">⬡</text>
+  <text x="218" y="494" fill="#1e293b" font-size="13" font-weight="700">Amazon Bedrock AgentCore</text>
+  <g font-size="9" font-weight="600">
+    <rect x="180" y="508" width="68" height="22" rx="6" fill="#FF9900" fill-opacity="0.08" stroke="#d97706" stroke-opacity="0.25" stroke-width="0.8"/>
+    <text x="214" y="523" text-anchor="middle" fill="#b45309">Runtime</text>
+    <rect x="258" y="508" width="72" height="22" rx="6" fill="#FF9900" fill-opacity="0.08" stroke="#d97706" stroke-opacity="0.25" stroke-width="0.8"/>
+    <text x="294" y="523" text-anchor="middle" fill="#b45309">Gateway</text>
+    <rect x="340" y="508" width="66" height="22" rx="6" fill="#FF9900" fill-opacity="0.08" stroke="#d97706" stroke-opacity="0.25" stroke-width="0.8"/>
+    <text x="373" y="523" text-anchor="middle" fill="#b45309">Identity</text>
+    <rect x="416" y="508" width="68" height="22" rx="6" fill="#FF9900" fill-opacity="0.08" stroke="#d97706" stroke-opacity="0.25" stroke-width="0.8"/>
+    <text x="450" y="523" text-anchor="middle" fill="#b45309">Memory</text>
+    <rect x="494" y="508" width="56" height="22" rx="6" fill="#FF9900" fill-opacity="0.08" stroke="#d97706" stroke-opacity="0.25" stroke-width="0.8"/>
+    <text x="522" y="523" text-anchor="middle" fill="#b45309">Tools</text>
+    <rect x="560" y="508" width="90" height="22" rx="6" fill="#FF9900" fill-opacity="0.08" stroke="#d97706" stroke-opacity="0.25" stroke-width="0.8"/>
+    <text x="605" y="523" text-anchor="middle" fill="#b45309">Observability</text>
+    <rect x="660" y="508" width="58" height="22" rx="6" fill="#FF9900" fill-opacity="0.08" stroke="#d97706" stroke-opacity="0.25" stroke-width="0.8"/>
+    <text x="689" y="523" text-anchor="middle" fill="#b45309">Policy</text>
+    <rect x="728" y="508" width="54" height="22" rx="6" fill="#FF9900" fill-opacity="0.08" stroke="#d97706" stroke-opacity="0.25" stroke-width="0.8"/>
+    <text x="755" y="523" text-anchor="middle" fill="#b45309">Evals</text>
+  </g>
+  <text x="480" y="550" text-anchor="middle" fill="#94a3b8" font-size="8">容器化 Agent 部署 · MCP 协议 · 按需 microVM · Session 生命周期管理</text>
+
+  <!-- ════════════════════════════════════════════ -->
+  <!-- Arrow: Layer 3 → Layer 4 -->
+  <!-- ════════════════════════════════════════════ -->
+  <line x1="480" y1="568" x2="480" y2="600" stroke="#1976D2" stroke-width="1.2" stroke-dasharray="4 3" opacity="0.3"/>
+  <polygon points="476,598 480,606 484,598" fill="#1976D2" opacity="0.4"/>
+
+  <!-- ════════════════════════════════════════════ -->
+  <!-- Layer 4: AWS Foundation -->
+  <!-- ════════════════════════════════════════════ -->
+  <rect x="200" y="610" width="560" height="56" rx="10" fill="url(#blueGrad)" stroke="#1976D2" stroke-opacity="0.15" stroke-width="1"/>
+  <text x="480" y="632" text-anchor="middle" fill="#475569" font-size="11" font-weight="600">AWS 基础服务</text>
+  <g font-size="9" fill="#1565C0" font-weight="500">
+    <text x="260" y="652" text-anchor="middle">Bedrock</text>
+    <text x="340" y="652" text-anchor="middle">Aurora</text>
+    <text x="410" y="652" text-anchor="middle">S3</text>
+    <text x="480" y="652" text-anchor="middle">Cognito</text>
+    <text x="560" y="652" text-anchor="middle">CloudWatch</text>
+    <text x="650" y="652" text-anchor="middle">EC2</text>
+    <text x="710" y="652" text-anchor="middle">CDK</text>
+  </g>
+
+  <!-- ════════════════════════════════════════════ -->
+  <!-- Legend -->
+  <!-- ════════════════════════════════════════════ -->
+  <line x1="60" y1="690" x2="900" y2="690" stroke="#cbd5e1" stroke-width="0.8"/>
+  <circle cx="240" cy="706" r="4" fill="#1976D2"/>
+  <text x="250" y="710" fill="#64748b" font-size="8.5">第一阶段（当前）：静态展示 + 链接跳转</text>
+  <circle cx="540" cy="706" r="4" fill="#d97706"/>
+  <text x="550" y="710" fill="#64748b" font-size="8.5">第二阶段（规划）：内嵌 Chat + AgentCore Runtime 按需启动</text>
+</svg>

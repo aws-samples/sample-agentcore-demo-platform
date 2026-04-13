@@ -1,0 +1,201 @@
+.navbar {
+  position: sticky;
+  top: 0;
+  z-index: 100;
+  background: var(--navbar-bg);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border-bottom: 1px solid var(--border-subtle);
+  transition: background 0.3s;
+}
+
+.navbar__inner {
+  max-width: 1200px;
+  margin: 0 auto;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 0 32px;
+  height: 58px;
+}
+
+.navbar__brand {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+  cursor: pointer;
+}
+
+.navbar__logo {
+  font-size: 1.3rem;
+  color: var(--accent-orange);
+  filter: drop-shadow(0 0 6px rgba(255, 153, 0, 0.4));
+}
+
+.navbar__name {
+  font-family: var(--font-display);
+  font-size: 1rem;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+}
+
+.navbar__badge {
+  font-family: var(--font-display);
+  font-size: 0.6rem;
+  font-weight: 600;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--accent-orange);
+  background: var(--accent-orange-dim);
+  padding: 2px 7px;
+  border-radius: 4px;
+  border: 1px solid rgba(255, 153, 0, 0.2);
+}
+
+.navbar__back {
+  font-size: 0.82rem;
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: color 0.2s;
+  white-space: nowrap;
+}
+
+.navbar__back:hover {
+  color: var(--accent-orange);
+}
+
+/* Search */
+.navbar__search-wrap {
+  flex: 1;
+  max-width: 480px;
+  margin-left: auto;
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.navbar__search-icon {
+  position: absolute;
+  left: 12px;
+  color: var(--text-muted);
+  pointer-events: none;
+}
+
+.navbar__search {
+  width: 100%;
+  padding: 9px 36px 9px 36px;
+  background: var(--bg-input);
+  border: 1px solid var(--border-input);
+  border-radius: 10px;
+  font-size: 0.84rem;
+  color: var(--text-primary);
+  transition: border-color 0.2s, background 0.2s;
+}
+
+.navbar__search::placeholder {
+  color: var(--text-muted);
+}
+
+.navbar__search:focus {
+  border-color: rgba(255, 153, 0, 0.35);
+  background: var(--bg-input-focus);
+  outline: none;
+}
+
+.navbar__search-clear {
+  position: absolute;
+  right: 10px;
+  font-size: 1.1rem;
+  color: var(--text-muted);
+  cursor: pointer;
+  line-height: 1;
+  padding: 2px 4px;
+}
+
+.navbar__search-clear:hover {
+  color: var(--text-secondary);
+}
+
+/* Actions (theme toggle + avatar) */
+.navbar__actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-left: auto;
+  flex-shrink: 0;
+}
+
+.navbar__nav-link {
+  font-family: var(--font-display);
+  font-size: 0.76rem;
+  font-weight: 500;
+  color: var(--text-secondary);
+  cursor: pointer;
+  padding: 6px 10px;
+  border-radius: 6px;
+  transition: color 0.2s, background 0.2s;
+}
+
+.navbar__nav-link:hover {
+  color: var(--accent-orange);
+  background: var(--accent-orange-dim);
+}
+
+.navbar__icon-btn {
+  width: 34px;
+  height: 34px;
+  border-radius: 8px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-secondary);
+  background: var(--bg-input);
+  border: 1px solid var(--border-subtle);
+  transition: background 0.2s, color 0.2s, border-color 0.2s;
+  cursor: pointer;
+  text-decoration: none;
+  flex-shrink: 0;
+}
+
+.navbar__icon-btn:hover {
+  color: var(--accent-orange);
+  border-color: var(--border-hover);
+  background: var(--accent-orange-dim);
+}
+
+.navbar__user-badge {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 6px 12px;
+  border-radius: 8px;
+  background: var(--bg-input);
+  border: 1px solid var(--border-subtle);
+  font-family: var(--font-display);
+  font-size: 0.78rem;
+  font-weight: 500;
+  color: var(--text-secondary);
+  white-space: nowrap;
+}
+
+@media (max-width: 600px) {
+  .navbar { overflow-x: hidden; }
+  .navbar__inner {
+    padding: 0 12px;
+    gap: 8px;
+    max-width: 100vw;
+    overflow: hidden;
+  }
+  .navbar__name { display: none; }
+  .navbar__search-wrap {
+    max-width: none;
+    flex: 1;
+    min-width: 0;
+  }
+  .navbar__search { padding: 7px 32px; font-size: 0.78rem; }
+  .navbar__actions { gap: 6px; }
+  .navbar__nav-link { padding: 4px 6px; font-size: 0.7rem; }
+  .navbar__icon-btn { width: 30px; height: 30px; }
+  .navbar__user-badge { display: none; }
+}

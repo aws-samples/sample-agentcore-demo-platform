@@ -1,0 +1,268 @@
+.plat-arch {
+  padding: 28px 24px;
+  background: var(--bg-card);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+}
+
+.plat-arch__title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-family: var(--font-display);
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: var(--text-primary);
+  margin-bottom: 24px;
+  justify-content: center;
+}
+
+.plat-arch__hex {
+  color: var(--accent-orange);
+  font-size: 1.1rem;
+  filter: drop-shadow(0 0 4px rgba(255, 153, 0, 0.4));
+}
+
+.plat-arch__hex--sm {
+  font-size: 0.9rem;
+}
+
+.plat-arch__canvas {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0;
+}
+
+/* ── Rows ── */
+.plat-arch__row {
+  width: 100%;
+  display: flex;
+  justify-content: center;
+}
+
+.plat-arch__row--three {
+  display: grid;
+  grid-template-columns: 1fr 1.4fr 1fr;
+  gap: 12px;
+  width: 100%;
+}
+
+/* ── Lanes ── */
+.plat-arch__lane {
+  display: flex;
+}
+
+/* ── Boxes ── */
+.plat-arch__box {
+  border: 1px solid var(--border-subtle);
+  border-radius: 10px;
+  padding: 16px;
+  width: 100%;
+  text-align: center;
+}
+
+.plat-arch__box--platform {
+  background: rgba(79, 195, 247, 0.04);
+  border-color: rgba(79, 195, 247, 0.2);
+  max-width: 480px;
+  margin: 0 auto;
+}
+
+.plat-arch__box--general {
+  background: rgba(79, 195, 247, 0.03);
+  border-color: rgba(79, 195, 247, 0.15);
+}
+
+.plat-arch__box--industry {
+  background: rgba(255, 153, 0, 0.04);
+  border-color: rgba(255, 153, 0, 0.25);
+}
+
+.plat-arch__box--tutorial {
+  background: rgba(102, 187, 106, 0.03);
+  border-color: rgba(102, 187, 106, 0.15);
+}
+
+.plat-arch__box--agentcore {
+  background: rgba(255, 153, 0, 0.05);
+  border-color: rgba(255, 153, 0, 0.2);
+  max-width: 600px;
+  margin: 0 auto;
+}
+
+.plat-arch__box--aws {
+  background: rgba(79, 195, 247, 0.03);
+  border-color: rgba(79, 195, 247, 0.12);
+  max-width: 520px;
+  margin: 0 auto;
+}
+
+.plat-arch__box-label {
+  font-family: var(--font-display);
+  font-size: 0.74rem;
+  font-weight: 600;
+  color: var(--text-primary);
+  margin-bottom: 4px;
+}
+
+.plat-arch__box-sub {
+  font-family: var(--font-body);
+  font-size: 0.66rem;
+  color: var(--text-muted);
+  margin-bottom: 10px;
+}
+
+/* ── Chips in platform box ── */
+.plat-arch__chips {
+  display: flex;
+  gap: 6px;
+  justify-content: center;
+  flex-wrap: wrap;
+}
+
+.plat-arch__chip {
+  font-family: var(--font-display);
+  font-size: 0.6rem;
+  font-weight: 500;
+  padding: 3px 10px;
+  border-radius: 20px;
+}
+
+.plat-arch__chip--blue {
+  color: #4FC3F7;
+  background: rgba(79, 195, 247, 0.1);
+  border: 1px solid rgba(79, 195, 247, 0.2);
+}
+
+.plat-arch__chip--orange {
+  color: #FF9900;
+  background: rgba(255, 153, 0, 0.1);
+  border: 1px solid rgba(255, 153, 0, 0.2);
+}
+
+.plat-arch__chip--green {
+  color: #66BB6A;
+  background: rgba(102, 187, 106, 0.1);
+  border: 1px solid rgba(102, 187, 106, 0.2);
+}
+
+/* ── Items list ── */
+.plat-arch__items {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  justify-content: center;
+}
+
+.plat-arch__items span {
+  font-family: var(--font-display);
+  font-size: 0.58rem;
+  color: var(--accent-blue);
+  background: rgba(79, 195, 247, 0.06);
+  padding: 2px 8px;
+  border-radius: 4px;
+}
+
+.plat-arch__items--orange span {
+  color: var(--accent-orange);
+  background: rgba(255, 153, 0, 0.08);
+}
+
+.plat-arch__items--green span {
+  color: var(--accent-green);
+  background: rgba(102, 187, 106, 0.06);
+}
+
+.plat-arch__tech-stack {
+  font-family: var(--font-display);
+  font-size: 0.56rem;
+  color: var(--text-muted);
+  margin-top: 8px;
+  padding-top: 8px;
+  border-top: 1px solid var(--border-subtle);
+}
+
+/* ── Connectors ── */
+.plat-arch__connector {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  padding: 2px 0;
+}
+
+.plat-arch__connector-label {
+  font-family: var(--font-display);
+  font-size: 0.54rem;
+  color: var(--text-muted);
+  background: var(--bg-card);
+  padding: 1px 8px;
+  border-radius: 4px;
+}
+
+/* ── AgentCore services ── */
+.plat-arch__services {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  justify-content: center;
+}
+
+.plat-arch__svc {
+  font-family: var(--font-display);
+  font-size: 0.6rem;
+  font-weight: 500;
+  color: var(--accent-orange);
+  background: rgba(255, 153, 0, 0.08);
+  border: 1px solid rgba(255, 153, 0, 0.15);
+  padding: 3px 10px;
+  border-radius: 6px;
+}
+
+.plat-arch__svc--aws {
+  color: var(--accent-blue);
+  background: rgba(79, 195, 247, 0.06);
+  border-color: rgba(79, 195, 247, 0.12);
+}
+
+/* ── Legend ── */
+.plat-arch__legend {
+  display: flex;
+  gap: 20px;
+  justify-content: center;
+  margin-top: 20px;
+  padding-top: 16px;
+  border-top: 1px solid var(--border-subtle);
+  flex-wrap: wrap;
+}
+
+.plat-arch__legend-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-family: var(--font-body);
+  font-size: 0.64rem;
+  color: var(--text-muted);
+}
+
+.plat-arch__legend-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+/* ── Responsive ── */
+@media (max-width: 700px) {
+  .plat-arch__row--three {
+    grid-template-columns: 1fr;
+    gap: 8px;
+  }
+
+  .plat-arch__legend {
+    flex-direction: column;
+    gap: 8px;
+    align-items: flex-start;
+  }
+}

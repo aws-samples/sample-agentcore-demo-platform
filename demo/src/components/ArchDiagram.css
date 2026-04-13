@@ -1,0 +1,16 @@
+.arch {
+  background: var(--bg-card);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  padding: 16px;
+  overflow: hidden;
+}
+
+.arch__svg {
+  width: 100%;
+  height: auto;
+  display: block;
+  border-radius: 6px;
+  background: #ffffff;
+  color-scheme: light;
+}
