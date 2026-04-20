@@ -3,6 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom'
 import { ArrowLeft, Maximize2, Minimize2, ExternalLink, Star, Play, Clock, Tag, User, ChevronDown, Heart, Trash2 } from 'lucide-react'
 import { restClient } from '@/services/api/restClient'
 import { useFavorites } from '@/hooks/useFavorites'
+import { useTranslation } from '@/i18n'
 
 // ============================================================================
 // Types
@@ -168,6 +169,7 @@ export function AppRunner() {
   const { id } = useParams<{ id: string }>()
   const navigate = useNavigate()
   const { favorites, toggle: toggleFav } = useFavorites()
+  const { t } = useTranslation()
   const [app, setApp] = useState<PublishedApp | null>(null)
   const [loading, setLoading] = useState(true)
   const [running, setRunning] = useState(false)
@@ -218,14 +220,14 @@ export function AppRunner() {
   }, [app, navigate])
 
   if (loading) {
-    return <div className="flex-1 flex items-center justify-center text-gray-500">Loading app...</div>
+    return <div className="flex-1 flex items-center justify-center text-gray-500">{t('appRunner.loading')}</div>
   }
 
   if (!app) {
     return (
       <div className="flex-1 flex flex-col items-center justify-center gap-3">
-        <p className="text-gray-400">App not found</p>
-        <button onClick={() => navigate('/marketplace')} className="text-blue-400 text-sm hover:underline">Back to Marketplace</button>
+        <p className="text-gray-400">{t('appRunner.notFound')}</p>
+        <button onClick={() => navigate('/marketplace')} className="text-blue-400 text-sm hover:underline">{t('appRunner.backToMarketplace')}</button>
       </div>
     )
   }
@@ -246,7 +248,7 @@ export function AppRunner() {
           <h2 className="text-sm font-semibold text-white truncate flex-1">{app.name}</h2>
           <span className="text-[10px] text-gray-600">v{app.version}</span>
           {staticUrl && (
-            <button onClick={() => window.open(staticUrl, '_blank')} className="p-1.5 rounded-lg text-gray-400 hover:text-white hover:bg-gray-800 transition-colors" title="Open in new tab">
+            <button onClick={() => window.open(staticUrl, '_blank')} className="p-1.5 rounded-lg text-gray-400 hover:text-white hover:bg-gray-800 transition-colors" title={t('appRunner.openInNewTab')}>
               <ExternalLink className="w-4 h-4" />
             </button>
           )}
@@ -257,8 +259,8 @@ export function AppRunner() {
         {app._sample ? (
           <div className="flex-1 flex flex-col items-center justify-center gap-3 bg-gray-950">
             <span className="text-6xl">{app.icon}</span>
-            <p className="text-gray-400">This is a sample app — no live preview available</p>
-            <p className="text-gray-600 text-sm">Publish a real app from the chat to see it running here</p>
+            <p className="text-gray-400">{t('appRunner.sampleNoPreview')}</p>
+            <p className="text-gray-600 text-sm">{t('appRunner.publishHint')}</p>
           </div>
         ) : (
           <iframe src={staticUrl!} className="flex-1 w-full border-0 bg-white" sandbox="allow-scripts allow-same-origin allow-forms allow-popups" title={app.name} />
@@ -278,7 +280,7 @@ export function AppRunner() {
         <button onClick={() => navigate('/marketplace')} className="p-1.5 rounded-lg text-gray-400 hover:text-white hover:bg-gray-800 transition-colors">
           <ArrowLeft className="w-4 h-4" />
         </button>
-        <span className="text-gray-600 text-sm">Back to Marketplace</span>
+        <span className="text-gray-600 text-sm">{t('appRunner.backToMarketplace')}</span>
       </div>
 
       <div className="max-w-4xl mx-auto w-full px-6 py-8 space-y-8">
@@ -296,17 +298,17 @@ export function AppRunner() {
               {app.author_name && <span className="flex items-center gap-1"><User className="w-3.5 h-3.5" /> {app.author_name}</span>}
               <span>v{app.version}</span>
               <span className="capitalize">{app.category}</span>
-              <span>Published {publishedLabel}</span>
+              <span>{t('appRunner.published')} {publishedLabel}</span>
             </div>
             <div className="flex items-center gap-4 mb-4">
               {app.avg_rating && (
                 <div className="flex items-center gap-2">
                   <StarRating rating={app.avg_rating} size="md" />
-                  <span className="text-sm text-gray-400">{app.avg_rating.toFixed(1)} ({app.rating_count} ratings)</span>
+                  <span className="text-sm text-gray-400">{app.avg_rating.toFixed(1)} ({app.rating_count} {t('appRunner.ratings')})</span>
                 </div>
               )}
               {app.launch_count != null && (
-                <span className="text-sm text-gray-500">{app.launch_count} runs</span>
+                <span className="text-sm text-gray-500">{app.launch_count} {t('appRunner.runs')}</span>
               )}
             </div>
             <div className="flex items-center gap-2">
@@ -315,7 +317,7 @@ export function AppRunner() {
                 className="flex items-center gap-2 px-5 py-2.5 rounded-lg bg-purple-600 text-white font-medium hover:bg-purple-500 transition-colors"
               >
                 <Play className="w-4 h-4 fill-white" />
-                Run App
+                {t('appRunner.runApp')}
               </button>
               <button
                 onClick={() => app && toggleFav(app.id)}
@@ -324,7 +326,7 @@ export function AppRunner() {
                     ? 'border-red-500/50 bg-red-500/10 text-red-400'
                     : 'border-gray-700 text-gray-500 hover:text-red-400 hover:border-red-500/30'
                 }`}
-                title={app && favorites.has(app.id) ? 'Remove from favorites' : 'Add to favorites'}
+                title={app && favorites.has(app.id) ? t('appRunner.removeFromFav') : t('appRunner.addToFav')}
               >
                 <Heart className={`w-5 h-5 ${app && favorites.has(app.id) ? 'fill-red-400' : ''}`} />
               </button>
@@ -332,7 +334,7 @@ export function AppRunner() {
                 <button
                   onClick={() => setShowDeleteConfirm(true)}
                   className="p-2.5 rounded-lg border border-gray-700 text-gray-500 hover:text-red-400 hover:border-red-500/30 hover:bg-red-500/10 transition-colors"
-                  title="Delete app"
+                  title={t('appRunner.deleteApp')}
                 >
                   <Trash2 className="w-5 h-5" />
                 </button>
@@ -345,13 +347,13 @@ export function AppRunner() {
         <div className="w-full h-48 bg-gray-800 border border-gray-700 rounded-xl flex items-center justify-center">
           <div className="text-center">
             <span className="text-5xl block mb-2">{app.icon}</span>
-            <span className="text-gray-600 text-sm">Screenshot preview</span>
+            <span className="text-gray-600 text-sm">{t('appRunner.screenshotPreview')}</span>
           </div>
         </div>
 
         {/* Description */}
         <div>
-          <h2 className="text-sm font-semibold text-white mb-2">About</h2>
+          <h2 className="text-sm font-semibold text-white mb-2">{t('appRunner.about')}</h2>
           <p className="text-gray-400 text-sm leading-relaxed">{app.description}</p>
           {app.tags && app.tags.length > 0 && (
             <div className="flex items-center gap-2 mt-3">
@@ -367,28 +369,28 @@ export function AppRunner() {
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
           {/* Rating breakdown */}
           <div>
-            <h2 className="text-sm font-semibold text-white mb-3">Ratings</h2>
+            <h2 className="text-sm font-semibold text-white mb-3">{t('appRunner.ratingsTitle')}</h2>
             {app.avg_rating ? (
               <div className="space-y-3">
                 <div className="flex items-center gap-3">
                   <span className="text-3xl font-bold text-white">{app.avg_rating.toFixed(1)}</span>
                   <div>
                     <StarRating rating={app.avg_rating} size="md" />
-                    <span className="text-xs text-gray-500">{app.rating_count} ratings</span>
+                    <span className="text-xs text-gray-500">{app.rating_count} {t('appRunner.ratings')}</span>
                   </div>
                 </div>
                 <RatingBreakdown reviews={reviews} />
               </div>
             ) : (
-              <p className="text-gray-600 text-sm">No ratings yet</p>
+              <p className="text-gray-600 text-sm">{t('appRunner.noRatings')}</p>
             )}
           </div>
 
           {/* Reviews list */}
           <div className="md:col-span-2">
-            <h2 className="text-sm font-semibold text-white mb-3">Reviews</h2>
+            <h2 className="text-sm font-semibold text-white mb-3">{t('appRunner.reviews')}</h2>
             {reviews.length === 0 ? (
-              <p className="text-gray-600 text-sm">No reviews yet. Be the first to leave one!</p>
+              <p className="text-gray-600 text-sm">{t('appRunner.noReviews')}</p>
             ) : (
               <div className="space-y-3">
                 {reviews.map(review => (
@@ -410,7 +412,7 @@ export function AppRunner() {
 
         {/* Version history */}
         <div>
-          <h2 className="text-sm font-semibold text-white mb-3">Version History</h2>
+          <h2 className="text-sm font-semibold text-white mb-3">{t('appRunner.versionHistory')}</h2>
           <div className="space-y-2">
             {versions.map((v, i) => (
               <div key={v.version} className="flex items-start gap-3">
@@ -443,12 +445,12 @@ export function AppRunner() {
                 <Trash2 className="w-5 h-5 text-red-400" />
               </div>
               <div>
-                <h3 className="text-white font-semibold">Delete App</h3>
-                <p className="text-xs text-gray-500">This action cannot be undone</p>
+                <h3 className="text-white font-semibold">{t('appRunner.deleteTitle')}</h3>
+                <p className="text-xs text-gray-500">{t('appRunner.deleteWarning')}</p>
               </div>
             </div>
             <p className="text-sm text-gray-400 mb-6">
-              Are you sure you want to permanently delete <span className="text-white">{app?.name}</span>? This will remove the app, all ratings, usage history, and version data.
+              {t('appRunner.deleteConfirm')} <span className="text-white">{app?.name}</span>{t('appRunner.deleteConfirmSuffix')}
             </p>
             <div className="flex items-center gap-3 justify-end">
               <button
@@ -456,7 +458,7 @@ export function AppRunner() {
                 className="px-4 py-2 rounded-lg text-sm text-gray-400 hover:text-white hover:bg-gray-800 transition-colors"
                 disabled={deleting}
               >
-                Cancel
+                {t('common.cancel')}
               </button>
               <button
                 onClick={handleDelete}
@@ -464,7 +466,7 @@ export function AppRunner() {
                 className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm bg-red-600 text-white hover:bg-red-500 transition-colors disabled:opacity-50"
               >
                 <Trash2 className="w-4 h-4" />
-                {deleting ? 'Deleting...' : 'Delete'}
+                {deleting ? t('appRunner.deleting') : t('common.delete')}
               </button>
             </div>
           </div>

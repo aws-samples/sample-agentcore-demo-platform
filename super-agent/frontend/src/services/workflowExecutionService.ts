@@ -5,7 +5,7 @@
  * with the canvas system.
  * 
  * Supports two modes:
- * - REST: Calls backend API (super-agent-backend)
+ * - REST: Calls backend API (backend)
  * - Mock: Uses in-memory simulation for development/testing
  * 
  * Requirements:

@@ -5,7 +5,6 @@
 import { useState, useCallback, useMemo, useEffect, useRef } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { 
-  Briefcase, 
   ChevronDown, 
   Check, 
   Loader2, 
@@ -22,6 +21,7 @@ import {
   Sparkles,
   PanelLeftOpen,
   PanelLeftClose,
+  Pencil,
 } from 'lucide-react';
 import { useTranslation } from '@/i18n';
 import { useWorkflows, useWorkflowExecution } from '@/services';
@@ -41,17 +41,8 @@ import type { WorkflowVariable } from '@/types/workflow-plan';
 import { createCanvasNode } from '@/lib/canvas/nodes';
 import { getAuthToken } from '@/services/api/restClient';
 import { ExecutionDetailModal } from '@/components/ExecutionDetailModal';
+import { BusinessScopeDropdown } from '@/components/BusinessScopeDropdown';
 import { RunWorkflowModal } from '@/components/RunWorkflowModal';
-
-// Default colors for business scope tabs
-const SCOPE_COLORS = [
-  'bg-blue-600',
-  'bg-emerald-700',
-  'bg-purple-600',
-  'bg-orange-600',
-  'bg-pink-600',
-  'bg-cyan-600',
-];
 
 // Convert legacy workflow to canvas data
 function workflowToCanvasData(workflow: WorkflowType): CanvasData {
@@ -224,7 +215,15 @@ export function WorkflowEditor() {
   const [showCopilotPanel, setShowCopilotPanel] = useState(true);
   const [copilotSuccess, setCopilotSuccess] = useState<string | null>(null);
 
-  
+  // Inline rename state
+  const [isRenamingHeader, setIsRenamingHeader] = useState(false);
+  const [renameValue, setRenameValue] = useState('');
+  const renameInputRef = useRef<HTMLInputElement>(null);
+  const [renamingSidebarName, setRenamingSidebarName] = useState<string | null>(null);
+  const [sidebarRenameValue, setSidebarRenameValue] = useState('');
+  const sidebarRenameInputRef = useRef<HTMLInputElement>(null);
+  const [deletingSidebarName, setDeletingSidebarName] = useState<string | null>(null);
+
   const copilotRef = useRef<WorkflowCopilotHandle>(null);
   const isLoading = workflowsLoading || scopesLoading;
 
@@ -650,6 +649,58 @@ export function WorkflowEditor() {
     }
   }, [selectedWorkflow, deleteWorkflow]);
 
+  // Handle rename workflow (header)
+  const startHeaderRename = useCallback(() => {
+    if (!selectedWorkflow) return;
+    setRenameValue(selectedWorkflow.name);
+    setIsRenamingHeader(true);
+    setTimeout(() => renameInputRef.current?.select(), 0);
+  }, [selectedWorkflow]);
+
+  const commitHeaderRename = useCallback(async () => {
+    if (!selectedWorkflow || !renameValue.trim() || renameValue.trim() === selectedWorkflow.name) {
+      setIsRenamingHeader(false);
+      return;
+    }
+    await updateWorkflow(selectedWorkflow.id, { name: renameValue.trim() });
+    setIsRenamingHeader(false);
+  }, [selectedWorkflow, renameValue, updateWorkflow]);
+
+  // Handle rename workflow (sidebar)
+  const startSidebarRename = useCallback((name: string) => {
+    setRenamingSidebarName(name);
+    setSidebarRenameValue(name);
+    setTimeout(() => sidebarRenameInputRef.current?.select(), 0);
+  }, []);
+
+  const commitSidebarRename = useCallback(async () => {
+    if (!renamingSidebarName || !sidebarRenameValue.trim() || sidebarRenameValue.trim() === renamingSidebarName) {
+      setRenamingSidebarName(null);
+      return;
+    }
+    // Rename all versions with this name in the current scope
+    const workflowsToRename = scopeWorkflows.filter((w: WorkflowType) => w.name === renamingSidebarName);
+    for (const wf of workflowsToRename) {
+      await updateWorkflow(wf.id, { name: sidebarRenameValue.trim() });
+    }
+    setRenamingSidebarName(null);
+  }, [renamingSidebarName, sidebarRenameValue, scopeWorkflows, updateWorkflow]);
+
+  // Handle delete workflow from sidebar (delete all versions with this name)
+  const handleSidebarDelete = useCallback(async () => {
+    if (!deletingSidebarName) return;
+    const workflowsToDelete = scopeWorkflows.filter((w: WorkflowType) => w.name === deletingSidebarName);
+    for (const wf of workflowsToDelete) {
+      await deleteWorkflow(wf.id);
+    }
+    // If the currently selected workflow was deleted, clear selection
+    if (selectedWorkflow && selectedWorkflow.name === deletingSidebarName) {
+      setSelectedWorkflowId(null);
+      setCanvasData({ nodes: [], edges: [] });
+    }
+    setDeletingSidebarName(null);
+  }, [deletingSidebarName, scopeWorkflows, deleteWorkflow, selectedWorkflow]);
+
   if (isLoading) {
     return (
       <div className="p-6 flex items-center justify-center h-full">
@@ -670,34 +721,13 @@ export function WorkflowEditor() {
     <div className="flex flex-col h-full">
       {/* Header */}
       <div className="p-4 border-b border-gray-800">
-        {/* Business Scope Tabs */}
-        <div className="flex gap-1 bg-gray-800/50 p-1 rounded-lg w-fit overflow-x-auto">
-          {businessScopes.map((scope, index) => {
-            const isActive = activeScopeId === scope.id;
-            const bgColor = SCOPE_COLORS[index % SCOPE_COLORS.length];
-            
-            return (
-              <button
-                key={scope.id}
-                onClick={() => handleScopeChange(scope.id)}
-                className={`
-                  flex items-center gap-2 px-4 py-2 rounded-md transition-all whitespace-nowrap
-                  ${isActive 
-                    ? `${bgColor} text-white` 
-                    : 'text-gray-400 hover:text-white hover:bg-gray-700/50'
-                  }
-                `}
-              >
-                {scope.icon ? (
-                  <span>{scope.icon}</span>
-                ) : (
-                  <Briefcase className="w-4 h-4" />
-                )}
-                <span className="text-sm font-medium">{scope.name}</span>
-              </button>
-            );
-          })}
-        </div>
+        {/* Business Scope Selector (dropdown) */}
+        <BusinessScopeDropdown
+          scopes={businessScopes}
+          activeScopeId={activeScopeId}
+          onScopeChange={handleScopeChange}
+          placeholder="Select scope"
+        />
       </div>
 
       {/* Main Content */}
@@ -716,7 +746,7 @@ export function WorkflowEditor() {
         ) : (
           <div className="w-48 border-r border-gray-800 p-4 overflow-y-auto flex-shrink-0">
             <div className="flex items-center justify-between mb-3">
-              <h3 className="text-sm font-medium text-gray-400">Workflows</h3>
+              <h3 className="text-sm font-medium text-gray-400">{t('workflowEditor.workflows')}</h3>
               <div className="flex items-center gap-1">
                 <button
                   onClick={() => setShowCreateModal(true)}
@@ -738,25 +768,68 @@ export function WorkflowEditor() {
               {workflowNames.length > 0 ? (
                 workflowNames.map((name: string) => {
                   const isSelected = selectedWorkflow?.name === name;
+                  const isRenaming = renamingSidebarName === name;
+
                   return (
-                    <button
+                    <div
                       key={name}
-                      onClick={() => handleWorkflowNameSelect(name)}
+                      onClick={() => !isRenaming && handleWorkflowNameSelect(name)}
                       className={`
-                        w-full text-left px-3 py-2 rounded-md transition-all text-sm
+                        w-full text-left px-3 py-2 rounded-md transition-all text-sm group cursor-pointer flex items-center gap-1
                         ${isSelected 
                           ? 'bg-blue-600/20 text-blue-400 border border-blue-500/30' 
                           : 'text-gray-300 hover:bg-gray-800 hover:text-white'
                         }
                       `}
                     >
-                      {name}
-                    </button>
+                      {isRenaming ? (
+                        <input
+                          ref={sidebarRenameInputRef}
+                          type="text"
+                          value={sidebarRenameValue}
+                          onChange={(e) => setSidebarRenameValue(e.target.value)}
+                          onClick={(e) => e.stopPropagation()}
+                          onBlur={commitSidebarRename}
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter') commitSidebarRename();
+                            if (e.key === 'Escape') setRenamingSidebarName(null);
+                          }}
+                          className="w-full px-1 py-0.5 rounded text-sm text-white bg-gray-900 border border-blue-500 outline-none focus:ring-1 focus:ring-blue-500"
+                          autoFocus
+                        />
+                      ) : (
+                        <>
+                          <span className="flex-1 truncate">{name}</span>
+                          <div className="flex items-center gap-0.5 flex-shrink-0 opacity-0 group-hover:opacity-100 transition-opacity">
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                startSidebarRename(name);
+                              }}
+                              className="p-0.5 rounded text-gray-500 hover:text-white transition-colors"
+                              title="Rename"
+                            >
+                              <Pencil className="w-3 h-3" />
+                            </button>
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setDeletingSidebarName(name);
+                              }}
+                              className="p-0.5 rounded text-gray-500 hover:text-red-400 transition-colors"
+                              title="Delete"
+                            >
+                              <Trash2 className="w-3 h-3" />
+                            </button>
+                          </div>
+                        </>
+                      )}
+                    </div>
                   );
                 })
               ) : (
                 <p className="text-sm text-gray-500 px-3 py-2">
-                  No workflows in this scope
+                  {t('workflowEditor.noWorkflows')}
                 </p>
               )}
             </div>
@@ -770,9 +843,30 @@ export function WorkflowEditor() {
               {/* Workflow Header */}
               <div className="p-4 border-b border-gray-800 flex items-center justify-between">
                 <div className="flex items-center gap-4">
-                  <h2 className="text-lg font-semibold text-white">
-                    {selectedWorkflow.name}
-                  </h2>
+                  {isRenamingHeader ? (
+                    <input
+                      ref={renameInputRef}
+                      type="text"
+                      value={renameValue}
+                      onChange={(e) => setRenameValue(e.target.value)}
+                      onBlur={commitHeaderRename}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') commitHeaderRename();
+                        if (e.key === 'Escape') setIsRenamingHeader(false);
+                      }}
+                      className="text-lg font-semibold text-white bg-gray-800 border border-blue-500 rounded px-2 py-0.5 outline-none focus:ring-1 focus:ring-blue-500"
+                      autoFocus
+                    />
+                  ) : (
+                    <h2
+                      className="text-lg font-semibold text-white cursor-pointer hover:text-blue-400 transition-colors group flex items-center gap-1.5"
+                      onClick={startHeaderRename}
+                      title={t('workflowEditor.clickToRename')}
+                    >
+                      {selectedWorkflow.name}
+                      <Pencil className="w-3.5 h-3.5 text-gray-500 opacity-0 group-hover:opacity-100 transition-opacity" />
+                    </h2>
+                  )}
                   
                   {/* Version Selector */}
                   <div className="relative">
@@ -821,7 +915,7 @@ export function WorkflowEditor() {
                   </div>
 
                   {isDirty && (
-                    <span className="text-xs text-yellow-400">Unsaved changes</span>
+                    <span className="text-xs text-yellow-400">{t('workflowEditor.unsavedChanges')}</span>
                   )}
                 </div>
 
@@ -834,7 +928,7 @@ export function WorkflowEditor() {
                         ? 'bg-blue-600/20 text-blue-400' 
                         : 'bg-gray-800 hover:bg-gray-700 text-gray-300'
                     }`}
-                    title="Execution History"
+                    title={t('workflowEditor.executionHistory')}
                   >
                     <History className="w-4 h-4" />
                   </button>
@@ -877,7 +971,7 @@ export function WorkflowEditor() {
                   <button
                     onClick={() => setShowDeleteConfirm(true)}
                     className="flex items-center gap-2 px-3 py-1.5 bg-gray-800 hover:bg-red-600/20 hover:text-red-400 text-gray-300 rounded-md transition-colors text-sm"
-                    title="Delete Workflow"
+                    title={t('workflowEditor.deleteWorkflow')}
                   >
                     <Trash2 className="w-4 h-4" />
                   </button>
@@ -887,7 +981,7 @@ export function WorkflowEditor() {
                     className="flex items-center gap-2 px-3 py-1.5 bg-gray-800 hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed text-gray-300 rounded-md transition-colors text-sm"
                   >
                     <Save className="w-4 h-4" />
-                    Save
+                    {t('workflowEditor.save')}
                   </button>
                   {isRunningV2 ? (
                     <button
@@ -895,7 +989,7 @@ export function WorkflowEditor() {
                       className="flex items-center gap-2 px-4 py-1.5 bg-red-600 hover:bg-red-500 text-white rounded-md transition-colors text-sm font-medium"
                     >
                       <Square className="w-4 h-4" />
-                      Stop
+                      {t('workflowEditor.stop')}
                     </button>
                   ) : (
                     <button
@@ -904,7 +998,7 @@ export function WorkflowEditor() {
                       className="flex items-center gap-2 px-4 py-1.5 bg-emerald-700 hover:bg-emerald-600 disabled:opacity-50 disabled:cursor-not-allowed text-white rounded-md transition-colors text-sm font-medium"
                     >
                       <Play className="w-4 h-4" />
-                      Run
+                      {t('workflowEditor.run')}
                     </button>
                   )}
                 </div>
@@ -929,7 +1023,7 @@ export function WorkflowEditor() {
                   {isRunningV2 && (
                     <div className="absolute top-4 right-4 z-10 px-4 py-2 bg-blue-500/20 border border-blue-500/30 rounded-lg text-blue-400 text-sm flex items-center gap-2">
                       <Loader2 className="w-4 h-4 animate-spin" />
-                      Executing workflow...
+                      {t('workflowEditor.executing')}
                     </div>
                   )}
 
@@ -960,7 +1054,7 @@ export function WorkflowEditor() {
                   <div className="w-80 border-l border-gray-800 bg-gray-900/95 overflow-y-auto">
                     <div className="p-4 border-b border-gray-800">
                       <div className="flex items-center justify-between">
-                        <h3 className="text-sm font-medium text-white">Execution History</h3>
+                        <h3 className="text-sm font-medium text-white">{t('workflowEditor.executionHistory')}</h3>
                         <button
                           onClick={() => setShowHistoryPanel(false)}
                           className="p-1 hover:bg-gray-800 rounded"
@@ -1072,7 +1166,7 @@ export function WorkflowEditor() {
             </>
           ) : (
             <div className="flex-1 flex items-center justify-center text-gray-400">
-              <p>Select a workflow to view</p>
+              <p>{t('workflowEditor.selectWorkflow')}</p>
             </div>
           )}
         </div>
@@ -1103,6 +1197,14 @@ export function WorkflowEditor() {
           workflowName={selectedWorkflow.name}
           onClose={() => setShowDeleteConfirm(false)}
           onConfirm={handleDeleteWorkflow}
+        />
+      )}
+
+      {deletingSidebarName && (
+        <DeleteConfirmModal
+          workflowName={deletingSidebarName}
+          onClose={() => setDeletingSidebarName(null)}
+          onConfirm={handleSidebarDelete}
         />
       )}
 
@@ -1212,7 +1314,7 @@ function DeleteConfirmModal({ workflowName, onClose, onConfirm }: DeleteConfirmM
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
       <div className="bg-gray-900 border border-gray-800 rounded-lg w-full max-w-md">
         <div className="flex items-center justify-between p-4 border-b border-gray-800">
-          <h2 className="text-lg font-semibold text-white">{t('workflow.deleteWorkflow') || 'Delete Workflow'}</h2>
+          <h2 className="text-lg font-semibold text-white">{t('workflow.deleteWorkflow')}</h2>
           <button
             onClick={onClose}
             className="p-1 hover:bg-gray-800 rounded transition-colors"
@@ -1223,7 +1325,7 @@ function DeleteConfirmModal({ workflowName, onClose, onConfirm }: DeleteConfirmM
         
         <div className="p-4 space-y-4">
           <p className="text-gray-300">
-            {t('workflow.deleteConfirmMessage') || `Are you sure you want to delete "${workflowName}"? This action cannot be undone.`}
+            {t('workflow.deleteConfirmMessage')} <span className="font-semibold text-white">"{workflowName}"</span>{t('workflow.deleteConfirmSuffix')}
           </p>
 
           <div className="flex gap-2 justify-end">
@@ -1242,7 +1344,7 @@ function DeleteConfirmModal({ workflowName, onClose, onConfirm }: DeleteConfirmM
               className="px-4 py-2 bg-red-600 hover:bg-red-700 disabled:opacity-50 text-white rounded-lg transition-colors flex items-center gap-2"
             >
               {isDeleting && <Loader2 className="w-4 h-4 animate-spin" />}
-              {t('common.delete') || 'Delete'}
+              {t('common.delete')}
             </button>
           </div>
         </div>

@@ -8,6 +8,7 @@ import { FileText, Loader2, CheckCircle, XCircle, Clock } from 'lucide-react';
 import type { CanvasNodeData, ActionStatus } from '@/types/canvas';
 import type { DocumentNodeMeta } from '@/types/canvas/metadata';
 import { BaseNode } from './BaseNode';
+import { useTranslation } from '@/i18n';
 
 type DocumentNodeData = CanvasNodeData<DocumentNodeMeta>;
 
@@ -27,6 +28,7 @@ export const DocumentNode = memo(function DocumentNode(props: NodeProps) {
   const { id, selected } = props;
   const data = props.data as DocumentNodeData;
   const metadata = data.metadata as DocumentNodeMeta | undefined;
+  const { t } = useTranslation();
   // Prioritize execution status from hook over metadata status
   // executionStatus is injected by Canvas component from nodeExecutionStates
   const executionStatus = (data as Record<string, unknown>).executionStatus as ActionStatus | undefined;
@@ -63,7 +65,7 @@ export const DocumentNode = memo(function DocumentNode(props: NodeProps) {
       {/* Share indicator */}
       {metadata?.shareId && (
         <div className="mt-2 text-[10px] text-cyan-400">
-          Shared
+          {t('node.shared')}
         </div>
       )}
     </BaseNode>

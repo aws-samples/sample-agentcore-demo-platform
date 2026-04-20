@@ -118,7 +118,7 @@ export function Agents() {
               title="Create a new team (business scope)"
             >
               <Plus size={14} />
-              <span>Create Team</span>
+              <span>{t('agents.createTeam')}</span>
             </button>
             <button
               onClick={() => navigate('/create-digital-twin')}
@@ -126,7 +126,7 @@ export function Agents() {
               title="Create a digital twin of yourself"
             >
               <Plus size={14} />
-              <span>Create Agent</span>
+              <span>{t('agents.createAgent')}</span>
             </button>
           </div>
         </div>

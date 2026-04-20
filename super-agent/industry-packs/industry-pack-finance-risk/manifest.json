@@ -1,0 +1,128 @@
+{
+  "version": "1.0.0",
+  "generatedAt": "2025-04-13T01:30:00.000Z",
+  "generator": "super-agent-batch-v2",
+  "industry": {
+    "id": "finance-risk",
+    "name": "金融风控",
+    "icon": "💰",
+    "color": "#F59E0B"
+  },
+  "stats": {
+    "scopeCount": 3,
+    "agentCount": 14,
+    "skillCount": 51,
+    "workflowCount": 3,
+    "twinCount": 2,
+    "sopCount": 3
+  },
+  "scopes": [
+    {
+      "dirName": "credit-approval",
+      "name": "信贷审批",
+      "agents": [
+        "intake-preprocessor",
+        "anti-fraud-checker",
+        "credit-assessor",
+        "compliance-approver",
+        "disbursement-notifier"
+      ],
+      "skills": [
+        "admission-rule-check",
+        "application-routing",
+        "approval-decision",
+        "association-graph-analysis",
+        "compliance-review",
+        "contract-verification",
+        "credit-report-analysis",
+        "credit-scoring",
+        "customer-notification",
+        "disbursement-execution",
+        "fraud-pattern-detection",
+        "identity-verification",
+        "multi-lending-check",
+        "ocr-document-extraction",
+        "regulatory-reporting",
+        "repayment-capacity-analysis",
+        "risk-pricing"
+      ],
+      "hasWorkflow": true,
+      "hasSop": true
+    },
+    {
+      "dirName": "delinquent-asset-management",
+      "name": "逾期资产治理",
+      "agents": [
+        "case-allocator",
+        "collection-executor",
+        "customer-negotiator",
+        "legal-disposition",
+        "collection-analytics"
+      ],
+      "skills": [
+        "asset-disposition-evaluation",
+        "case-grading-assessment",
+        "collection-dashboard-monitoring",
+        "collection-performance-evaluation",
+        "collection-record-management",
+        "collection-strategy-matching",
+        "compliance-monitoring",
+        "customer-complaint-handling",
+        "dispute-investigation",
+        "dynamic-escalation-monitoring",
+        "hardship-assistance-processing",
+        "legal-feasibility-assessment",
+        "litigation-document-preparation",
+        "litigation-progress-tracking",
+        "multi-channel-collection-execution",
+        "outsource-management",
+        "provision-adequacy-assessment",
+        "recovery-forecasting",
+        "repayment-negotiation",
+        "repayment-plan-management",
+        "resource-optimization-allocation",
+        "roll-rate-analysis"
+      ],
+      "hasWorkflow": true,
+      "hasSop": true
+    },
+    {
+      "dirName": "anti-fraud-center",
+      "name": "反欺诈中心",
+      "agents": [
+        "realtime-monitor",
+        "case-investigator",
+        "rule-strategist",
+        "fraud-intel-analyst"
+      ],
+      "skills": [
+        "cross-institution-collaboration",
+        "fraud-case-investigation",
+        "fraud-knowledge-base-management",
+        "fraud-trend-analysis",
+        "gang-fraud-network-analysis",
+        "model-performance-monitoring",
+        "realtime-transaction-scoring",
+        "regulatory-report-generation",
+        "risk-decision-routing",
+        "rule-lifecycle-management",
+        "system-health-monitoring",
+        "threat-intelligence-collection"
+      ],
+      "hasWorkflow": true,
+      "hasSop": true
+    }
+  ],
+  "digitalTwins": [
+    {
+      "dirName": "首席风控官",
+      "name": "首席风控官",
+      "role": "Chief Risk Officer"
+    },
+    {
+      "dirName": "合规总监",
+      "name": "合规总监",
+      "role": "Chief Compliance Officer"
+    }
+  ]
+}

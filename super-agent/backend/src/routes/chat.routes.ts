@@ -5,8 +5,14 @@
  */
 
 import { FastifyInstance, FastifyRequest, FastifyReply } from 'fastify';
-import { stat as fsStat } from 'fs/promises';
+import { stat as fsStat, mkdtemp, writeFile as fsWriteFile, readFile as fsReadFile, rm } from 'fs/promises';
 import { createReadStream } from 'fs';
+import { execFile } from 'child_process';
+import { promisify } from 'util';
+import { tmpdir } from 'os';
+import { join } from 'path';
+
+const execFileAsync = promisify(execFile);
 import http from 'http';
 import { chatService } from '../services/chat.service.js';
 import { streamRegistry } from '../services/stream-registry.js';
@@ -147,6 +153,7 @@ export async function chatRoutes(fastify: FastifyInstance): Promise<void> {
           properties: {
             agent_id: { type: 'string', format: 'uuid' },
             business_scope_id: { type: 'string', format: 'uuid' },
+            mention_agent_id: { type: 'string', format: 'uuid' },
             session_id: { type: 'string', format: 'uuid' },
             message: { type: 'string', minLength: 1 },
             context: { type: 'object' },
@@ -179,6 +186,7 @@ export async function chatRoutes(fastify: FastifyInstance): Promise<void> {
       await chatService.streamChat(reply, request.user!.orgId, request.user!.id, {
         agentId: data.agent_id,
         businessScopeId: data.business_scope_id,
+        mentionAgentId: data.mention_agent_id,
         sessionId: data.session_id,
         message: data.message,
         context: data.context,
@@ -445,6 +453,7 @@ export async function chatRoutes(fastify: FastifyInstance): Promise<void> {
             agent_id: { type: 'string', format: 'uuid', nullable: true },
             sop_context: { type: 'string', nullable: true },
             context: { type: 'object', default: {} },
+            provision_workspace: { type: 'boolean', default: false },
           },
         },
         response: {
@@ -467,6 +476,20 @@ export async function chatRoutes(fastify: FastifyInstance): Promise<void> {
       const data = validateSchema(createChatSessionSchema, request.body);
 
       const session = await chatService.createSession(data, request.user!.orgId, request.user!.id);
+
+      // Fire-and-forget workspace provisioning — return the session ID immediately
+      // so the frontend can show the chat UI without waiting. The workspace will
+      // be ready by the time the first message arrives (prepareScopeSession calls
+      // ensureWorkspaceUpToDate as a fallback if provisioning hasn't finished).
+      if (data.provision_workspace && session.business_scope_id) {
+        chatService.provisionSessionWorkspace(
+          session.id, request.user!.orgId,
+        ).then(() => {
+          console.log(`[chat] Workspace provisioned successfully for session ${session.id}`);
+        }).catch(err => {
+          console.warn(`[chat] Eager workspace provisioning failed for session ${session.id}:`, err instanceof Error ? err.message : err);
+        });
+      }
 
       return reply.status(201).send(session);
     }
@@ -1023,13 +1046,6 @@ export async function chatRoutes(fastify: FastifyInstance): Promise<void> {
         return reply.status(404).send({ error: 'File not found' });
       }
 
-      let fileStat;
-      try {
-        fileStat = await fsStat(resolvedPath);
-      } catch {
-        return reply.status(404).send({ error: 'File not found' });
-      }
-
       const ext = request.query.path.split('.').pop()?.toLowerCase() || '';
       const mimeMap: Record<string, string> = {
         png: 'image/png', jpg: 'image/jpeg', jpeg: 'image/jpeg', gif: 'image/gif',
@@ -1038,14 +1054,211 @@ export async function chatRoutes(fastify: FastifyInstance): Promise<void> {
         html: 'text/html', htm: 'text/html',
         css: 'text/css', js: 'application/javascript', mjs: 'application/javascript',
         json: 'application/json',
+        xlsx: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        xls: 'application/vnd.ms-excel',
+        xlsb: 'application/vnd.ms-excel.sheet.binary.macroEnabled.12',
+        docx: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+        doc: 'application/msword',
+        pptx: 'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+        ppt: 'application/vnd.ms-powerpoint',
+        zip: 'application/zip',
+        gz: 'application/gzip',
+        tar: 'application/x-tar',
+        csv: 'text/csv',
       };
       const contentType = mimeMap[ext] || 'application/octet-stream';
+
+      // Try local filesystem first
+      let fileStat;
+      try {
+        fileStat = await fsStat(resolvedPath);
+      } catch {
+        // Local file not found — in agentcore mode, fall back to Command API then S3
+        const { config: appConfig } = await import('../config/index.js');
+        if (appConfig.agentRuntime === 'agentcore') {
+          const isBinaryContent = !contentType.startsWith('text/') && contentType !== 'application/json' && contentType !== 'application/javascript';
+
+          // Try reading from the agentcore container via Command API (text only — Command API returns strings)
+          if (!isBinaryContent) {
+            try {
+              const cmdContent = await agentCoreCommandService.readFile(session.id, request.query.path);
+              if (cmdContent !== null) {
+                const buf = Buffer.from(cmdContent, 'utf-8');
+                return reply
+                  .type(contentType)
+                  .header('Content-Length', buf.length)
+                  .send(buf);
+              }
+            } catch {
+              // Command API failed, try S3 fallback
+            }
+          }
+
+          // Try S3 fallback — use raw binary read for binary content types
+          if (isBinaryContent) {
+            const s3Buffer = await workspaceManager.readWorkspaceFileFromS3Raw(
+              request.user!.orgId,
+              session.business_scope_id,
+              session.id,
+              request.query.path,
+            );
+            if (s3Buffer !== null) {
+              return reply
+                .type(contentType)
+                .header('Content-Length', s3Buffer.length)
+                .send(s3Buffer);
+            }
+          } else {
+            const s3Content = await workspaceManager.readWorkspaceFileFromS3(
+              request.user!.orgId,
+              session.business_scope_id,
+              session.id,
+              request.query.path,
+            );
+            if (s3Content !== null) {
+              const buf = Buffer.from(s3Content, 'utf-8');
+              return reply
+                .type(contentType)
+                .header('Content-Length', buf.length)
+                .send(buf);
+            }
+          }
+        }
+        return reply.status(404).send({ error: 'File not found' });
+      }
 
       const stream = createReadStream(resolvedPath);
       return reply
         .type(contentType)
         .header('Content-Length', fileStat.size)
         .send(stream);
+    },
+  );
+
+  /**
+   * GET /api/chat/sessions/:id/workspace/file/pdf-preview
+   * Convert a docx/pptx/doc/ppt file to PDF on-the-fly using LibreOffice headless
+   * and return the PDF for in-browser preview.
+   */
+  fastify.get<{ Params: { id: string }; Querystring: { path: string; token?: string } }>(
+    '/sessions/:id/workspace/file/pdf-preview',
+    {
+      preHandler: [authenticate],
+      schema: {
+        description: 'Convert an Office document to PDF for preview',
+        tags: ['Chat'],
+        security: [{ bearerAuth: [] }],
+        params: {
+          type: 'object',
+          required: ['id'],
+          properties: { id: { type: 'string', format: 'uuid' } },
+        },
+        querystring: {
+          type: 'object',
+          required: ['path'],
+          properties: {
+            path: { type: 'string', minLength: 1 },
+            token: { type: 'string', description: 'Auth token for iframe src' },
+          },
+        },
+      },
+    },
+    async (request, reply) => {
+      const { id } = validateSchema(idParamSchema, request.params);
+      const session = await chatService.getSessionById(id, request.user!.orgId);
+
+      if (!session.business_scope_id) {
+        return reply.status(404).send({ error: 'No workspace for this session' });
+      }
+
+      const filePath = request.query.path;
+      const ext = filePath.split('.').pop()?.toLowerCase() || '';
+      const allowedExts = new Set(['doc', 'docx', 'ppt', 'pptx']);
+      if (!allowedExts.has(ext)) {
+        return reply.status(400).send({ error: 'Only doc/docx/ppt/pptx files can be converted to PDF' });
+      }
+
+      // Read the original binary file
+      let sourceBuffer: Buffer | null = null;
+
+      // Try local filesystem first
+      const resolvedPath = workspaceManager.resolveWorkspaceFilePath(
+        request.user!.orgId,
+        session.business_scope_id,
+        session.id,
+        filePath,
+      );
+
+      if (resolvedPath) {
+        try {
+          sourceBuffer = await fsReadFile(resolvedPath);
+        } catch {
+          // Local file not found, try fallbacks
+        }
+      }
+
+      // Fallback: S3 raw read (agentcore mode)
+      if (!sourceBuffer) {
+        const { config: appConfig } = await import('../config/index.js');
+        if (appConfig.agentRuntime === 'agentcore') {
+          sourceBuffer = await workspaceManager.readWorkspaceFileFromS3Raw(
+            request.user!.orgId,
+            session.business_scope_id,
+            session.id,
+            filePath,
+          );
+        }
+      }
+
+      if (!sourceBuffer) {
+        return reply.status(404).send({ error: 'File not found' });
+      }
+
+      // Convert to PDF using LibreOffice headless
+      // Detect the correct binary name: macOS uses 'soffice', Linux uses 'libreoffice'
+      let sofficeBin: string | null = null;
+      for (const candidate of ['libreoffice', 'soffice']) {
+        try {
+          await execFileAsync('which', [candidate]);
+          sofficeBin = candidate;
+          break;
+        } catch { /* not found, try next */ }
+      }
+      if (!sofficeBin) {
+        return reply.status(500).send({ error: 'LibreOffice is not installed. Install it with: brew install --cask libreoffice (macOS) or apt-get install libreoffice-core (Ubuntu)' });
+      }
+
+      let tmpDir: string | null = null;
+      try {
+        tmpDir = await mkdtemp(join(tmpdir(), 'pdf-preview-'));
+        const inputFile = join(tmpDir, `input.${ext}`);
+        await fsWriteFile(inputFile, sourceBuffer);
+
+        await execFileAsync(sofficeBin, [
+          '--headless',
+          '--norestore',
+          '--convert-to', 'pdf',
+          '--outdir', tmpDir,
+          inputFile,
+        ], { timeout: 30_000 });
+
+        const pdfPath = join(tmpDir, 'input.pdf');
+        const pdfBuffer = await fsReadFile(pdfPath);
+
+        return reply
+          .type('application/pdf')
+          .header('Content-Length', pdfBuffer.length)
+          .header('Content-Disposition', 'inline')
+          .send(pdfBuffer);
+      } catch (err) {
+        console.error('[pdf-preview] LibreOffice conversion failed:', err instanceof Error ? err.message : err);
+        return reply.status(500).send({ error: 'PDF conversion failed. Ensure LibreOffice is installed on the server.' });
+      } finally {
+        // Clean up temp directory
+        if (tmpDir) {
+          rm(tmpDir, { recursive: true, force: true }).catch(() => {});
+        }
+      }
     },
   );
 

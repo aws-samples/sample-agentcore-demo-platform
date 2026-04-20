@@ -7,6 +7,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { Users, Loader2, Check, X } from 'lucide-react';
 import { RestUserGroupService, type UserGroup } from '@/services/api/restUserGroupService';
+import { useTranslation } from '@/i18n';
 
 interface GroupAccessPopoverProps {
   resourceType: 'skill' | 'mcp';
@@ -22,6 +23,7 @@ export function GroupAccessPopover({ resourceType, resourceId, resourceName }: G
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const popoverRef = useRef<HTMLDivElement>(null);
+  const { t } = useTranslation();
 
   const loadData = useCallback(async () => {
     setLoading(true);
@@ -83,7 +85,7 @@ export function GroupAccessPopover({ resourceType, resourceId, resourceName }: G
         title="Manage group access"
       >
         <Users className="w-3 h-3" />
-        Access
+        {t('groupAccess.access')}
       </button>
 
       {isOpen && (
@@ -95,7 +97,7 @@ export function GroupAccessPopover({ resourceType, resourceId, resourceName }: G
           >
           <div className="px-3 py-2 border-b border-gray-700 flex items-center justify-between">
             <span className="text-xs font-medium text-gray-300 truncate">
-              Access: {resourceName}
+              {t('groupAccess.accessFor').replace('{name}', resourceName)}
             </span>
             <button onClick={() => setIsOpen(false)} className="text-gray-500 hover:text-white">
               <X className="w-3.5 h-3.5" />
@@ -108,7 +110,7 @@ export function GroupAccessPopover({ resourceType, resourceId, resourceName }: G
             </div>
           ) : groups.length === 0 ? (
             <div className="px-3 py-4 text-xs text-gray-500 text-center">
-              No groups yet. Create groups in Settings → Groups.
+              {t('groupAccess.noGroups')}
             </div>
           ) : (
             <div className="max-h-48 overflow-y-auto p-2 space-y-0.5">
@@ -141,7 +143,7 @@ export function GroupAccessPopover({ resourceType, resourceId, resourceName }: G
                 onClick={() => setIsOpen(false)}
                 className="px-2 py-1 text-xs text-gray-400 hover:text-white"
               >
-                Cancel
+                {t('common.cancel')}
               </button>
               <button
                 onClick={handleSave}
@@ -149,7 +151,7 @@ export function GroupAccessPopover({ resourceType, resourceId, resourceName }: G
                 className="px-3 py-1 text-xs bg-blue-600 hover:bg-blue-500 disabled:opacity-50 text-white rounded transition-colors flex items-center gap-1"
               >
                 {saving && <Loader2 className="w-3 h-3 animate-spin" />}
-                Save
+                {t('common.save')}
               </button>
             </div>
           )}

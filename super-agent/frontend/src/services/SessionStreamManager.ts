@@ -93,6 +93,7 @@ class SessionStreamManager {
     options: {
       businessScopeId: string
       agentId?: string
+      mentionAgentId?: string
       sopContext: string
     }
   ): void {
@@ -124,6 +125,7 @@ class SessionStreamManager {
       {
         businessScopeId: options.businessScopeId,
         agentId: options.agentId,
+        mentionAgentId: options.mentionAgentId,
         message: content.trim(),
         sessionId,
         context: { sop_context: options.sopContext },

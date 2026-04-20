@@ -24,6 +24,7 @@ import { createWorkflowProgressServer } from './workflow-progress-mcp.js';
 import { provisionWorkflowWorkspace } from './workflow-workspace.js';
 import { checkpointService, type CheckpointType } from './checkpoint.service.js';
 import { prisma } from '../config/database.js';
+import { recordTokenUsage } from './token-usage.service.js';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -729,6 +730,17 @@ export class WorkflowExecutorV2 {
         const textContent = this.extractText(event);
         if (textContent) {
           yield { type: 'log', content: textContent };
+        }
+
+        // Record token usage from result events
+        if (event.type === 'result' && event.tokenUsage) {
+          recordTokenUsage({
+            organizationId,
+            userId,
+            agentId: agentConfig.id,
+            source: 'workflow',
+            tokenUsage: event.tokenUsage,
+          });
         }
 
         if (event.type === 'error') {

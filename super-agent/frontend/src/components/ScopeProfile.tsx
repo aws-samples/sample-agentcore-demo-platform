@@ -17,11 +17,21 @@ import { ScopeMemoryPanel } from './ScopeMemoryPanel'
 import { DocGroupsPanel } from './DocGroupsPanel'
 import { RehearsalPanel } from './RehearsalPanel'
 import { MCPCatalogPanel, type CustomMcpServer } from './MCPCatalogPanel'
+import { ConnectorPanel } from './ConnectorPanel'
 import {
   getAvatarDisplayUrl,
   getAvatarFallback,
   shouldShowAvatarImage,
 } from '@/utils/avatarUtils'
+import { translations } from '@/i18n/translations'
+
+/** Module-level t() — no React context dependency */
+function t(key: string): string {
+  const lang = (typeof window !== 'undefined' && localStorage.getItem('super-agent-language')) || 'en'
+  const entry = translations[key]
+  if (!entry) return key
+  return entry[lang as 'en' | 'cn'] ?? entry.en ?? key
+}
 
 interface ScopeProfileProps {
   scope: BusinessScope
@@ -192,10 +202,10 @@ function StatCard({ icon: Icon, label, value, sub, color }: {
 /*  Task Briefing Card (Pinterest-style)                               */
 /* ------------------------------------------------------------------ */
 const statusBadge: Record<TaskBriefing['status'], { bg: string; text: string; label: string }> = {
-  completed: { bg: 'bg-emerald-500/10', text: 'text-emerald-400', label: 'Completed' },
-  flagged: { bg: 'bg-yellow-500/10', text: 'text-yellow-400', label: 'Flagged' },
-  'in-progress': { bg: 'bg-blue-500/10', text: 'text-blue-400', label: 'In Progress' },
-  escalated: { bg: 'bg-orange-500/10', text: 'text-orange-400', label: 'Escalated' },
+  completed: { bg: 'bg-emerald-500/10', text: 'text-emerald-400', label: t('scopeProfile.statusCompleted') },
+  flagged: { bg: 'bg-yellow-500/10', text: 'text-yellow-400', label: t('scopeProfile.statusFlagged') },
+  'in-progress': { bg: 'bg-blue-500/10', text: 'text-blue-400', label: t('scopeProfile.statusInProgress') },
+  escalated: { bg: 'bg-orange-500/10', text: 'text-orange-400', label: t('scopeProfile.statusEscalated') },
 }
 
 function BriefingCard({ briefing }: { briefing: TaskBriefing }) {
@@ -279,7 +289,7 @@ function AgentRow({ agent }: { agent: Agent }) {
         <p className="text-xs text-white font-medium truncate">{agent.displayName}</p>
       </div>
       <span className="text-[10px] text-gray-500">{agent.role}</span>
-      <span className="text-[10px] text-gray-600 w-12 text-right">{agent.metrics?.taskCount ?? 0} tasks</span>
+      <span className="text-[10px] text-gray-600 w-12 text-right">{agent.metrics?.taskCount ?? 0} {t('scopeProfile.tasks')}</span>
     </div>
   )
 }
@@ -296,6 +306,7 @@ export function ScopeProfile({ scope, agents, allAgents = [], onDeleteScope, onA
   const [isAdding, setIsAdding] = useState(false)
   const [showPicker, setShowPicker] = useState(false)
   const [showCatalogPanel, setShowCatalogPanel] = useState(false)
+  const [showConnectorPanel, setShowConnectorPanel] = useState(false)
   const [showAgentPicker, setShowAgentPicker] = useState(false)
   const [editingConfigId, setEditingConfigId] = useState<string | null>(null)
   const [configDraft, setConfigDraft] = useState('')
@@ -640,10 +651,10 @@ export function ScopeProfile({ scope, agents, allAgents = [], onDeleteScope, onA
                 <button
                   className="text-[10px] font-semibold px-2.5 py-1 rounded-full border border-blue-500/30 bg-blue-500/10 text-blue-400 hover:bg-blue-500/20 transition-colors cursor-pointer"
                 >
-                  Business Health Check
+                  {t('scopeProfile.healthCheck')}
                 </button>
                 <span className="absolute -top-2 -right-3 text-[8px] font-medium px-1.5 py-0.5 rounded-full bg-gray-700 text-gray-400 whitespace-nowrap">
-                  Coming Soon
+                  {t('scopeProfile.comingSoon')}
                 </span>
               </div>
             </div>
@@ -655,7 +666,7 @@ export function ScopeProfile({ scope, agents, allAgents = [], onDeleteScope, onA
             <button
               onClick={() => onDeleteScope(scope.id)}
               className="p-2 text-gray-500 hover:text-red-400 hover:bg-red-400/10 rounded-lg transition-colors"
-              title="Delete scope"
+              title={t('scopeProfile.deleteScope')}
             >
               <Trash2 className="w-5 h-5" />
             </button>
@@ -664,11 +675,11 @@ export function ScopeProfile({ scope, agents, allAgents = [], onDeleteScope, onA
 
         {/* Inline KPI strip */}
         <div className="grid grid-cols-4 gap-3 mt-4">
-          <StatCard icon={Users} label="Agents" value={totalAgents}
+          <StatCard icon={Users} label={t('scopeProfile.agents')} value={totalAgents}
             sub={`${activeCount} active · ${busyCount} busy`} color="bg-blue-600/80" />
-          <StatCard icon={Zap} label="Tasks Done" value={totalTasks.toLocaleString()}
+          <StatCard icon={Zap} label={t('scopeProfile.tasksDone')} value={totalTasks.toLocaleString()}
             color="bg-purple-600/80" />
-          <StatCard icon={TrendingUp} label="Response Rate" value={`${avgResponseRate}%`}
+          <StatCard icon={TrendingUp} label={t('scopeProfile.responseRate')} value={`${avgResponseRate}%`}
             color="bg-emerald-600/80" />
           <StatCard icon={BarChart3} label="Skills" value={totalSkills}
             sub={`${scopeServers.length} MCP`} color="bg-amber-600/80" />
@@ -683,7 +694,7 @@ export function ScopeProfile({ scope, agents, allAgents = [], onDeleteScope, onA
           <div className="flex items-center justify-between mb-3">
             <div className="flex items-center gap-2">
               <Terminal className="w-4 h-4 text-gray-400" />
-              <h3 className="text-[11px] font-semibold text-gray-500 uppercase tracking-wider">System Prompt</h3>
+              <h3 className="text-[11px] font-semibold text-gray-500 uppercase tracking-wider">{t('scopeProfile.systemPrompt')}</h3>
             </div>
             {!isEditingPrompt && (
               <button
@@ -701,7 +712,7 @@ export function ScopeProfile({ scope, agents, allAgents = [], onDeleteScope, onA
                 onChange={e => setPromptDraft(e.target.value)}
                 rows={6}
                 className="w-full px-3 py-2 text-xs bg-gray-800 border border-gray-700 rounded-lg text-white focus:border-blue-500 focus:outline-none resize-y font-mono"
-                placeholder="Define the behavior and personality for this scope..."
+                placeholder={t('scopeProfile.promptPlaceholder')}
               />
               <div className="flex items-center gap-2">
                 <button
@@ -725,7 +736,7 @@ export function ScopeProfile({ scope, agents, allAgents = [], onDeleteScope, onA
               {scope.systemPrompt ? (
                 <p className="text-xs text-gray-400 whitespace-pre-wrap leading-relaxed break-words">{scope.systemPrompt}</p>
               ) : (
-                <p className="text-xs text-gray-600 italic">No system prompt defined. Click Edit to add one.</p>
+                <p className="text-xs text-gray-600 italic">{t('scopeProfile.noPrompt')}</p>
               )}
             </div>
           )}
@@ -739,16 +750,16 @@ export function ScopeProfile({ scope, agents, allAgents = [], onDeleteScope, onA
             <div className="flex items-center gap-2">
               <Sparkles className="w-4 h-4 text-yellow-400" />
               <h3 className="text-[11px] font-semibold text-gray-500 uppercase tracking-wider">Skills</h3>
-              <span className="text-[10px] text-gray-600">{scopeSkills.length} equipped</span>
+              <span className="text-[10px] text-gray-600">{scopeSkills.length} {t('scopeProfile.skillsEquipped')}</span>
             </div>
           </div>
           {skillsLoading ? (
-            <div className="py-4 text-center text-xs text-gray-500">Loading skills...</div>
+            <div className="py-4 text-center text-xs text-gray-500">{t('scopeProfile.loadingSkills')}</div>
           ) : scopeSkills.length === 0 ? (
             <div className="py-4 text-center">
               <Sparkles className="w-5 h-5 text-gray-700 mx-auto mb-1" />
-              <p className="text-xs text-gray-500">No skills equipped</p>
-              <p className="text-[10px] text-gray-600 mt-0.5">Skills can be added from the Skill Workshop or API integrations.</p>
+              <p className="text-xs text-gray-500">{t('scopeProfile.noSkillsEquipped')}</p>
+              <p className="text-[10px] text-gray-600 mt-0.5">{t('scopeProfile.noSkillsHint')}</p>
             </div>
           ) : (
             <div className="space-y-1.5">
@@ -774,19 +785,19 @@ export function ScopeProfile({ scope, agents, allAgents = [], onDeleteScope, onA
         <div>
           <div className="flex items-center gap-2 mb-3">
             <FileText className="w-4 h-4 text-gray-400" />
-            <h3 className="text-xs font-semibold text-gray-400 uppercase tracking-wider">What's Happened</h3>
-            <span className="text-[10px] text-gray-600 ml-auto">AI-summarized task briefings</span>
+            <h3 className="text-xs font-semibold text-gray-400 uppercase tracking-wider">{t('scopeProfile.whatsHappened')}</h3>
+            <span className="text-[10px] text-gray-600 ml-auto">{t('scopeProfile.briefingsSubtitle')}</span>
           </div>
 
           {briefingsLoading ? (
             <div className="py-12 text-center bg-gray-900 border border-gray-800 rounded-xl">
               <Loader2 className="w-6 h-6 text-blue-500 animate-spin mx-auto mb-2" />
-              <p className="text-sm text-gray-500">Loading briefings...</p>
+              <p className="text-sm text-gray-500">{t('scopeProfile.loadingBriefings')}</p>
             </div>
           ) : briefings.length === 0 ? (
             <div className="py-12 text-center bg-gray-900 border border-gray-800 rounded-xl">
               <FileText className="w-8 h-8 text-gray-700 mx-auto mb-2" />
-              <p className="text-sm text-gray-500">No task history yet</p>
+              <p className="text-sm text-gray-500">{t('scopeProfile.noHistory')}</p>
             </div>
           ) : (
             <div className="columns-1 md:columns-2 gap-3 space-y-3">
@@ -815,7 +826,7 @@ export function ScopeProfile({ scope, agents, allAgents = [], onDeleteScope, onA
                   className="flex items-center gap-1 px-2 py-1 text-[10px] bg-blue-600 hover:bg-blue-700 rounded text-white transition-colors"
                 >
                   <Plus className="w-3 h-3" />
-                  Add Agent
+                  {t('scopeProfile.addAgent')}
                 </button>
               )}
               <div className="flex items-center gap-2 text-[10px] text-gray-600">
@@ -830,7 +841,7 @@ export function ScopeProfile({ scope, agents, allAgents = [], onDeleteScope, onA
             <div className="border-b border-gray-800 bg-gray-800/50">
               {unassignedAgents.length === 0 ? (
                 <p className="p-3 text-xs text-gray-400">
-                  {allAgents.length === 0 ? 'No agents available.' : 'All agents are already assigned to this scope.'}
+                  {allAgents.length === 0 ? t('scopeProfile.noAgentsAvailable') : t('scopeProfile.allAssigned')}
                 </p>
               ) : (
                 <div className="max-h-40 overflow-y-auto divide-y divide-gray-700/50">
@@ -854,7 +865,7 @@ export function ScopeProfile({ scope, agents, allAgents = [], onDeleteScope, onA
           )}
 
           {agents.length === 0 ? (
-            <div className="py-4 text-center text-xs text-gray-500">No agents</div>
+            <div className="py-4 text-center text-xs text-gray-500">{t('scopeProfile.noAgents')}</div>
           ) : (
             <div className="divide-y divide-gray-800/50">
               {agents.map(agent => (
@@ -883,12 +894,12 @@ export function ScopeProfile({ scope, agents, allAgents = [], onDeleteScope, onA
         <div className="bg-gray-900 border border-gray-800 rounded-xl overflow-hidden">
           <div className="flex items-center justify-between px-4 py-2.5 border-b border-gray-800">
             <div className="flex items-center gap-2">
-              <Server className="w-3.5 h-3.5 text-gray-500" />
+              <Server className="w-4 h-4 text-gray-400" />
               <h3 className="text-[11px] font-semibold text-gray-500 uppercase tracking-wider">MCP Servers</h3>
             </div>
             <button
               onClick={() => setShowCatalogPanel(true)}
-              className="flex items-center gap-1 px-2 py-1 text-[10px] bg-blue-600 hover:bg-blue-700 rounded text-white transition-colors"
+              className="flex items-center gap-1 text-[10px] px-2 py-1 rounded bg-blue-500/10 text-blue-400 hover:bg-blue-500/20 transition-colors"
             >
               <Plus className="w-3 h-3" />
               Add
@@ -899,7 +910,7 @@ export function ScopeProfile({ scope, agents, allAgents = [], onDeleteScope, onA
             <div className="border-b border-gray-800 bg-gray-800/50">
               {availableServers.length === 0 ? (
                 <p className="p-3 text-xs text-gray-400">
-                  {allServers.length === 0 ? 'No MCP servers configured.' : 'All servers already assigned.'}
+                  {allServers.length === 0 ? t('scopeProfile.noMcpConfigured') : t('scopeProfile.allMcpAssigned')}
                 </p>
               ) : (
                 <div className="max-h-40 overflow-y-auto divide-y divide-gray-700/50">
@@ -929,7 +940,7 @@ export function ScopeProfile({ scope, agents, allAgents = [], onDeleteScope, onA
               <Loader2 className="w-4 h-4 text-blue-500 animate-spin" />
             </div>
           ) : scopeServers.length === 0 ? (
-            <div className="py-4 text-center text-xs text-gray-500">No MCP servers assigned</div>
+            <div className="py-4 text-center text-xs text-gray-500">{t('scopeProfile.noMcpServers')}</div>
           ) : (
             <div className="divide-y divide-gray-800/50">
               {scopeServers.map(server => (
@@ -947,7 +958,7 @@ export function ScopeProfile({ scope, agents, allAgents = [], onDeleteScope, onA
                             {getTypeLabel(server.config, server.host_address)}
                           </span>
                           {server.scope_config && Object.keys(server.scope_config).length > 0 && (
-                            <span className="text-[9px] px-1 py-0.5 rounded bg-cyan-500/15 text-cyan-400">configured</span>
+                            <span className="text-[9px] px-1 py-0.5 rounded bg-cyan-500/15 text-cyan-400">{t('scopeProfile.configured')}</span>
                           )}
                         </div>
                       </div>
@@ -1000,6 +1011,34 @@ export function ScopeProfile({ scope, agents, allAgents = [], onDeleteScope, onA
             </div>
           )}
         </div>
+
+        {/* ============================================================ */}
+        {/*  Data Connectors                                               */}
+        {/* ============================================================ */}
+        <div className="bg-gray-900 border border-gray-800 rounded-xl overflow-hidden p-4">
+          <div className="flex items-center justify-between mb-3">
+            <div className="flex items-center gap-2">
+              <Database className="w-4 h-4 text-gray-400" />
+              <h3 className="text-[11px] font-semibold text-gray-500 uppercase tracking-wider">{t('connector.title')}</h3>
+            </div>
+            <button
+              onClick={() => setShowConnectorPanel(true)}
+              className="flex items-center gap-1 text-[10px] px-2 py-1 rounded bg-emerald-500/10 text-emerald-400 hover:bg-emerald-500/20 transition-colors"
+            >
+              <Settings className="w-3 h-3" />
+              {t('connector.manage')}
+            </button>
+          </div>
+          <p className="text-xs text-gray-500">
+            {t('connector.description')}
+          </p>
+        </div>
+
+        <ConnectorPanel
+          open={showConnectorPanel}
+          onClose={() => setShowConnectorPanel(false)}
+          scopeId={scope.id}
+        />
 
         {/* ============================================================ */}
         {/*  Knowledge Base (Document Groups)                              */}

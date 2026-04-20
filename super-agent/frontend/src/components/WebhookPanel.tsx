@@ -18,6 +18,7 @@ import {
 } from 'lucide-react';
 import { useWebhooks } from '@/services/useWebhooks';
 import type { Webhook, WebhookCallRecord } from '@/services/useWebhooks';
+import { useTranslation } from '@/i18n';
 
 interface WebhookPanelProps {
   workflowId: string;
@@ -36,6 +37,7 @@ export function WebhookPanel({ workflowId, onClose }: WebhookPanelProps) {
     getCallHistory,
     clearError,
   } = useWebhooks();
+  const { t } = useTranslation();
 
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const [showSecret, setShowSecret] = useState<{ secret: string; webhookUrl: string } | null>(null);
@@ -72,7 +74,7 @@ export function WebhookPanel({ workflowId, onClose }: WebhookPanelProps) {
   };
 
   const handleDelete = async (webhook: Webhook) => {
-    if (confirm('Are you sure you want to delete this webhook?')) {
+    if (confirm(t('webhook.confirmDelete'))) {
       await deleteWebhook(webhook.webhookId);
       if (selectedWebhook?.webhookId === webhook.webhookId) {
         setSelectedWebhook(null);
@@ -95,7 +97,7 @@ export function WebhookPanel({ workflowId, onClose }: WebhookPanelProps) {
     <div className="w-96 border-l border-gray-800 bg-gray-900/95 flex flex-col h-full">
       {/* Header */}
       <div className="p-4 border-b border-gray-800 flex items-center justify-between">
-        <h3 className="text-sm font-medium text-white">Webhooks</h3>
+        <h3 className="text-sm font-medium text-white">{t('webhook.title')}</h3>
         <button onClick={onClose} className="p-1 hover:bg-gray-800 rounded">
           <X className="w-4 h-4 text-gray-400" />
         </button>
@@ -116,13 +118,13 @@ export function WebhookPanel({ workflowId, onClose }: WebhookPanelProps) {
       {showSecret && (
         <div className="mx-4 mt-4 p-4 bg-yellow-500/10 border border-yellow-500/30 rounded-lg">
           <p className="text-sm text-yellow-400 mb-2 font-medium">
-            ⚠️ Save this secret - it won't be shown again!
+            {t('webhook.saveSecret')}
           </p>
           <code className="block p-2 bg-gray-800 rounded text-xs text-gray-300 break-all">
             {showSecret.secret}
           </code>
           <div className="mt-2 text-xs text-gray-400">
-            <p className="mb-1">Example:</p>
+            <p className="mb-1">{t('webhook.example')}:</p>
             <code className="block p-2 bg-gray-800 rounded text-[11px] text-gray-300 break-all whitespace-pre-wrap">
 {`curl -X POST ${showSecret.webhookUrl} \\
   -H "Content-Type: application/json" \\
@@ -134,7 +136,7 @@ export function WebhookPanel({ workflowId, onClose }: WebhookPanelProps) {
             onClick={() => setShowSecret(null)}
             className="mt-2 text-xs text-yellow-400 hover:text-yellow-300"
           >
-            I've saved it
+            {t('webhook.secretSaved')}
           </button>
         </div>
       )}
@@ -147,7 +149,7 @@ export function WebhookPanel({ workflowId, onClose }: WebhookPanelProps) {
           </div>
         ) : webhooks.length === 0 ? (
           <div className="text-center py-8">
-            <p className="text-sm text-gray-500 mb-4">No webhooks configured</p>
+            <p className="text-sm text-gray-500 mb-4">{t('webhook.noWebhooks')}</p>
             <button
               onClick={handleCreate}
               disabled={isCreating}
@@ -158,7 +160,7 @@ export function WebhookPanel({ workflowId, onClose }: WebhookPanelProps) {
               ) : (
                 <Plus className="w-4 h-4" />
               )}
-              Create Webhook
+              {t('webhook.create')}
             </button>
           </div>
         ) : (
@@ -221,14 +223,14 @@ export function WebhookPanel({ workflowId, onClose }: WebhookPanelProps) {
                       ? 'bg-green-500/20 text-green-400' 
                       : 'bg-gray-500/20 text-gray-400'
                   }`}>
-                    {webhook.isEnabled ? 'Active' : 'Disabled'}
+                    {webhook.isEnabled ? t('webhook.active') : t('webhook.disabled')}
                   </span>
                   <button
                     onClick={() => handleViewHistory(webhook)}
                     className="text-xs text-blue-400 hover:text-blue-300 flex items-center gap-1"
                   >
                     <Clock className="w-3 h-3" />
-                    History
+                    {t('webhook.history')}
                   </button>
                 </div>
               </div>
@@ -244,7 +246,7 @@ export function WebhookPanel({ workflowId, onClose }: WebhookPanelProps) {
               ) : (
                 <Plus className="w-4 h-4" />
               )}
-              Add Webhook
+              {t('webhook.add')}
             </button>
           </>
         )}
@@ -255,13 +257,13 @@ export function WebhookPanel({ workflowId, onClose }: WebhookPanelProps) {
         <div className="border-t border-gray-800 p-4 max-h-80 overflow-y-auto">
           <div className="flex items-center justify-between mb-2">
             <h4 className="text-xs font-medium text-gray-400">
-              Execution History - {selectedWebhook.name || 'Webhook'}
+              {t('webhook.executionHistory')} - {selectedWebhook.name || 'Webhook'}
             </h4>
             <button
               onClick={() => handleViewHistory(selectedWebhook)}
               className="text-xs text-blue-400 hover:text-blue-300"
             >
-              Refresh
+              {t('webhook.refresh')}
             </button>
           </div>
           {isLoadingHistory ? (
@@ -269,7 +271,7 @@ export function WebhookPanel({ workflowId, onClose }: WebhookPanelProps) {
               <Loader2 className="w-4 h-4 text-blue-400 animate-spin" />
             </div>
           ) : callHistory.length === 0 ? (
-            <p className="text-xs text-gray-500 text-center py-4">No calls yet</p>
+            <p className="text-xs text-gray-500 text-center py-4">{t('webhook.noCalls')}</p>
           ) : (
             <div className="space-y-2">
               {callHistory.map((record) => {
@@ -306,7 +308,7 @@ export function WebhookPanel({ workflowId, onClose }: WebhookPanelProps) {
                     </div>
                     {duration && (
                       <div className="text-gray-500">
-                        {record.status === 'running' ? 'Running for' : 'Duration'}: {duration}
+                        {record.status === 'running' ? t('webhook.runningFor') : t('webhook.duration')}: {duration}
                       </div>
                     )}
                     {record.errorMessage && (
@@ -332,6 +334,7 @@ export function WebhookPanel({ workflowId, onClose }: WebhookPanelProps) {
 
 function WebhookLogModal({ record, onClose }: { record: WebhookCallRecord; onClose: () => void }) {
   const logsEndRef = useRef<HTMLDivElement>(null);
+  const { t } = useTranslation();
   const logs = (record.logs || []) as Array<{ type: string; content?: string; taskId?: string; taskTitle?: string; timestamp: string }>;
 
   useEffect(() => {
@@ -344,7 +347,7 @@ function WebhookLogModal({ record, onClose }: { record: WebhookCallRecord; onClo
         {/* Header */}
         <div className="p-4 border-b border-gray-800 flex items-center justify-between">
           <div>
-            <h3 className="text-sm font-medium text-white">Execution Log</h3>
+            <h3 className="text-sm font-medium text-white">{t('webhook.executionLog')}</h3>
             <p className="text-xs text-gray-400 mt-0.5">
               {new Date(record.createdAt).toLocaleString()} · <span className={
                 record.status === 'success' ? 'text-green-400'
@@ -366,10 +369,10 @@ function WebhookLogModal({ record, onClose }: { record: WebhookCallRecord; onClo
               {record.status === 'running' ? (
                 <div className="flex items-center gap-2">
                   <Loader2 className="w-4 h-4 animate-spin" />
-                  <span>Execution in progress...</span>
+                  <span>{t('webhook.inProgress')}</span>
                 </div>
               ) : (
-                'No log events recorded'
+                t('webhook.noLogs')
               )}
             </div>
           ) : (
@@ -406,7 +409,7 @@ function WebhookLogModal({ record, onClose }: { record: WebhookCallRecord; onClo
         {record.status === 'running' && (
           <div className="p-3 border-t border-gray-800 flex items-center gap-2 text-xs text-blue-400">
             <Loader2 className="w-3 h-3 animate-spin" />
-            <span>Execution in progress — logs update automatically</span>
+            <span>{t('webhook.logsAutoUpdate')}</span>
           </div>
         )}
       </div>

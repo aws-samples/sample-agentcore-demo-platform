@@ -1,4 +1,5 @@
-import { Users, Monitor, Megaphone, DollarSign, Headphones, Briefcase, Settings, TrendingUp } from 'lucide-react'
+import { Users, Monitor, Megaphone, DollarSign, Headphones, Briefcase, Settings, TrendingUp, Search } from 'lucide-react'
+import { useState } from 'react'
 import type { Agent, AgentStatus } from '@/types'
 import { useTranslation } from '@/i18n'
 import { useBusinessScopes } from '@/services/useBusinessScopes'
@@ -45,9 +46,21 @@ const statusColors: Record<AgentStatus, { dot: string }> = {
 export function AgentList({ agents, selectedAgentId, selectedScopeId, onSelectAgent, onSelectScope }: AgentListProps) {
   const { t } = useTranslation()
   const { businessScopes } = useBusinessScopes()
+  const [search, setSearch] = useState('')
+
+  const query = search.trim().toLowerCase()
+
+  // Filter agents by search query (name, role, displayName)
+  const filteredAgents = query
+    ? agents.filter(a =>
+        a.displayName.toLowerCase().includes(query) ||
+        (a.role ?? '').toLowerCase().includes(query) ||
+        a.name.toLowerCase().includes(query)
+      )
+    : agents
 
   // Group agents by their department (which is actually business_scope_id from Supabase)
-  const agentsByScope = agents.reduce<Record<string, Agent[]>>((acc, agent) => {
+  const agentsByScope = filteredAgents.reduce<Record<string, Agent[]>>((acc, agent) => {
     const scopeId = agent.department // department field holds business_scope_id
     if (!acc[scopeId]) {
       acc[scopeId] = []
@@ -92,10 +105,35 @@ export function AgentList({ agents, selectedAgentId, selectedScopeId, onSelectAg
     // Independent agents last
     ...(agentsByScope['__independent__'] ? ['__independent__'] : []),
   ]
-  const scopeIds = allScopeIds
+  // When searching, also include scopes whose name matches (even if no agent matches)
+  const filteredScopeIds = query
+    ? allScopeIds.filter(id => {
+        // Keep if scope has matching agents
+        if ((agentsByScope[id] || []).length > 0) return true
+        // Keep if scope name matches
+        const scope = businessScopes.find(s => s.id === id)
+        if (scope && scope.name.toLowerCase().includes(query)) return true
+        return false
+      })
+    : allScopeIds
+  const scopeIds = filteredScopeIds
 
   return (
-    <div className="h-full overflow-y-auto">
+    <div className="h-full flex flex-col">
+      {/* Search */}
+      <div className="px-2 py-2 border-b border-gray-800">
+        <div className="relative">
+          <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-500" />
+          <input
+            type="text"
+            value={search}
+            onChange={e => setSearch(e.target.value)}
+            placeholder={t('agentList.searchPlaceholder')}
+            className="w-full pl-8 pr-3 py-1.5 text-sm bg-gray-800 border border-gray-700 rounded-md text-white placeholder-gray-500 focus:outline-none focus:border-blue-500 transition-colors"
+          />
+        </div>
+      </div>
+      <div className="flex-1 overflow-y-auto">
       {scopeIds.map((scopeId) => {
         const scopeAgents = agentsByScope[scopeId] || []
         const scope = businessScopes.find(s => s.id === scopeId)
@@ -106,7 +144,7 @@ export function AgentList({ agents, selectedAgentId, selectedScopeId, onSelectAg
         const isIndependent = scopeId === '__independent__'
         const isDigitalTwin = scope?.scopeType === 'digital_twin'
         const scopeInfo = isIndependent
-          ? { name: 'Independent Agents', icon: <Briefcase className="w-4 h-4 text-white" />, color: 'bg-gray-600' }
+          ? { name: t('agentList.independent'), icon: <Briefcase className="w-4 h-4 text-white" />, color: 'bg-gray-600' }
           : getScopeInfo(scopeId)
 
         // Digital twin scopes render as an agent-style card (no sub-agents)
@@ -151,7 +189,7 @@ export function AgentList({ agents, selectedAgentId, selectedScopeId, onSelectAg
                   <p className={`text-sm font-medium truncate ${isSelected ? 'text-blue-400' : 'text-white'}`}>
                     {scope.name}
                   </p>
-                  <p className="text-xs text-gray-400 truncate">{scope.role || 'Digital Twin'}</p>
+                  <p className="text-xs text-gray-400 truncate">{scope.role || t('agentList.digitalTwin')}</p>
                 </div>
               </button>
             </div>
@@ -238,6 +276,7 @@ export function AgentList({ agents, selectedAgentId, selectedScopeId, onSelectAg
           </div>
         )
       })}
+      </div>
     </div>
   )
 }

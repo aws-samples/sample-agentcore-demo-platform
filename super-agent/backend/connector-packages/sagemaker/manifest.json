@@ -1,0 +1,24 @@
+{
+  "id": "sagemaker",
+  "version": "1.0.0",
+  "name": "SageMaker",
+  "icon": "🧠",
+  "category": "aws_service",
+  "description": {
+    "en": "ML model inference",
+    "cn": "ML 模型推理"
+  },
+  "auth": {
+    "type": "iam_role",
+    "credential_fields": [
+      { "key": "role_arn", "label": { "en": "IAM Role ARN", "cn": "IAM Role ARN" }, "type": "text", "placeholder": "arn:aws:iam::123456789012:role/SageMakerRole", "required": true }
+    ]
+  },
+  "config_fields": [
+    { "key": "region", "label": { "en": "AWS Region", "cn": "AWS Region" }, "type": "text", "placeholder": "us-east-1", "required": true },
+    { "key": "endpoint_name", "label": { "en": "Endpoint Name", "cn": "Endpoint Name" }, "type": "text", "placeholder": "my-model-endpoint", "required": false }
+  ],
+  "setup_guide": "setup-guide.md",
+  "tools_definition": "tools.json",
+  "lambda_handler": "handler.ts"
+}

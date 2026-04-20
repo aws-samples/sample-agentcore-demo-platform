@@ -66,7 +66,7 @@ const navItems: NavItemConfig[] = [
     id: 'starred',
     icon: <Star className="w-5 h-5" />,
     tooltipKey: 'nav.starred',
-    path: '/starred',
+    path: '/showcase',
   },
 ]
 
@@ -89,7 +89,7 @@ export function Sidebar({ onAvatarClick, isAdminMenuOpen }: SidebarProps) {
     if (path.startsWith('/projects')) return 'projects'
     if (path.startsWith('/tools')) return 'tools'
     if (path.startsWith('/apps')) return 'apps'
-    if (path.startsWith('/starred')) return 'starred'
+    if (path.startsWith('/starred') || path.startsWith('/showcase')) return 'starred'
     return 'dashboard'
   }
 
@@ -149,7 +149,7 @@ export function Sidebar({ onAvatarClick, isAdminMenuOpen }: SidebarProps) {
             hover:ring-2 hover:ring-blue-400 hover:ring-offset-2 hover:ring-offset-gray-900
             ${isAdminMenuOpen ? 'ring-2 ring-blue-400 ring-offset-2 ring-offset-gray-900' : ''}
           `}
-          title="Admin Menu"
+          title={t('sidebar.adminMenu')}
         >
           <img 
             src="https://api.dicebear.com/9.x/avataaars/svg?seed=Admin" 

@@ -6,6 +6,7 @@
 import { useState } from 'react'
 import { Brain, Pin, PinOff, Trash2, Plus, Search, X, Edit3, Check } from 'lucide-react'
 import { useScopeMemories } from '@/services/useScopeMemories'
+import { useTranslation } from '@/i18n'
 
 const CATEGORIES = ['lesson', 'decision', 'procedure', 'fact', 'custom'] as const
 const CATEGORY_COLORS: Record<string, string> = {
@@ -23,6 +24,7 @@ interface ScopeMemoryPanelProps {
 
 export function ScopeMemoryPanel({ scopeId, scopeName }: ScopeMemoryPanelProps) {
   const { memories, isLoading, create, update, remove, load } = useScopeMemories(scopeId)
+  const { t } = useTranslation()
   const [showForm, setShowForm] = useState(false)
   const [searchQuery, setSearchQuery] = useState('')
   const [filterCategory, setFilterCategory] = useState<string | ''>('')
@@ -77,14 +79,14 @@ export function ScopeMemoryPanel({ scopeId, scopeName }: ScopeMemoryPanelProps) 
       <div className="flex items-center justify-between mb-3">
         <div className="flex items-center gap-2">
           <Brain className="w-4 h-4 text-gray-400" />
-          <h3 className="text-[11px] font-semibold text-gray-500 uppercase tracking-wider">Scope Memory</h3>
-          <span className="text-[10px] text-gray-600">{memories.length} entries</span>
+          <h3 className="text-[11px] font-semibold text-gray-500 uppercase tracking-wider">{t('scopeMemory.title')}</h3>
+          <span className="text-[10px] text-gray-600">{memories.length} {t('scopeMemory.entries')}</span>
         </div>
         <button
           onClick={() => setShowForm(!showForm)}
           className="flex items-center gap-1 text-[10px] px-2 py-1 rounded bg-blue-500/10 text-blue-400 hover:bg-blue-500/20 transition-colors"
         >
-          <Plus className="w-3 h-3" /> Add Memory
+          <Plus className="w-3 h-3" /> {t('scopeMemory.addMemory')}
         </button>
       </div>
 
@@ -97,7 +99,7 @@ export function ScopeMemoryPanel({ scopeId, scopeName }: ScopeMemoryPanelProps) 
             value={searchQuery}
             onChange={e => setSearchQuery(e.target.value)}
             onKeyDown={e => e.key === 'Enter' && handleSearch()}
-            placeholder="Search memories..."
+            placeholder={t('scopeMemory.searchPlaceholder')}
             className="w-full pl-7 pr-2 py-1.5 bg-gray-900 border border-gray-700 rounded text-xs text-white focus:border-blue-500 focus:outline-none"
           />
         </div>
@@ -106,7 +108,7 @@ export function ScopeMemoryPanel({ scopeId, scopeName }: ScopeMemoryPanelProps) 
           onChange={e => { setFilterCategory(e.target.value); setTimeout(handleSearch, 0) }}
           className="px-2 py-1.5 bg-gray-900 border border-gray-700 rounded text-xs text-gray-300 focus:outline-none"
         >
-          <option value="">All categories</option>
+          <option value="">{t('scopeMemory.allCategories')}</option>
           {CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
         </select>
       </div>
@@ -118,13 +120,13 @@ export function ScopeMemoryPanel({ scopeId, scopeName }: ScopeMemoryPanelProps) 
             type="text"
             value={formData.title}
             onChange={e => setFormData(prev => ({ ...prev, title: e.target.value }))}
-            placeholder="Memory title"
+            placeholder={t('scopeMemory.titlePlaceholder')}
             className="w-full px-3 py-1.5 bg-gray-900 border border-gray-700 rounded text-sm text-white focus:border-blue-500 focus:outline-none"
           />
           <textarea
             value={formData.content}
             onChange={e => setFormData(prev => ({ ...prev, content: e.target.value }))}
-            placeholder="What should this scope remember?"
+            placeholder={t('scopeMemory.contentPlaceholder')}
             rows={3}
             className="w-full px-3 py-1.5 bg-gray-900 border border-gray-700 rounded text-sm text-white focus:border-blue-500 focus:outline-none resize-none"
           />
@@ -140,7 +142,7 @@ export function ScopeMemoryPanel({ scopeId, scopeName }: ScopeMemoryPanelProps) 
               type="text"
               value={formData.tags}
               onChange={e => setFormData(prev => ({ ...prev, tags: e.target.value }))}
-              placeholder="Tags (comma-separated)"
+              placeholder={t('scopeMemory.tagsPlaceholder')}
               className="flex-1 px-2 py-1.5 bg-gray-900 border border-gray-700 rounded text-xs text-white focus:border-blue-500 focus:outline-none"
             />
             <label className="flex items-center gap-1 text-xs text-gray-400 cursor-pointer">
@@ -150,17 +152,17 @@ export function ScopeMemoryPanel({ scopeId, scopeName }: ScopeMemoryPanelProps) 
                 onChange={e => setFormData(prev => ({ ...prev, is_pinned: e.target.checked }))}
                 className="rounded"
               />
-              Pin
+              {t('scopeMemory.pin')}
             </label>
           </div>
           <div className="flex justify-end gap-2">
-            <button onClick={() => setShowForm(false)} className="px-3 py-1 text-xs text-gray-400 hover:text-white">Cancel</button>
+            <button onClick={() => setShowForm(false)} className="px-3 py-1 text-xs text-gray-400 hover:text-white">{t('common.cancel')}</button>
             <button
               onClick={handleCreate}
               disabled={!formData.title.trim() || !formData.content.trim()}
               className="px-3 py-1 text-xs bg-blue-600 text-white rounded hover:bg-blue-500 disabled:opacity-40"
             >
-              Save Memory
+              {t('scopeMemory.saveMemory')}
             </button>
           </div>
         </div>
@@ -168,13 +170,13 @@ export function ScopeMemoryPanel({ scopeId, scopeName }: ScopeMemoryPanelProps) 
 
       {/* Memory List */}
       {isLoading ? (
-        <div className="py-6 text-center text-xs text-gray-500">Loading memories...</div>
+        <div className="py-6 text-center text-xs text-gray-500">{t('scopeMemory.loading')}</div>
       ) : memories.length === 0 ? (
         <div className="py-6 text-center">
           <Brain className="w-6 h-6 text-gray-700 mx-auto mb-1" />
-          <p className="text-xs text-gray-500">No memories yet</p>
+          <p className="text-xs text-gray-500">{t('scopeMemory.empty')}</p>
           <p className="text-[10px] text-gray-600 mt-0.5">
-            Add knowledge that {scopeName || 'this scope'} should remember across sessions.
+            {t('scopeMemory.emptyHint').replace('{name}', scopeName || 'this scope')}
           </p>
         </div>
       ) : (
@@ -206,7 +208,7 @@ export function ScopeMemoryPanel({ scopeId, scopeName }: ScopeMemoryPanelProps) 
                     <input
                       type="text" value={editData.tags}
                       onChange={e => setEditData(prev => ({ ...prev, tags: e.target.value }))}
-                      placeholder="Tags (comma-separated)"
+                      placeholder={t('scopeMemory.tagsPlaceholder')}
                       className="flex-1 px-2 py-1 bg-gray-900 border border-gray-700 rounded text-xs text-white"
                     />
                     <button onClick={handleSaveEdit} className="px-2 py-1 text-xs bg-blue-600 text-white rounded"><Check className="w-3 h-3" /></button>

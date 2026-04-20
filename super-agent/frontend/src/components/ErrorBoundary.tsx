@@ -1,5 +1,6 @@
 import { Component, type ErrorInfo, type ReactNode } from 'react'
 import { AlertTriangle, RefreshCw } from 'lucide-react'
+import { TranslationContext } from '@/i18n'
 
 interface Props {
   children: ReactNode
@@ -13,6 +14,9 @@ interface State {
 }
 
 export class ErrorBoundary extends Component<Props, State> {
+  static contextType = TranslationContext
+  declare context: React.ContextType<typeof TranslationContext>
+
   constructor(props: Props) {
     super(props)
     this.state = { hasError: false }
@@ -37,6 +41,8 @@ export class ErrorBoundary extends Component<Props, State> {
         return this.props.fallback
       }
 
+      const t = this.context.t
+
       return (
         <div className="min-h-screen bg-gray-900 flex items-center justify-center p-4">
           <div className="bg-gray-800 rounded-lg p-8 max-w-md w-full text-center">
@@ -44,15 +50,15 @@ export class ErrorBoundary extends Component<Props, State> {
               <AlertTriangle className="h-12 w-12 text-red-500" />
             </div>
             <h2 className="text-xl font-semibold text-white mb-2">
-              Something went wrong
+              {t('error.title')}
             </h2>
             <p className="text-gray-400 mb-6">
-              An unexpected error occurred. Please try refreshing the page or contact support if the problem persists.
+              {t('error.description')}
             </p>
             {import.meta.env.DEV && this.state.error && (
               <details className="text-left mb-6 bg-gray-700 rounded p-4">
                 <summary className="text-red-400 cursor-pointer mb-2">
-                  Error Details (Development)
+                  {t('error.details')}
                 </summary>
                 <pre className="text-xs text-gray-300 overflow-auto">
                   {this.state.error.toString()}
@@ -65,7 +71,7 @@ export class ErrorBoundary extends Component<Props, State> {
               className="inline-flex items-center px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors"
             >
               <RefreshCw className="h-4 w-4 mr-2" />
-              Try Again
+              {t('error.tryAgain')}
             </button>
           </div>
         </div>

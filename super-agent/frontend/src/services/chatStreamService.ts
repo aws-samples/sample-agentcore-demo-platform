@@ -117,6 +117,7 @@ export interface ChatStreamCallbacks {
 export interface StreamChatOptions {
   businessScopeId?: string;
   agentId?: string;
+  mentionAgentId?: string;
   message: string;
   sessionId?: string;
   context?: Record<string, unknown>;
@@ -353,6 +354,9 @@ export function streamChat(
       }
       if (options.agentId) {
         body.agent_id = options.agentId;
+      }
+      if (options.mentionAgentId) {
+        body.mention_agent_id = options.mentionAgentId;
       }
       if (options.sessionId) {
         body.session_id = options.sessionId;

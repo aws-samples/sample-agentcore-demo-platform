@@ -8,6 +8,7 @@ import { Code, Eye, Loader2, CheckCircle, XCircle, Clock } from 'lucide-react';
 import type { CanvasNodeData, ActionStatus } from '@/types/canvas';
 import type { CodeArtifactNodeMeta } from '@/types/canvas/metadata';
 import { BaseNode } from './BaseNode';
+import { useTranslation } from '@/i18n';
 
 type CodeArtifactNodeData = CanvasNodeData<CodeArtifactNodeMeta>;
 
@@ -50,6 +51,7 @@ export const CodeArtifactNode = memo(function CodeArtifactNode(props: NodeProps)
   const languageColor = languageColors[language] ?? 'text-gray-400';
 
   const [tab, setTab] = useState<'code' | 'preview'>(activeTab);
+  const { t } = useTranslation();
 
   return (
     <BaseNode
@@ -94,7 +96,7 @@ export const CodeArtifactNode = memo(function CodeArtifactNode(props: NodeProps)
             `}
           >
             <Code className="w-3 h-3" />
-            Code
+            {t('node.code')}
           </button>
           <button
             onClick={(e) => {
@@ -109,7 +111,7 @@ export const CodeArtifactNode = memo(function CodeArtifactNode(props: NodeProps)
             `}
           >
             <Eye className="w-3 h-3" />
-            Preview
+            {t('node.preview')}
           </button>
         </div>
 
@@ -118,18 +120,18 @@ export const CodeArtifactNode = memo(function CodeArtifactNode(props: NodeProps)
           {tab === 'code' ? (
             <div className="p-2 max-h-24 overflow-hidden">
               <pre className="text-[10px] text-gray-300 font-mono whitespace-pre-wrap line-clamp-6">
-                {data.contentPreview || '// No code yet'}
+                {data.contentPreview || t('node.noCodeYet')}
               </pre>
             </div>
           ) : (
             <div className="p-2 h-24 flex items-center justify-center">
               {metadata?.previewUrl ? (
                 <div className="text-xs text-gray-400">
-                  Preview available
+                  {t('node.previewAvailable')}
                 </div>
               ) : (
                 <div className="text-xs text-gray-500 italic">
-                  No preview
+                  {t('node.noPreview')}
                 </div>
               )}
             </div>

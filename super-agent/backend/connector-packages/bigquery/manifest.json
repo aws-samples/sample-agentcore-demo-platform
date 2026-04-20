@@ -1,0 +1,24 @@
+{
+  "id": "bigquery",
+  "version": "1.0.0",
+  "name": "BigQuery",
+  "icon": "🔍",
+  "category": "database",
+  "description": {
+    "en": "Big data analytics queries",
+    "cn": "大数据分析查询"
+  },
+  "auth": {
+    "type": "service_account",
+    "credential_fields": [
+      { "key": "service_account_json", "label": { "en": "Service Account JSON", "cn": "Service Account JSON" }, "type": "textarea", "placeholder": "{\"type\":\"service_account\",\"project_id\":\"...\"}", "required": true }
+    ]
+  },
+  "config_fields": [
+    { "key": "project_id", "label": { "en": "Project ID", "cn": "Project ID" }, "type": "text", "placeholder": "my-gcp-project", "required": true },
+    { "key": "dataset", "label": { "en": "Default Dataset", "cn": "默认 Dataset" }, "type": "text", "placeholder": "analytics", "required": false }
+  ],
+  "setup_guide": "setup-guide.md",
+  "tools_definition": "tools.json",
+  "lambda_handler": "handler.ts"
+}

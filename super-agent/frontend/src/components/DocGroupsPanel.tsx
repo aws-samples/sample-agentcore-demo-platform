@@ -8,6 +8,7 @@ import { FolderOpen, Plus, Trash2, Loader2, Upload, FileText, X } from 'lucide-r
 import { useScopeDocGroups, useDocGroups } from '@/services/useDocGroups'
 import { restDocGroupService, type DocGroupFile } from '@/services/api/restDocGroupService'
 import { useToast } from '@/components'
+import { useTranslation } from '@/i18n'
 
 interface DocGroupsPanelProps {
   scopeId: string
@@ -18,6 +19,7 @@ export function DocGroupsPanel({ scopeId }: DocGroupsPanelProps) {
   const { assignments, isLoading, assign, unassign, load: reloadAssignments } = useScopeDocGroups(scopeId)
   const { groups: allGroups, load: reloadGroups, create: createGroup } = useDocGroups()
   const { success, error: showError } = useToast()
+  const { t } = useTranslation()
 
   const [showPicker, setShowPicker] = useState(false)
   const [showCreate, setShowCreate] = useState(false)
@@ -104,17 +106,17 @@ export function DocGroupsPanel({ scopeId }: DocGroupsPanelProps) {
       <div className="flex items-center justify-between mb-3">
         <div className="flex items-center gap-2">
           <FolderOpen className="w-4 h-4 text-gray-400" />
-          <h3 className="text-[11px] font-semibold text-gray-500 uppercase tracking-wider">Knowledge Base</h3>
+          <h3 className="text-[11px] font-semibold text-gray-500 uppercase tracking-wider">{t('docGroups.title')}</h3>
           <span className="text-[10px] text-gray-600">{assignments.length} group{assignments.length !== 1 ? 's' : ''}</span>
         </div>
         <div className="flex gap-1">
           <button onClick={() => setShowCreate(!showCreate)}
             className="flex items-center gap-1 text-[10px] px-2 py-1 rounded bg-emerald-500/10 text-emerald-400 hover:bg-emerald-500/20 transition-colors">
-            <Plus className="w-3 h-3" /> New Group
+            <Plus className="w-3 h-3" /> {t('docGroups.newGroup')}
           </button>
           <button onClick={() => { setShowPicker(!showPicker); reloadGroups() }}
             className="flex items-center gap-1 text-[10px] px-2 py-1 rounded bg-blue-500/10 text-blue-400 hover:bg-blue-500/20 transition-colors">
-            <Plus className="w-3 h-3" /> Assign
+            <Plus className="w-3 h-3" /> {t('docGroups.assign')}
           </button>
         </div>
       </div>
@@ -122,14 +124,14 @@ export function DocGroupsPanel({ scopeId }: DocGroupsPanelProps) {
       {/* Create new group form */}
       {showCreate && (
         <div className="mb-3 p-3 bg-gray-800/50 border border-gray-700 rounded-lg space-y-2">
-          <input value={newName} onChange={e => setNewName(e.target.value)} placeholder="Group name"
+          <input value={newName} onChange={e => setNewName(e.target.value)} placeholder={t('docGroups.namePlaceholder')}
             className="w-full px-2 py-1.5 bg-gray-900 border border-gray-700 rounded text-xs text-white focus:outline-none focus:border-blue-500" />
-          <input value={newDesc} onChange={e => setNewDesc(e.target.value)} placeholder="Description (optional)"
+          <input value={newDesc} onChange={e => setNewDesc(e.target.value)} placeholder={t('docGroups.descPlaceholder')}
             className="w-full px-2 py-1.5 bg-gray-900 border border-gray-700 rounded text-xs text-white focus:outline-none focus:border-blue-500" />
           <div className="flex justify-end gap-2">
-            <button onClick={() => setShowCreate(false)} className="text-[10px] text-gray-400 hover:text-white">Cancel</button>
+            <button onClick={() => setShowCreate(false)} className="text-[10px] text-gray-400 hover:text-white">{t('common.cancel')}</button>
             <button onClick={handleCreate} disabled={!newName.trim()}
-              className="text-[10px] px-2 py-1 bg-emerald-600 text-white rounded hover:bg-emerald-500 disabled:opacity-40">Create & Assign</button>
+              className="text-[10px] px-2 py-1 bg-emerald-600 text-white rounded hover:bg-emerald-500 disabled:opacity-40">{t('docGroups.createAndAssign')}</button>
           </div>
         </div>
       )}
@@ -138,7 +140,7 @@ export function DocGroupsPanel({ scopeId }: DocGroupsPanelProps) {
       {showPicker && (
         <div className="mb-3 border border-gray-700 rounded-lg bg-gray-800/50 max-h-40 overflow-y-auto">
           {availableGroups.length === 0 ? (
-            <p className="p-3 text-xs text-gray-400">No unassigned groups available.</p>
+            <p className="p-3 text-xs text-gray-400">{t('docGroups.noUnassigned')}</p>
           ) : availableGroups.map(g => (
             <button key={g.id} onClick={() => handleAssign(g.id)}
               className="w-full flex items-center justify-between px-3 py-2 hover:bg-gray-700/50 text-left border-b border-gray-700/50 last:border-0">
@@ -146,7 +148,7 @@ export function DocGroupsPanel({ scopeId }: DocGroupsPanelProps) {
                 <p className="text-xs text-white">{g.name}</p>
                 {g.description && <p className="text-[10px] text-gray-400">{g.description}</p>}
               </div>
-              <span className="text-[10px] text-gray-500">{g._count?.files ?? 0} files</span>
+              <span className="text-[10px] text-gray-500">{g._count?.files ?? 0} {t('docGroups.files')}</span>
             </button>
           ))}
         </div>
@@ -156,7 +158,7 @@ export function DocGroupsPanel({ scopeId }: DocGroupsPanelProps) {
       {isLoading ? (
         <div className="py-4 text-center"><Loader2 className="w-4 h-4 text-blue-500 animate-spin mx-auto" /></div>
       ) : assignments.length === 0 ? (
-        <div className="py-4 text-center text-xs text-gray-500">No document groups assigned</div>
+        <div className="py-4 text-center text-xs text-gray-500">{t('docGroups.empty')}</div>
       ) : (
         <div className="space-y-2">
           {assignments.map(a => {
@@ -169,10 +171,10 @@ export function DocGroupsPanel({ scopeId }: DocGroupsPanelProps) {
                   <div className="flex items-center gap-2">
                     <FolderOpen className="w-3.5 h-3.5 text-amber-400" />
                     <span className="text-xs text-white font-medium">{g.name}</span>
-                    <span className="text-[10px] text-gray-500">{g._count?.files ?? 0} files</span>
+                    <span className="text-[10px] text-gray-500">{g._count?.files ?? 0} {t('docGroups.files')}</span>
                   </div>
                   <button onClick={e => { e.stopPropagation(); handleUnassign(a.id) }}
-                    className="p-1 text-gray-600 hover:text-red-400 transition-colors" title="Remove from scope">
+                    className="p-1 text-gray-600 hover:text-red-400 transition-colors" title={t('docGroups.removeFromScope')}>
                     <Trash2 className="w-3.5 h-3.5" />
                   </button>
                 </div>
@@ -183,7 +185,7 @@ export function DocGroupsPanel({ scopeId }: DocGroupsPanelProps) {
                     <div className="px-3 py-2 border-b border-gray-800">
                       <label className="flex items-center gap-1 text-[10px] text-blue-400 cursor-pointer hover:text-blue-300">
                         <Upload className="w-3 h-3" />
-                        {uploading ? 'Uploading...' : 'Upload files'}
+                        {uploading ? t('docGroups.uploading') : t('docGroups.uploadFiles')}
                         <input type="file" multiple className="hidden" disabled={uploading}
                           onChange={e => e.target.files && handleUpload(g.id, e.target.files)} />
                       </label>
@@ -192,7 +194,7 @@ export function DocGroupsPanel({ scopeId }: DocGroupsPanelProps) {
                     {filesLoading ? (
                       <div className="py-3 text-center"><Loader2 className="w-3 h-3 text-blue-500 animate-spin mx-auto" /></div>
                     ) : files.length === 0 ? (
-                      <div className="py-3 text-center text-[10px] text-gray-500">No files yet</div>
+                      <div className="py-3 text-center text-[10px] text-gray-500">{t('docGroups.noFiles')}</div>
                     ) : (
                       <div className="divide-y divide-gray-800/50">
                         {files.map(f => (

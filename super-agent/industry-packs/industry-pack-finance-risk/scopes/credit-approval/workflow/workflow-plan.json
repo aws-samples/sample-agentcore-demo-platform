@@ -1,0 +1,345 @@
+{
+  "title": "信贷审批全流程工作流",
+  "description": "覆盖从客户提交贷款申请到最终放款（或拒绝）的完整信贷审批流程，采用'流水线+关卡'模式，支持个人信贷自动审批通道（48小时SLA）和企业信贷审批委员会通道（5工作日SLA），在关键决策点设置人工介入机制。",
+  "tasks": [
+    {
+      "id": "task-1",
+      "title": "申请接收与OCR信息提取",
+      "type": "agent",
+      "prompt": "接收客户提交的贷款申请及附件材料。自动识别申请类型（个人消费贷/经营贷/企业流动资金贷/项目贷）。对所有上传材料执行OCR识别，提取身份证、营业执照、银行流水、房产证、收入证明等关键信息字段，并为每个字段标注置信度评分。对置信度低于90%的字段标记为需人工复核。将OCR提取信息与申请表填报数据进行逐字段交叉核验，标记不一致的字段并生成差异报告。输出结构化申请数据包，包含申请人基本信息、贷款要素、OCR提取结果和交叉核验报告。",
+      "agentRef": "intake-preprocessor",
+      "dependentTasks": [],
+      "requiredIntegrations": ["OCR识别服务", "NLP信息提取引擎"]
+    },
+    {
+      "id": "task-2",
+      "title": "资料完整性检查与补件处理",
+      "type": "agent",
+      "prompt": "根据申请产品类型的材料清单，逐项检查提交材料的完整性。资料完整率必须达到98%以上方可流转至下一环节。对资料不完整的申请，生成精确的补件通知，明确列出缺失项目名称、要求的具体格式（如'需提供加盖公章的近6个月银行流水原件扫描件'）以及提交截止时间（7天）。补件超时未补齐的申请自动关闭并通知客户。输出资料完整性校验结果和补件通知（如需要）。",
+      "agentRef": "intake-preprocessor",
+      "dependentTasks": ["task-1"],
+      "requiredIntegrations": []
+    },
+    {
+      "id": "task-3",
+      "title": "基础准入规则筛查",
+      "type": "agent",
+      "prompt": "对资料完整的申请执行基础准入规则校验，按成本从低到高的顺序执行：（1）年龄限制校验（18-65周岁）；（2）地域准入校验；（3）禁入行业黑名单校验（企业客户）；（4）内部黑名单比对（历史欺诈/坏账客户）；（5）外部黑名单比对（法院被执行人、反洗钱制裁名单）；（6）征信授权书合规性检查（签名真实性、授权范围、有效期）。任一硬性规则命中则直接标记为拒绝并记录命中规则。软性规则命中则标记风险标签后继续流转。输出准入校验结果（PASS/REJECT/REVIEW）和命中规则明细。",
+      "agentRef": "intake-preprocessor",
+      "dependentTasks": ["task-2"],
+      "requiredIntegrations": ["法院被执行人查询接口", "反洗钱名单查询接口"]
+    },
+    {
+      "id": "task-4",
+      "title": "准入结果判定",
+      "type": "condition",
+      "prompt": "判断准入规则筛查结果：如果准入结果为REJECT（硬性规则命中），则流转至拒贷通知环节；如果准入结果为PASS或REVIEW，则流转至反欺诈检测环节。",
+      "agentRef": "intake-preprocessor",
+      "dependentTasks": ["task-3"],
+      "requiredIntegrations": []
+    },
+    {
+      "id": "task-5",
+      "title": "申请路由与SLA设定",
+      "type": "agent",
+      "prompt": "对通过准入的申请进行路由分发：（1）识别审批通道——个人信贷≤30万走自动审批通道，个人信贷>30万走人工审批通道，企业信贷走审委会通道；（2）设置SLA计时器——个人信贷48小时、企业信贷5个工作日；（3）标记优先级——VIP客户高优先级、大额申请重点审批件、补件回流续审件。输出路由决策、审批通道标识、SLA截止时间和优先级标记。",
+      "agentRef": "intake-preprocessor",
+      "dependentTasks": ["task-4"],
+      "requiredIntegrations": []
+    },
+    {
+      "id": "task-6",
+      "title": "身份核验与证件防伪检测",
+      "type": "agent",
+      "prompt": "对申请人执行多维度身份核验：（1）校验活体检测结果的真实性（防范照片翻拍、视频回放、Deepfake攻击），验证活体照片与身份证照片的人脸比对相似度≥85%；（2）调用公安部二要素核验（姓名+身份证号）确认身份真实性，高额贷款或高风险标记的申请增加三要素核验；（3）手机号三要素核验确认实名信息一致性；（4）对身份证执行防伪检测（PS痕迹、有效期、翻拍检测），对营业执照通过国家企业信用信息公示系统交叉核实。输出身份核验综合评分和各维度检测结果。",
+      "agentRef": "anti-fraud-checker",
+      "dependentTasks": ["task-5"],
+      "requiredIntegrations": ["公安二要素/三要素核验接口", "运营商三要素核验接口", "国家企业信用信息公示系统"]
+    },
+    {
+      "id": "task-7",
+      "title": "设备指纹与行为分析",
+      "type": "agent",
+      "prompt": "分析申请设备的指纹信息和申请行为特征：（1）采集设备指纹（设备型号、操作系统、屏幕分辨率、APP列表哈希等），检测模拟器、虚拟机、Root/越狱、多开工具等异常环境；（2）查询设备指纹库，检查该设备是否关联其他申请账号或在设备黑名单中；（3）分析行为特征——打字速度、页面停留时间、填写顺序是否符合正常人类行为模式。输出设备风险评分和行为异常标记。",
+      "agentRef": "anti-fraud-checker",
+      "dependentTasks": ["task-5"],
+      "requiredIntegrations": ["设备指纹采集SDK", "设备指纹库"]
+    },
+    {
+      "id": "task-8",
+      "title": "关联图谱分析与团伙检测",
+      "type": "agent",
+      "prompt": "以申请人为中心构建多维关联网络（扩展1-2度关系），基于手机号、设备ID、IP地址、Wi-Fi热点、地址、银行卡、企业股权等关联因子进行图谱分析：（1）检测团伙申请模式——7天窗口内多个申请人共享≥2个关联因子触发团伙告警；（2）检测中介代办模式——同一设备/IP短期提交多笔不同人申请；（3）检测关联人风险传导——1度关联人中存在逾期、欺诈或黑名单记录。对企业信贷增加实控人穿透和互保圈检测。输出关联图谱数据、异常模式列表和关联风险评分。",
+      "agentRef": "anti-fraud-checker",
+      "dependentTasks": ["task-5"],
+      "requiredIntegrations": ["图数据库", "企业工商信息查询"]
+    },
+    {
+      "id": "task-9",
+      "title": "多头借贷检测",
+      "type": "agent",
+      "prompt": "查询申请人的多头借贷情况：（1）分析征信报告查询记录段——统计近1/3/6个月贷款审批类查询次数（近1个月≥4次为高多头风险）；（2）通过百行征信/朴道征信查询网贷在贷数据——当前在贷平台数、在贷笔数、在贷总余额；（3）计算多头借贷风险指数，进行趋势分析（在贷余额是否持续增加/疑似以贷养贷）；（4）评估多头风险等级：低（在贷≤2平台）/中（3-5平台）/高（>5平台）/极高（近1月余额环比增>30%）。输出多头风险评分、在贷汇总数据和趋势分析结果。",
+      "agentRef": "anti-fraud-checker",
+      "dependentTasks": ["task-5"],
+      "requiredIntegrations": ["百行征信接口", "朴道征信接口"]
+    },
+    {
+      "id": "task-10",
+      "title": "反欺诈综合评分与分级决策",
+      "type": "agent",
+      "prompt": "汇总身份核验、设备分析、关联图谱和多头检测的结果，融合规则引擎命中和ML模型评分，计算反欺诈综合评分（0-100分）。执行分级处理决策：（1）评分<50（低风险）——放行，附'反欺诈通过'标签；（2）评分50-80（中风险）——标注具体命中规则和风险点后流转至信用评估环节；（3）评分>80（高风险）——自动拦截，生成欺诈调查工单（含可疑点摘要、证据和建议调查方向），转交人工反欺诈团队复核。输出反欺诈检测报告、处理决策和风险标签。",
+      "agentRef": "anti-fraud-checker",
+      "dependentTasks": ["task-6", "task-7", "task-8", "task-9"],
+      "requiredIntegrations": ["反欺诈ML模型服务", "规则引擎"]
+    },
+    {
+      "id": "task-11",
+      "title": "反欺诈结果判定",
+      "type": "condition",
+      "prompt": "判断反欺诈综合评分结果：如果评分>80（高风险拦截），则流转至人工复核等待环节，24小时内人工复核确认欺诈则拒绝，排除欺诈则继续；如果评分≤80（低风险放行或中风险标注流转），则流转至信用评估环节。",
+      "agentRef": "anti-fraud-checker",
+      "dependentTasks": ["task-10"],
+      "requiredIntegrations": []
+    },
+    {
+      "id": "task-12",
+      "title": "征信报告调取与解析",
+      "type": "agent",
+      "prompt": "确认征信授权书有效（签署30天内、范围覆盖）后，调取央行征信中心的个人/企业征信报告。系统化解析以下内容：（1）信贷记录——所有贷款和信用卡的账户信息、授信额度、已用额度、贷款余额、状态；（2）逾期历史——近24个月月度还款状态、累计逾期次数、最长连续逾期、历史最高逾期金额、最近一次逾期距今天数；（3）担保信息——对外担保记录、担保余额、代偿风险；（4）公共信息——欠税、法院判决、强制执行、行政处罚。征信系统不可用时放入等待队列（个人2小时/企业8小时超时告警）。输出结构化征信解析报告和征信风险摘要，解析准确率须≥99.5%。",
+      "agentRef": "credit-assessor",
+      "dependentTasks": ["task-11"],
+      "requiredIntegrations": ["央行征信中心查询接口"]
+    },
+    {
+      "id": "task-13",
+      "title": "征信评分秒拒判定",
+      "type": "condition",
+      "prompt": "判断征信评分是否达到最低要求：如果央行征信评分低于600分，则触发秒拒，流转至拒贷通知环节，生成标准化拒贷理由'综合信用评估未达到准入要求'；如果征信评分≥600分，则继续进入信用评分和还款能力分析环节。",
+      "agentRef": "credit-assessor",
+      "dependentTasks": ["task-12"],
+      "requiredIntegrations": []
+    },
+    {
+      "id": "task-14",
+      "title": "信用评分计算与风险分级",
+      "type": "agent",
+      "prompt": "对征信评分≥600的申请执行信用评分计算：（1）从征信数据、申请信息和反欺诈标签中提取评分特征；（2）调用A卡申请评分模型计算综合评分（300-900分区间），输出Top5特征贡献度；（3）划分风险等级：A级（≥750优质）/B级（700-749良好）/C级（650-699一般）/D级（600-649高风险）。对征信数据不足的白户客户，启用替代数据评估方案（运营商/社保/电商/税务数据），调用白户专用模型，标注'替代数据评分'标签。输出综合信用评分、风险等级、评分分解和评分方式标识。",
+      "agentRef": "credit-assessor",
+      "dependentTasks": ["task-13"],
+      "requiredIntegrations": ["信用评分模型服务", "替代数据查询接口"]
+    },
+    {
+      "id": "task-15",
+      "title": "还款能力分析",
+      "type": "agent",
+      "prompt": "对申请人执行还款能力量化分析：个人客户——（1）验证收入来源并计算月均收入（近6个月银行流水算术平均值，剔除大额非经常性收入）；（2）评估收入稳定性（同一单位发薪年限）；（3）测算DTI（月度总债务含本笔预计月供/月均收入），阈值为50%，30%以下为优秀，40-50%为需关注。企业客户——（1）计算资产负债率（警戒线70%）、流动比率（最低1.2）、速动比率（最低0.8）；（2）分析近12个月经营性现金流（须为正值）和EBITDA利息覆盖倍数（最低2倍）；（3）评估行业景气度对还款能力的影响。最终计算最大可承受贷款金额。输出还款能力等级、DTI/财务指标数据和最大可承受额度。",
+      "agentRef": "credit-assessor",
+      "dependentTasks": ["task-14"],
+      "requiredIntegrations": []
+    },
+    {
+      "id": "task-16",
+      "title": "风险定价与额度建议",
+      "type": "agent",
+      "prompt": "基于信用评分和还款能力分析结果确定贷款定价建议：（1）额度核定——取还款能力上限和评分维度上限中的较低值，参照产品限额封顶（个人消费贷50万），抵押贷计算LTV（住宅≤70%/商业≤60%/工业≤50%）；（2）利率定价——基准LPR+风险溢价（A级0-50BP/B级50-150BP/C级150-300BP/D级300-500BP），校验不超过LPR的4倍；（3）建议还款方式和期限。生成推荐定价方案和备选方案，计算预期损失率（EL=PD×LGD×EAD）。输出建议额度区间、利率区间、推荐期限和定价方案。",
+      "agentRef": "credit-assessor",
+      "dependentTasks": ["task-15"],
+      "requiredIntegrations": ["LPR报价数据", "抵押物评估系统"]
+    },
+    {
+      "id": "task-17",
+      "title": "合规性审查",
+      "type": "agent",
+      "prompt": "对信用评估通过的申请执行全面合规性审查：（1）贷款用途合规——消费贷排除购房/炒股/民间借贷，经营贷核实真实经营背景；（2）利率合规——APR不超过LPR×4，无砍头息，费率披露完整；（3）客户适当性——产品与风险承受能力匹配，排除特殊限制群体；（4）集中度管控——单一客户授信余额不超过资本净额10%，行业限额检查；（5）关联交易——识别与机构股东/高管/员工的关联关系；（6）反洗钱——制裁名单比对，大额贷款增强尽职调查。逐项出具审查结论（通过/不通过/豁免）。输出合规审查清单和综合合规结论。",
+      "agentRef": "compliance-approver",
+      "dependentTasks": ["task-16"],
+      "requiredIntegrations": ["授信台账系统", "反洗钱筛查系统"]
+    },
+    {
+      "id": "task-18",
+      "title": "合规审查结果判定",
+      "type": "condition",
+      "prompt": "判断合规审查结果：如果合规审查存在不通过项，则根据不通过项的严重性判断——硬性合规问题（如利率违规、用途违规）直接拒绝；软性合规问题（如集中度接近上限）标记为需关注后继续。合规审查全部通过则进入审批决策环节。",
+      "agentRef": "compliance-approver",
+      "dependentTasks": ["task-17"],
+      "requiredIntegrations": []
+    },
+    {
+      "id": "task-19",
+      "title": "审批通道与权限判定",
+      "type": "condition",
+      "prompt": "根据申请类型、金额和风险等级判定审批通道：（1）个人信贷+金额≤30万+风险等级A或B+合规审查全部通过 → 进入自动审批决策；（2）个人信贷+金额>30万或风险等级C/D → 提交人工审批官；（3）企业信贷（全部）→ 提交审批委员会。输出审批通道标识和权限级别。",
+      "agentRef": "compliance-approver",
+      "dependentTasks": ["task-18"],
+      "requiredIntegrations": []
+    },
+    {
+      "id": "task-20",
+      "title": "审批决策执行",
+      "type": "agent",
+      "prompt": "综合全部前序评估结果做出最终审批决策：（1）批准——确定最终额度（不超过信用评估建议上限且不超过客户申请金额）、利率（风险定价区间内取值）、期限和还款方式，生成还款计划模拟；（2）有条件批准——生成补充条件清单（如增加担保人、提供额外抵押物、降低额度等），反馈至进件预处理环节重新收集材料；（3）拒绝——生成合规拒贷通知（含理由大类和申诉渠道，不泄露模型细节）。自动审批的申请由系统直接做出决策，需人工/委员会审批的生成审批提案。输出审批决策书（结论、最终贷款要素、决策理由）和完整审计轨迹。",
+      "agentRef": "compliance-approver",
+      "dependentTasks": ["task-19"],
+      "requiredIntegrations": ["审批权限管理系统"]
+    },
+    {
+      "id": "task-21",
+      "title": "审批决策结果分流",
+      "type": "condition",
+      "prompt": "根据审批决策结果进行分流：（1）批准 → 流转至放款前置检查环节；（2）有条件批准 → 生成补充条件后流转回进件预处理环节等待客户补充材料；（3）拒绝 → 流转至拒贷通知环节。",
+      "agentRef": "compliance-approver",
+      "dependentTasks": ["task-20"],
+      "requiredIntegrations": []
+    },
+    {
+      "id": "task-22",
+      "title": "放款前置检查",
+      "type": "agent",
+      "prompt": "对审批通过且客户已签约的申请执行放款前置检查：（1）收款账户验证——账户与签约预留账户一致、账户状态正常（非冻结/销户/黑名单）、对公贷款户名与企业一致；（2）合同要素校验——电子签章CA有效、核心要素（金额/利率/期限/还款方式）与审批决策完全一致、附件齐全；（3）抵押登记确认（抵押贷款）——抵押登记已完成且信息与合同一致；（4）额度校验——本笔未超审批额度且未触日限额。所有检查项均通过方可生成放款指令。输出放款前置检查报告（逐项检查结果）。",
+      "agentRef": "disbursement-notifier",
+      "dependentTasks": ["task-21"],
+      "requiredIntegrations": ["核心银行系统", "不动产登记查询"]
+    },
+    {
+      "id": "task-23",
+      "title": "放款指令执行与监控",
+      "type": "agent",
+      "prompt": "生成标准化放款指令报文（借据号、金额精确到分、放款账户、收款账户、利率、起息日、到期日、还款方式），执行金额和账号二次校验后提交至核心银行系统。实时监控放款状态直至资金到账。放款成功记录到账时间和交易流水号。放款失败执行自动重试（最多3次，间隔5分钟），3次均失败则触发人工介入告警，状态更新为'放款异常'。个人信贷放款超30分钟未返回结果触发超时告警。输出放款执行报告（状态、流水号、时间戳、重试记录）。",
+      "agentRef": "disbursement-notifier",
+      "dependentTasks": ["task-22"],
+      "requiredIntegrations": ["核心银行放款接口"]
+    },
+    {
+      "id": "task-24",
+      "title": "客户通知与贷后同步",
+      "type": "agent",
+      "prompt": "放款成功后执行多渠道客户通知和系统同步：（1）发送放款到账通知——短信+APP推送+邮件全渠道触达，内容包含到账金额、到账时间、贷款期限、月供金额、首期还款日和还款方式；（2）发送还款计划——邮件附PDF还款计划表（每期应还本金、利息和总额明细）；（3）通知送达确认——监控各渠道回执，首次失败自动重试2次，全渠道失败触发人工跟进；（4）贷后系统同步——生成借据、更新贷款台账、触发征信报送（T+1）、同步贷款信息至贷后监控系统。输出客户通知记录（各渠道送达状态）和贷后同步确认。",
+      "agentRef": "disbursement-notifier",
+      "dependentTasks": ["task-23"],
+      "requiredIntegrations": ["短信网关", "APP推送服务", "邮件服务", "贷后监控系统", "征信报送接口"]
+    },
+    {
+      "id": "task-25",
+      "title": "拒贷通知发送",
+      "type": "agent",
+      "prompt": "对被拒绝的申请（包括准入拒绝、反欺诈拦截、征信秒拒、合规拒绝、审批拒绝等各环节产生的拒绝）发送合规的拒贷通知：（1）通过短信和邮件发送拒贷通知，内容包含感谢语、拒贷原因大类描述（如'综合信用评估未通过'、'申请材料不符合要求'等）、申诉渠道和客服联系方式；（2）拒贷通知不得泄露模型评分细节、具体规则阈值和内部决策逻辑；（3）不得包含歧视性内容。记录通知发送时间和送达状态。完成申请数据归档。输出拒贷通知记录和归档确认。",
+      "agentRef": "disbursement-notifier",
+      "dependentTasks": ["task-21"],
+      "requiredIntegrations": ["短信网关", "邮件服务"]
+    }
+  ],
+  "variables": [
+    {
+      "variableId": "var-1",
+      "name": "applicationId",
+      "variableType": "string",
+      "description": "贷款申请唯一编号，全流程追踪标识",
+      "required": true
+    },
+    {
+      "variableId": "var-2",
+      "name": "applicantType",
+      "variableType": "string",
+      "description": "申请人类型：personal（个人）/corporate（企业）",
+      "required": true
+    },
+    {
+      "variableId": "var-3",
+      "name": "productCode",
+      "variableType": "string",
+      "description": "申请产品代码（消费贷/经营贷/流动资金贷/项目贷）",
+      "required": true
+    },
+    {
+      "variableId": "var-4",
+      "name": "applicationAmount",
+      "variableType": "number",
+      "description": "客户申请贷款金额（元）",
+      "required": true
+    },
+    {
+      "variableId": "var-5",
+      "name": "applicationTerm",
+      "variableType": "number",
+      "description": "客户申请贷款期限（月）",
+      "required": true
+    },
+    {
+      "variableId": "var-6",
+      "name": "admissionResult",
+      "variableType": "string",
+      "description": "准入筛查结果：PASS/REJECT/REVIEW",
+      "required": true
+    },
+    {
+      "variableId": "var-7",
+      "name": "fraudScore",
+      "variableType": "number",
+      "description": "反欺诈综合评分（0-100）",
+      "required": true
+    },
+    {
+      "variableId": "var-8",
+      "name": "fraudRiskLevel",
+      "variableType": "string",
+      "description": "反欺诈风险等级：LOW/MEDIUM/HIGH",
+      "required": true
+    },
+    {
+      "variableId": "var-9",
+      "name": "creditScore",
+      "variableType": "number",
+      "description": "综合信用评分（300-900）",
+      "required": true
+    },
+    {
+      "variableId": "var-10",
+      "name": "riskGrade",
+      "variableType": "string",
+      "description": "风险等级：A/B/C/D/REJECT",
+      "required": true
+    },
+    {
+      "variableId": "var-11",
+      "name": "dtiRatio",
+      "variableType": "number",
+      "description": "债务收入比DTI（个人客户）或资产负债率（企业客户），百分比",
+      "required": false
+    },
+    {
+      "variableId": "var-12",
+      "name": "approvalDecision",
+      "variableType": "string",
+      "description": "最终审批决策：APPROVED/CONDITIONAL/REJECTED/COMMITTEE",
+      "required": true
+    },
+    {
+      "variableId": "var-13",
+      "name": "approvedAmount",
+      "variableType": "number",
+      "description": "批准贷款金额（元）",
+      "required": false
+    },
+    {
+      "variableId": "var-14",
+      "name": "approvedRate",
+      "variableType": "number",
+      "description": "批准年化利率（%）",
+      "required": false
+    },
+    {
+      "variableId": "var-15",
+      "name": "disbursementStatus",
+      "variableType": "string",
+      "description": "放款状态：SUCCESS/FAILED/PENDING/EXCEPTION",
+      "required": true
+    },
+    {
+      "variableId": "var-16",
+      "name": "approvalChannel",
+      "variableType": "string",
+      "description": "审批通道：auto（自动审批）/manual（人工审批）/committee（审批委员会）",
+      "required": true
+    }
+  ]
+}

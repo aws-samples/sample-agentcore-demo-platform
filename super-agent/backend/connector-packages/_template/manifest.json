@@ -1,0 +1,50 @@
+{
+  "id": "my-connector",
+  "version": "1.0.0",
+  "name": "My Connector",
+  "icon": "🔌",
+  "category": "saas",
+  "description": {
+    "en": "Short description of what this connector does",
+    "cn": "连接器功能简述"
+  },
+
+  "auth": {
+    "type": "api_key",
+
+    "oauth": {
+      "provider": "google",
+      "scopes": ["https://www.googleapis.com/auth/gmail.readonly"],
+      "authorize_url": "https://accounts.google.com/o/oauth2/v2/auth",
+      "token_url": "https://oauth2.googleapis.com/token",
+      "extra_params": {
+        "access_type": "offline",
+        "prompt": "consent"
+      }
+    },
+
+    "credential_fields": [
+      {
+        "key": "api_key",
+        "label": { "en": "API Key", "cn": "API Key" },
+        "type": "password",
+        "placeholder": "sk-...",
+        "required": true
+      }
+    ]
+  },
+
+  "config_fields": [
+    {
+      "key": "region",
+      "label": { "en": "Region", "cn": "区域" },
+      "type": "text",
+      "placeholder": "us-east-1",
+      "required": false
+    }
+  ],
+
+  "setup_guide": "setup-guide.md",
+  "tools_definition": "tools.json",
+  "lambda_handler": "handler.ts"
+}

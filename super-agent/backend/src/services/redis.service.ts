@@ -197,6 +197,64 @@ export class RedisService {
   }
 
   /**
+   * Set a value in Redis with expiry in seconds
+   *
+   * @param key - The key
+   * @param seconds - TTL in seconds
+   * @param value - The value
+   */
+  async setex(key: string, seconds: number, value: string): Promise<void> {
+    if (!this.client) {
+      throw new Error('Redis service not initialized');
+    }
+
+    await this.client.setex(key, seconds, value);
+  }
+
+  /**
+   * Increment a key's integer value by 1
+   *
+   * @param key - The key
+   * @returns The new value after increment
+   */
+  async incr(key: string): Promise<number> {
+    if (!this.client) {
+      throw new Error('Redis service not initialized');
+    }
+
+    return this.client.incr(key);
+  }
+
+  /**
+   * Set a timeout on a key in seconds
+   *
+   * @param key - The key
+   * @param seconds - TTL in seconds
+   */
+  async expire(key: string, seconds: number): Promise<void> {
+    if (!this.client) {
+      throw new Error('Redis service not initialized');
+    }
+
+    await this.client.expire(key, seconds);
+  }
+
+  /**
+   * Delete a key from Redis (alias for ioredis del)
+   *
+   * @param key - The key
+   * @returns True if the key was deleted
+   */
+  async del(key: string): Promise<boolean> {
+    if (!this.client) {
+      throw new Error('Redis service not initialized');
+    }
+
+    const result = await this.client.del(key);
+    return result === 1;
+  }
+
+  /**
    * Set a value in Redis with optional expiry
    *
    * @param key - The key

@@ -46,19 +46,19 @@ export function KnowledgeManager() {
     const errors: ValidationErrors = {}
 
     if (!form.title.trim()) {
-      errors.title = 'Document title is required'
+      errors.title = t('knowledge.titleRequired')
     }
 
     if (!form.category.trim()) {
-      errors.category = 'Category is required'
+      errors.category = t('knowledge.categoryRequired')
     }
 
     if (!file) {
-      errors.file = 'File is required'
+      errors.file = t('knowledge.fileRequired')
     } else {
       const fileExtension = file.name.split('.').pop()?.toUpperCase()
       if (!supportedFileTypes.includes(fileExtension as any)) {
-        errors.file = `Unsupported file type. Supported: ${supportedFileTypes.join(', ')}`
+        errors.file = t('knowledge.unsupportedType').replace('{types}', supportedFileTypes.join(', '))
       }
     }
 
@@ -82,7 +82,7 @@ export function KnowledgeManager() {
     if (!file) return
 
     if (!validateForm(file)) {
-      showToast('error', 'Please fix validation errors')
+      showToast('error', t('knowledge.fixErrors'))
       return
     }
 
@@ -96,10 +96,10 @@ export function KnowledgeManager() {
       }
 
       await uploadDocument(upload)
-      showToast('success', 'Document uploaded successfully')
+      showToast('success', t('knowledge.uploadSuccess'))
       resetForm()
     } catch (err) {
-      const message = err instanceof Error ? err.message : 'Failed to upload document'
+      const message = err instanceof Error ? err.message : t('knowledge.uploadFailed')
       showToast('error', message)
     } finally {
       setIsUploading(false)
@@ -109,9 +109,9 @@ export function KnowledgeManager() {
   const handleDeleteDocument = async (id: string) => {
     try {
       await deleteDocument(id)
-      showToast('success', 'Document deleted successfully')
+      showToast('success', t('knowledge.deleteSuccess'))
     } catch (err) {
-      const message = err instanceof Error ? err.message : 'Failed to delete document'
+      const message = err instanceof Error ? err.message : t('knowledge.deleteFailed')
       showToast('error', message)
     }
   }
@@ -120,9 +120,9 @@ export function KnowledgeManager() {
     setIsSyncing(true)
     try {
       await syncAll()
-      showToast('success', 'All documents synced successfully')
+      showToast('success', t('knowledge.syncSuccess'))
     } catch (err) {
-      const message = err instanceof Error ? err.message : 'Failed to sync documents'
+      const message = err instanceof Error ? err.message : t('knowledge.syncFailed')
       showToast('error', message)
     } finally {
       setIsSyncing(false)
@@ -167,7 +167,7 @@ export function KnowledgeManager() {
         <div className="flex items-center justify-between">
           <div>
             <h1 className="text-xl font-bold text-white">{t('knowledge.title')}</h1>
-            <p className="text-sm text-gray-400">{t('knowledge.subtitle') || 'Manage documents and knowledge bases for RAG retrieval'}</p>
+            <p className="text-sm text-gray-400">{t('knowledge.subtitle')}</p>
           </div>
           <div className="flex items-center gap-3">
             <button
@@ -213,7 +213,7 @@ export function KnowledgeManager() {
                 className={`w-full px-4 py-2 bg-gray-800 border rounded-lg text-white focus:border-blue-500 focus:ring-1 focus:ring-blue-500 outline-none transition-colors ${
                   validationErrors.title ? 'border-red-500' : 'border-gray-700'
                 }`}
-                placeholder="e.g., Company Policies"
+                placeholder={t('knowledge.titlePlaceholder')}
               />
             </FormField>
 
@@ -229,7 +229,7 @@ export function KnowledgeManager() {
                 className={`w-full px-4 py-2 bg-gray-800 border rounded-lg text-white focus:border-blue-500 focus:ring-1 focus:ring-blue-500 outline-none transition-colors ${
                   validationErrors.category ? 'border-red-500' : 'border-gray-700'
                 }`}
-                placeholder="e.g., HR, Technical, Product"
+                placeholder={t('knowledge.categoryPlaceholder')}
               />
             </FormField>
 
@@ -272,18 +272,18 @@ export function KnowledgeManager() {
                   {isUploading ? (
                     <>
                       <Loader2 className="w-5 h-5 text-blue-500 animate-spin" />
-                      <span className="text-gray-300">Uploading...</span>
+                      <span className="text-gray-300">{t('knowledge.uploading')}</span>
                     </>
                   ) : (
                     <>
                       <Upload className="w-5 h-5 text-gray-400" />
-                      <span className="text-gray-300">Click to select file</span>
+                      <span className="text-gray-300">{t('knowledge.clickToSelect')}</span>
                     </>
                   )}
                 </button>
               </div>
               <p className="text-xs text-gray-400 mt-2">
-                {t('knowledge.supportedFormats') || `Supported formats: ${supportedFileTypes.join(', ')}`}
+                {t('knowledge.supportedFormats')}
               </p>
             </FormField>
           </div>
@@ -293,7 +293,7 @@ export function KnowledgeManager() {
         <div className="bg-gray-900 border border-gray-800 rounded-lg overflow-hidden">
           <div className="p-4 border-b border-gray-800">
             <h2 className="text-lg font-semibold text-white">
-              {t('knowledge.documents') || 'Documents'} ({documents.length})
+              {t('knowledge.documents')} ({documents.length})
             </h2>
           </div>
           <div className="p-6">

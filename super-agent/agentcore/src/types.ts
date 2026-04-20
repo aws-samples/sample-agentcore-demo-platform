@@ -38,6 +38,14 @@ export interface ContentBlock {
   is_error?: boolean;
 }
 
+export interface TokenUsage {
+  input_tokens: number;
+  output_tokens: number;
+  cache_read_input_tokens: number;
+  cache_creation_input_tokens: number;
+  total_cost_usd: number;
+}
+
 export interface AgentEvent {
   type: 'session_start' | 'assistant' | 'result' | 'error';
   session_id?: string;
@@ -48,4 +56,5 @@ export interface AgentEvent {
   num_turns?: number;
   is_error?: boolean;
   result?: string;
+  token_usage?: TokenUsage;
 }

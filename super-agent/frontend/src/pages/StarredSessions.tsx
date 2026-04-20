@@ -15,12 +15,13 @@ import {
   Pencil, Tag, LayoutGrid, ChevronDown, ChevronRight, X,
 } from 'lucide-react'
 import { restClient } from '@/services/api/restClient'
+import { useTranslation } from '@/i18n/useTranslation'
 
 const PRESET_CATEGORIES = [
-  { value: 'showcase', label: '客户演示', color: 'bg-blue-500/20 text-blue-400' },
-  { value: 'best-practice', label: '最佳实践', color: 'bg-emerald-500/20 text-emerald-400' },
-  { value: 'training', label: '培训教材', color: 'bg-purple-500/20 text-purple-400' },
-  { value: 'template', label: '可复用模板', color: 'bg-amber-500/20 text-amber-400' },
+  { value: 'showcase', labelKey: 'starred.category.showcase', color: 'bg-blue-500/20 text-blue-400' },
+  { value: 'best-practice', labelKey: 'starred.category.bestPractice', color: 'bg-emerald-500/20 text-emerald-400' },
+  { value: 'training', labelKey: 'starred.category.training', color: 'bg-purple-500/20 text-purple-400' },
+  { value: 'template', labelKey: 'starred.category.template', color: 'bg-amber-500/20 text-amber-400' },
 ]
 
 const CATEGORY_COLOR: Record<string, string> = Object.fromEntries(
@@ -48,10 +49,11 @@ function formatDate(dateStr: string): string {
   })
 }
 
-function CategoryBadge({ category, onClick }: { category: string | null; onClick?: (e: React.MouseEvent) => void }) {
+function CategoryBadge({ category, onClick, t }: { category: string | null; onClick?: (e: React.MouseEvent) => void; t: (key: string) => string }) {
   if (!category) return null
   const color = CATEGORY_COLOR[category] ?? 'bg-gray-500/20 text-gray-400'
-  const label = PRESET_CATEGORIES.find(c => c.value === category)?.label ?? category
+  const cat = PRESET_CATEGORIES.find(c => c.value === category)
+  const label = cat ? t(cat.labelKey) : category
   return (
     <span
       onClick={onClick}
@@ -62,10 +64,11 @@ function CategoryBadge({ category, onClick }: { category: string | null; onClick
   )
 }
 
-function CategoryPicker({ sessionId, current, onUpdate }: {
+function CategoryPicker({ sessionId, current, onUpdate, t }: {
   sessionId: string
   current: string | null
   onUpdate: (id: string, cat: string | null) => void
+  t: (key: string) => string
 }) {
   const [open, setOpen] = useState(false)
   const ref = useRef<HTMLDivElement>(null)
@@ -108,7 +111,7 @@ function CategoryPicker({ sessionId, current, onUpdate }: {
               }`}
             >
               <span className={`w-2 h-2 rounded-full ${cat.color.split(' ')[0]}`} />
-              {cat.label}
+              {t(cat.labelKey)}
               {current === cat.value && <span className="ml-auto text-blue-400">✓</span>}
             </button>
           ))}
@@ -119,7 +122,7 @@ function CategoryPicker({ sessionId, current, onUpdate }: {
                 onClick={() => handleSelect(null)}
                 className="w-full text-left px-3 py-1.5 text-xs text-gray-500 hover:bg-gray-700 hover:text-white transition-colors flex items-center gap-2"
               >
-                <X className="w-3 h-3" /> Remove category
+                <X className="w-3 h-3" /> {t('starred.removeCategory')}
               </button>
             </>
           )}
@@ -131,6 +134,7 @@ function CategoryPicker({ sessionId, current, onUpdate }: {
 
 export function StarredSessions() {
   const navigate = useNavigate()
+  const { t } = useTranslation()
   const [sessions, setSessions] = useState<StarredSession[]>([])
   const [loading, setLoading] = useState(true)
   const [searchQuery, setSearchQuery] = useState('')
@@ -212,13 +216,13 @@ export function StarredSessions() {
     const map = new Map<string, StarredSession[]>()
     for (const s of filtered) {
       const key = viewMode === 'scope'
-        ? (s.business_scope?.name ?? '未分类')
-        : (PRESET_CATEGORIES.find(c => c.value === s.star_category)?.label ?? s.star_category ?? '未分类')
+        ? (s.business_scope?.name ?? t('starred.uncategorized'))
+        : ((() => { const cat = PRESET_CATEGORIES.find(c => c.value === s.star_category); return cat ? t(cat.labelKey) : s.star_category ?? t('starred.uncategorized') })())
       if (!map.has(key)) map.set(key, [])
       map.get(key)!.push(s)
     }
     return map
-  }, [filtered, viewMode])
+  }, [filtered, viewMode, t])
 
   return (
     <div className="h-full overflow-y-auto">
@@ -226,8 +230,8 @@ export function StarredSessions() {
       <div className="px-6 pt-6 pb-4 border-b border-gray-800">
         <div className="flex items-center gap-3 mb-4">
           <Star className="w-6 h-6 text-yellow-400" fill="currentColor" />
-          <h1 className="text-xl font-semibold text-white">明星案例</h1>
-          <span className="text-sm text-gray-500">{sessions.length} starred</span>
+          <h1 className="text-xl font-semibold text-white">{t('starred.title')}</h1>
+          <span className="text-sm text-gray-500">{sessions.length} {t('starred.starred')}</span>
         </div>
 
         <div className="flex items-center gap-3">
@@ -237,7 +241,7 @@ export function StarredSessions() {
               type="text"
               value={searchQuery}
               onChange={e => setSearchQuery(e.target.value)}
-              placeholder="Search starred sessions..."
+              placeholder={t('starred.searchPlaceholder')}
               className="w-full pl-10 pr-4 py-2 bg-gray-900 border border-gray-800 rounded-lg text-sm text-white placeholder-gray-600 focus:outline-none focus:border-gray-600"
             />
           </div>
@@ -249,7 +253,7 @@ export function StarredSessions() {
                 viewMode === 'scope' ? 'bg-gray-700 text-white' : 'text-gray-500 hover:text-gray-300'
               }`}
             >
-              <LayoutGrid className="w-3.5 h-3.5" /> By Scope
+              <LayoutGrid className="w-3.5 h-3.5" /> {t('starred.byScope')}
             </button>
             <button
               onClick={() => setViewMode('category')}
@@ -257,7 +261,7 @@ export function StarredSessions() {
                 viewMode === 'category' ? 'bg-gray-700 text-white' : 'text-gray-500 hover:text-gray-300'
               }`}
             >
-              <Tag className="w-3.5 h-3.5" /> By Category
+              <Tag className="w-3.5 h-3.5" /> {t('starred.byCategory')}
             </button>
           </div>
         </div>
@@ -273,8 +277,8 @@ export function StarredSessions() {
         ) : filtered.length === 0 ? (
           <div className="text-center py-16">
             <Star className="w-10 h-10 text-gray-700 mx-auto mb-3" />
-            <p className="text-sm text-gray-500">No starred sessions yet</p>
-            <p className="text-xs text-gray-600 mt-1">Star a chat session to save it as a showcase case.</p>
+            <p className="text-sm text-gray-500">{t('starred.noStarred')}</p>
+            <p className="text-xs text-gray-600 mt-1">{t('starred.noStarredHint')}</p>
           </div>
         ) : (
           <div className="space-y-4">
@@ -345,7 +349,7 @@ export function StarredSessions() {
                                     </span>
                                   )}
                                   {viewMode === 'scope' && session.star_category && (
-                                    <CategoryBadge category={session.star_category} />
+                                    <CategoryBadge category={session.star_category} t={t} />
                                   )}
                                   <span className="flex items-center gap-1">
                                     <Clock className="w-3 h-3" />
@@ -359,6 +363,7 @@ export function StarredSessions() {
                                 sessionId={session.id}
                                 current={session.star_category}
                                 onUpdate={handleCategoryUpdate}
+                                t={t}
                               />
                               <button
                                 onClick={(e) => { e.stopPropagation(); handleUnstar(session.id) }}

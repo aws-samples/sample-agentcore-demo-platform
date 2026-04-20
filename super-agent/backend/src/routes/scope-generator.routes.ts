@@ -20,7 +20,7 @@ function formatSSEEvent(payload: { event?: string; data: string }): string {
 }
 
 interface GenerateBody {
-  Body: { description: string };
+  Body: { description: string; language?: string };
 }
 
 interface ConfirmBody {
@@ -36,7 +36,7 @@ export async function scopeGeneratorRoutes(fastify: FastifyInstance): Promise<vo
    * Stream AI-generated scope configuration via SSE.
    */
   fastify.post<GenerateBody>('/generate', { preHandler: [authenticate] }, async (request: FastifyRequest<GenerateBody>, reply: FastifyReply) => {
-    const { description } = request.body;
+    const { description, language } = request.body;
     if (!description || description.trim().length === 0) {
       return reply.status(400).send({ error: 'Business description is required', code: 'MISSING_DESCRIPTION' });
     }
@@ -61,7 +61,7 @@ export async function scopeGeneratorRoutes(fastify: FastifyInstance): Promise<vo
     }, 15_000);
 
     try {
-      const generator = scopeGeneratorService.generate(description.trim());
+      const generator = scopeGeneratorService.generate(description.trim(), undefined, language);
 
       for await (const event of generator) {
         if (clientDisconnected) break;
@@ -132,6 +132,13 @@ export async function scopeGeneratorRoutes(fastify: FastifyInstance): Promise<vo
       description = `Create a business scope based on the uploaded SOP document.`;
     }
 
+    // Extract the language field from multipart fields
+    const languageField = data.fields?.language;
+    let language: string | undefined;
+    if (languageField && 'value' in languageField) {
+      language = (languageField as { value: string }).value;
+    }
+
     // Set SSE headers
     reply.raw.writeHead(200, {
       'Content-Type': 'text/event-stream',
@@ -155,7 +162,7 @@ export async function scopeGeneratorRoutes(fastify: FastifyInstance): Promise<vo
       const generator = scopeGeneratorService.generate(description.trim(), {
         buffer: fileBuffer,
         fileName: data.filename || 'document',
-      });
+      }, language);
 
       for await (const event of generator) {
         if (clientDisconnected) break;

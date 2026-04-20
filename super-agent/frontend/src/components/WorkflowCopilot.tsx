@@ -10,6 +10,7 @@ import type { WorkflowPlan, WorkflowPatch, WorkflowTask, WorkflowVariable } from
 import type { CanvasData } from '@/types/canvas'
 import type { Agent } from '@/types'
 import { getAuthToken } from '@/services/api/restClient'
+import { useTranslation } from '@/i18n'
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? 'http://localhost:3000'
 
@@ -355,6 +356,7 @@ export const WorkflowCopilot = forwardRef<WorkflowCopilotHandle, WorkflowCopilot
   const [isProcessing, setIsProcessing] = useState(false)
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLTextAreaElement>(null)
+  const { t } = useTranslation()
 
   const hasNodes = canvasData && canvasData.nodes.length > 0
 
@@ -430,7 +432,7 @@ export const WorkflowCopilot = forwardRef<WorkflowCopilotHandle, WorkflowCopilot
           return { ...m, steps }
         }))
       } else if (event.type === 'error') {
-        updateMessage(msgId, { content: event.message || 'Execution error', status: 'error' })
+        updateMessage(msgId, { content: event.message || t('copilot.executionError'), status: 'error' })
       }
     },
     finishExecution(msgId, success, message) {
@@ -444,8 +446,8 @@ export const WorkflowCopilot = forwardRef<WorkflowCopilotHandle, WorkflowCopilot
         const total = nodeSteps.length
         const summary = message
           || (success
-            ? `Workflow completed. ${completed}/${total} steps finished${failed > 0 ? `, ${failed} failed` : ''}.`
-            : 'Workflow execution failed.')
+            ? t('copilot.workflowCompleted').replace('{completed}', String(completed)).replace('{total}', String(total)).replace('{failed}', failed > 0 ? `, ${failed} failed` : '')
+            : t('copilot.workflowFailed'))
         return prev.map(m => m.id === msgId ? { ...m, content: summary, status: success ? 'done' : 'error' } : m)
       })
     },
@@ -624,7 +626,7 @@ export const WorkflowCopilot = forwardRef<WorkflowCopilotHandle, WorkflowCopilot
     } catch (err) {
       console.error('Copilot error:', err)
       updateMessage(assistantId, {
-        content: err instanceof Error ? err.message : 'An error occurred.',
+        content: err instanceof Error ? err.message : t('copilot.error'),
         status: 'error',
       })
     } finally {
@@ -649,8 +651,8 @@ export const WorkflowCopilot = forwardRef<WorkflowCopilotHandle, WorkflowCopilot
         {messages.length === 0 && (
           <div className="flex flex-col items-center justify-center h-full text-gray-500 text-sm px-4 text-center">
             <Bot className="w-8 h-8 mb-2 text-gray-600" />
-            <p>{hasNodes ? 'Ask anything about this workflow' : 'Describe the workflow you want to create'}</p>
-            <p className="text-xs mt-1 text-gray-600">Generate, modify, or run workflows from here</p>
+            <p>{hasNodes ? t('copilot.emptyHasNodes') : t('copilot.emptyNoNodes')}</p>
+            <p className="text-xs mt-1 text-gray-600">{t('copilot.emptyHint')}</p>
           </div>
         )}
 
@@ -757,7 +759,7 @@ export const WorkflowCopilot = forwardRef<WorkflowCopilotHandle, WorkflowCopilot
               value={input}
               onChange={(e) => setInput(e.target.value)}
               onKeyDown={handleKeyDown}
-              placeholder="Generate, modify, or ask about this workflow..."
+              placeholder={t('copilot.placeholder')}
               disabled={isDisabled}
               rows={2}
               className={`
@@ -785,7 +787,7 @@ export const WorkflowCopilot = forwardRef<WorkflowCopilotHandle, WorkflowCopilot
               )}
             </button>
           </div>
-          <p className="mt-1.5 text-xs text-gray-600">Enter to send</p>
+          <p className="mt-1.5 text-xs text-gray-600">{t('copilot.enterToSend')}</p>
         </form>
       </div>
     </div>

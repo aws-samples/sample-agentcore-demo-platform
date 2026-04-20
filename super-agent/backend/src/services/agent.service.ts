@@ -154,10 +154,11 @@ export class AgentService {
       throw AppError.validation('Display name is required');
     }
 
-    // Check for duplicate name within organization
-    const existingAgent = await agentRepository.findByName(organizationId, data.name);
+    // Check for duplicate name within the same business scope
+    const scopeId = data.business_scope_id ?? null;
+    const existingAgent = await agentRepository.findByName(organizationId, data.name, scopeId);
     if (existingAgent) {
-      throw AppError.conflict(`Agent with name "${data.name}" already exists`);
+      throw AppError.conflict(`Agent with name "${data.name}" already exists in this scope`);
     }
 
     // Create the agent
@@ -226,10 +227,11 @@ export class AgentService {
         throw AppError.validation('Agent name cannot be empty');
       }
 
-      // Check for duplicate name (excluding current agent)
-      const agentWithName = await agentRepository.findByName(organizationId, data.name);
+      // Check for duplicate name within the same scope (excluding current agent)
+      const scopeId = data.business_scope_id !== undefined ? data.business_scope_id : existingAgent.business_scope_id;
+      const agentWithName = await agentRepository.findByName(organizationId, data.name, scopeId);
       if (agentWithName && agentWithName.id !== id) {
-        throw AppError.conflict(`Agent with name "${data.name}" already exists`);
+        throw AppError.conflict(`Agent with name "${data.name}" already exists in this scope`);
       }
     }
 

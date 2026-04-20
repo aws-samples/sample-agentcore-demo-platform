@@ -1,0 +1,106 @@
+[
+  {
+    "name": "gmail_search",
+    "description": "搜索 Gmail 邮件。支持 Gmail 搜索语法，如 'from:boss@company.com is:unread'、'subject:报价 after:2026/01/01'、'has:attachment label:important'。返回匹配邮件的摘要列表（不含正文）。",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "query": {
+          "type": "string",
+          "description": "Gmail 搜索查询，支持标准 Gmail 搜索语法。示例: 'from:alice@example.com is:unread', 'subject:会议 after:2026/04/01'"
+        },
+        "max_results": {
+          "type": "number",
+          "description": "最大返回数量，默认 10，最大 50"
+        }
+      },
+      "required": ["query"]
+    }
+  },
+  {
+    "name": "gmail_read",
+    "description": "读取一封邮件的完整内容，包括正文、发件人、收件人、日期和标签。需要先通过 gmail_search 获取 message_id。",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "message_id": {
+          "type": "string",
+          "description": "邮件 ID，从 gmail_search 结果中获取"
+        }
+      },
+      "required": ["message_id"]
+    }
+  },
+  {
+    "name": "gmail_send",
+    "description": "发送一封新邮件。",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "to": {
+          "type": "string",
+          "description": "收件人邮箱地址"
+        },
+        "subject": {
+          "type": "string",
+          "description": "邮件主题"
+        },
+        "body": {
+          "type": "string",
+          "description": "邮件正文（纯文本）"
+        }
+      },
+      "required": ["to", "subject", "body"]
+    }
+  },
+  {
+    "name": "gmail_reply",
+    "description": "回复一封已有邮件。自动处理 Re: 前缀、In-Reply-To 头和线程关联。",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "message_id": {
+          "type": "string",
+          "description": "要回复的邮件 ID"
+        },
+        "body": {
+          "type": "string",
+          "description": "回复正文（纯文本）"
+        }
+      },
+      "required": ["message_id", "body"]
+    }
+  },
+  {
+    "name": "gmail_list_labels",
+    "description": "列出所有 Gmail 标签及其未读邮件数。用于了解邮箱的组织结构。",
+    "inputSchema": {
+      "type": "object",
+      "properties": {}
+    }
+  },
+  {
+    "name": "gmail_modify_labels",
+    "description": "修改邮件的标签。常用操作: 归档(remove INBOX)、标星(add STARRED)、标记已读(remove UNREAD)、移到垃圾箱(add TRASH)。",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "message_id": {
+          "type": "string",
+          "description": "邮件 ID"
+        },
+        "add_labels": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "要添加的标签 ID 列表。常用: STARRED, IMPORTANT, TRASH, SPAM"
+        },
+        "remove_labels": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "要移除的标签 ID 列表。常用: INBOX(归档), UNREAD(标记已读), STARRED"
+        }
+      },
+      "required": ["message_id"]
+    }
+  }
+]

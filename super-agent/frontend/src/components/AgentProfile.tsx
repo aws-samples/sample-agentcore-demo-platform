@@ -121,7 +121,7 @@ export function AgentProfile({ agent, onConfigure, onRemove, onToggleStatus }: A
                   ? 'bg-green-600/20 hover:bg-green-600/30 text-green-400'
                   : 'bg-yellow-600/20 hover:bg-yellow-600/30 text-yellow-400'
               }`}
-              title={isDisabled ? 'Enable agent' : 'Disable agent'}
+              title={isDisabled ? t('agentProfile.enableAgent') : t('agentProfile.disableAgent')}
             >
               <Power className="w-4 h-4" />
               <span className="text-sm">{isDisabled ? t('common.enable') : t('common.disable')}</span>
@@ -140,7 +140,7 @@ export function AgentProfile({ agent, onConfigure, onRemove, onToggleStatus }: A
             <button
               onClick={() => onRemove(agent.id)}
               className="flex items-center gap-2 px-4 py-2 bg-red-600/20 hover:bg-red-600/30 rounded-lg text-red-400 transition-colors"
-              title="Remove agent"
+              title={t('agentProfile.removeAgent')}
             >
               <Trash2 className="w-4 h-4" />
               <span className="text-sm">{t('common.remove')}</span>
@@ -224,7 +224,7 @@ export function AgentProfile({ agent, onConfigure, onRemove, onToggleStatus }: A
               <div className="flex-1 min-w-0">
                 <p className="text-sm font-medium text-white">{tool.name}</p>
                 <p className="text-xs text-gray-400 truncate" title={tool.skillMd}>
-                  {tool.skillMd ? tool.skillMd.split('\n')[0].replace(/^#\s*/, '') : 'No description'}
+                  {tool.skillMd ? tool.skillMd.split('\n')[0].replace(/^#\s*/, '') : t('agentProfile.noDescription')}
                 </p>
               </div>
             </div>
@@ -249,13 +249,13 @@ export function AgentProfile({ agent, onConfigure, onRemove, onToggleStatus }: A
       <div className="mb-6">
         <h3 className="text-sm font-semibold text-gray-400 uppercase tracking-wider mb-3 flex items-center gap-2">
           <Terminal className="w-4 h-4" />
-          Execution Logs
+          {t('agentProfile.executionLogs')}
         </h3>
         {eventsLoading ? (
-          <div className="text-gray-500 text-sm py-4 text-center">Loading...</div>
+          <div className="text-gray-500 text-sm py-4 text-center">{t('common.loading')}</div>
         ) : events.length === 0 ? (
           <div className="text-gray-500 text-sm py-4 text-center border border-gray-700 rounded-lg bg-gray-800/30">
-            No execution history yet
+            {t('agentProfile.noHistory')}
           </div>
         ) : (
           <div className="space-y-1.5 max-h-[400px] overflow-y-auto">
@@ -296,11 +296,11 @@ function MetricCard({ icon, label, value }: MetricCardProps) {
 /*  Event type styling                                                 */
 /* ------------------------------------------------------------------ */
 const EVENT_STYLE: Record<string, { icon: React.ReactNode; color: string; label: string }> = {
-  subagent_invocation: { icon: <Users className="w-3.5 h-3.5" />, color: 'text-orange-400', label: 'Sub-agent' },
-  tool_call:           { icon: <Zap className="w-3.5 h-3.5" />, color: 'text-yellow-400', label: 'Tool' },
-  skill_usage:         { icon: <Wrench className="w-3.5 h-3.5" />, color: 'text-blue-400', label: 'Skill' },
-  turn_complete:       { icon: <CheckCircle className="w-3.5 h-3.5" />, color: 'text-green-400', label: 'Complete' },
-  error:               { icon: <AlertCircle className="w-3.5 h-3.5" />, color: 'text-red-400', label: 'Error' },
+  subagent_invocation: { icon: <Users className="w-3.5 h-3.5" />, color: 'text-orange-400', label: 'agentProfile.eventSubAgent' },
+  tool_call:           { icon: <Zap className="w-3.5 h-3.5" />, color: 'text-yellow-400', label: 'agentProfile.eventTool' },
+  skill_usage:         { icon: <Wrench className="w-3.5 h-3.5" />, color: 'text-blue-400', label: 'agentProfile.eventSkill' },
+  turn_complete:       { icon: <CheckCircle className="w-3.5 h-3.5" />, color: 'text-green-400', label: 'agentProfile.eventComplete' },
+  error:               { icon: <AlertCircle className="w-3.5 h-3.5" />, color: 'text-red-400', label: 'common.error' },
 }
 
 function formatRelativeTime(iso: string): string {
@@ -317,6 +317,7 @@ function formatRelativeTime(iso: string): string {
 
 function EventRow({ event, currentAgentId }: { event: AgentEvent; currentAgentId: string }) {
   const [expanded, setExpanded] = useState(false)
+  const { t } = useTranslation()
   const style = EVENT_STYLE[event.eventType] ?? { icon: <Activity className="w-3.5 h-3.5" />, color: 'text-gray-400', label: event.eventType }
 
   // Build description
@@ -349,7 +350,7 @@ function EventRow({ event, currentAgentId }: { event: AgentEvent; currentAgentId
       >
         <div className={`flex-shrink-0 ${style.color}`}>{style.icon}</div>
         <span className={`text-[10px] font-semibold uppercase tracking-wider flex-shrink-0 w-16 ${style.color}`}>
-          {style.label}
+          {t(style.label)}
         </span>
         {event.eventType === 'subagent_invocation' && (
           <ArrowRight className="w-3 h-3 text-gray-600 flex-shrink-0" />
@@ -427,6 +428,7 @@ function AgentConfigSections({ agentId, agentName, scopeId }: { agentId: string;
   const effectiveId = scopeId || agentId
   const effectiveName = agentName
   const [mcpPanelOpen, setMcpPanelOpen] = useState(false)
+  const { t } = useTranslation()
 
   return (
     <div className="space-y-6">
@@ -434,13 +436,13 @@ function AgentConfigSections({ agentId, agentName, scopeId }: { agentId: string;
       <div className="bg-gray-900 border border-gray-800 rounded-xl overflow-hidden p-4">
         <div className="flex items-center justify-between mb-2">
           <h3 className="text-sm font-semibold text-gray-400 uppercase tracking-wider flex items-center gap-2">
-            MCP Servers
+            {t('agentProfile.mcpServers')}
           </h3>
           <button
             onClick={() => setMcpPanelOpen(true)}
             className="text-xs text-blue-400 hover:text-blue-300 transition-colors"
           >
-            Manage
+            {t('agentProfile.manage')}
           </button>
         </div>
         <MCPServersPanel open={mcpPanelOpen} onClose={() => setMcpPanelOpen(false)} sessionId={null} />

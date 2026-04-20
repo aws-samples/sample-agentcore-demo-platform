@@ -175,6 +175,14 @@ export type ContentBlock =
   | { type: 'tool_use'; id: string; name: string; input: Record<string, unknown> }
   | { type: 'tool_result'; tool_use_id: string; content: string | null; is_error: boolean };
 
+export interface TokenUsage {
+  inputTokens: number;
+  outputTokens: number;
+  cacheReadInputTokens: number;
+  cacheCreationInputTokens: number;
+  totalCostUsd: number;
+}
+
 export interface ConversationEvent {
   type: 'session_start' | 'assistant' | 'result' | 'heartbeat' | 'error' | 'preview_ready';
   sessionId?: string;
@@ -192,6 +200,8 @@ export interface ConversationEvent {
   /** Sub-agent speaker identity — set when the message originates from a sub-agent */
   speakerAgentName?: string;
   speakerAgentAvatar?: string | null;
+  /** Token usage from the LLM — populated on result events */
+  tokenUsage?: TokenUsage;
 }
 
 export interface MCPServerRecord {
@@ -477,7 +487,32 @@ export class ClaudeAgentService {
       }
       case 'result': {
         const r = message as SDKResultMessage;
-        return { type: 'result', sessionId: r.session_id ?? sessionId, durationMs: r.duration_ms, numTurns: r.num_turns };
+        // Extract token usage from SDK result
+        let tokenUsage: TokenUsage | undefined;
+        const usage = (r as Record<string, unknown>).usage as Record<string, number> | undefined;
+        const modelUsage = (r as Record<string, unknown>).modelUsage as Record<string, Record<string, number>> | undefined;
+
+        if (usage) {
+          tokenUsage = {
+            inputTokens: usage.input_tokens ?? 0,
+            outputTokens: usage.output_tokens ?? 0,
+            cacheReadInputTokens: usage.cache_read_input_tokens ?? 0,
+            cacheCreationInputTokens: usage.cache_creation_input_tokens ?? 0,
+            totalCostUsd: ((r as Record<string, unknown>).total_cost_usd as number) ?? 0,
+          };
+        } else if (modelUsage) {
+          let inputTokens = 0, outputTokens = 0, cacheRead = 0, cacheCreation = 0, cost = 0;
+          for (const mu of Object.values(modelUsage)) {
+            inputTokens += mu.inputTokens ?? 0;
+            outputTokens += mu.outputTokens ?? 0;
+            cacheRead += mu.cacheReadInputTokens ?? 0;
+            cacheCreation += mu.cacheCreationInputTokens ?? 0;
+            cost += mu.costUSD ?? 0;
+          }
+          tokenUsage = { inputTokens, outputTokens, cacheReadInputTokens: cacheRead, cacheCreationInputTokens: cacheCreation, totalCostUsd: cost };
+        }
+
+        return { type: 'result', sessionId: r.session_id ?? sessionId, durationMs: r.duration_ms, numTurns: r.num_turns, tokenUsage };
       }
       case 'system': return null;
       default: return null;

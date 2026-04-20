@@ -1,0 +1,21 @@
+{
+  "id": "google-maps",
+  "version": "1.0.0",
+  "name": "Google Maps",
+  "icon": "🗺️",
+  "category": "saas",
+  "description": {
+    "en": "Geolocation and routing services",
+    "cn": "地理位置与路线服务"
+  },
+  "auth": {
+    "type": "api_key",
+    "credential_fields": [
+      { "key": "api_key", "label": { "en": "API Key", "cn": "API Key" }, "type": "password", "placeholder": "AIza...", "required": true }
+    ]
+  },
+  "config_fields": [],
+  "setup_guide": "setup-guide.md",
+  "tools_definition": "tools.json",
+  "lambda_handler": "handler.ts"
+}

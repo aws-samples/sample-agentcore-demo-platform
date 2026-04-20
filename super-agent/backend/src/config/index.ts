@@ -42,7 +42,7 @@ const envSchema = z.object({
   COGNITO_ADMIN_SUB: z.string().optional(),
 
   // AWS
-  AWS_REGION: z.string().default('us-west-2'),
+  AWS_REGION: z.string().default('us-east-1'),
   AWS_ACCESS_KEY_ID: z.string().optional(),
   AWS_SECRET_ACCESS_KEY: z.string().optional(),
 
@@ -65,12 +65,12 @@ const envSchema = z.object({
   // Claude Agent SDK
   ANTHROPIC_API_KEY: z.string().optional(),
   CLAUDE_CODE_USE_BEDROCK: z.string().optional().default('false'),
-  CLAUDE_MODEL: z.string().optional().default('claude-sonnet-4-6'),
+  CLAUDE_MODEL: z.string().optional().default('claude-sonnet-4-5-20250929'),
   // Separate Bedrock credentials — only injected into the SDK subprocess,
   // so the main process keeps using the EC2 instance role for S3/Secrets/etc.
   BEDROCK_AWS_ACCESS_KEY_ID: z.string().optional(),
   BEDROCK_AWS_SECRET_ACCESS_KEY: z.string().optional(),
-  AGENT_WORKSPACE_BASE_DIR: z.string().optional().default('/tmp/super-agent-workspaces'),
+  AGENT_WORKSPACE_BASE_DIR: z.string().optional().default('/tmp/workspaces'),
   CLAUDE_CODE_EXECUTABLE: z.string().optional(),
   CLAUDE_SESSION_TIMEOUT_MS: z.string().optional().default('1800000').transform(Number), // 30 min
   CLAUDE_RESPONSE_TIMEOUT_MS: z.string().optional().default('1200000').transform(Number), // 20 min
@@ -95,6 +95,13 @@ const envSchema = z.object({
   // Agent Runtime selection: "claude" (default), "agentcore", or "openclaw"
   AGENT_RUNTIME: z.enum(['claude', 'agentcore', 'openclaw']).optional().default('claude'),
 
+  // Process role: controls which components start in this process.
+  // "all" (default) = API + workers + gateways (single-process, local dev / EC2)
+  // "api" = HTTP server only (no BullMQ workers, no schedulers, no IM gateways)
+  // "worker" = BullMQ workers + schedulers only (no HTTP routes)
+  // "gateway" = IM long-lived connections only
+  PROCESS_ROLE: z.enum(['all', 'api', 'worker', 'gateway']).optional().default('all'),
+
   // OpenClaw on AgentCore (when AGENT_RUNTIME=openclaw)
   OPENCLAW_AGENTCORE_RUNTIME_ARN: z.string().optional(),
 
@@ -103,6 +110,13 @@ const envSchema = z.object({
 
   // RAG (optional — semantic document search over knowledge base)
   RAG_ENABLED: z.string().optional(),
+
+  // Data Connector OAuth (Google, Salesforce, etc.)
+  GOOGLE_OAUTH_CLIENT_ID: z.string().optional(),
+  GOOGLE_OAUTH_CLIENT_SECRET: z.string().optional(),
+  SALESFORCE_OAUTH_CLIENT_ID: z.string().optional(),
+  SALESFORCE_OAUTH_CLIENT_SECRET: z.string().optional(),
+  OAUTH_REDIRECT_BASE_URL: z.string().optional(), // e.g. https://app.example.com
 });
 
 function loadConfig(): z.infer<typeof envSchema> {
@@ -214,6 +228,7 @@ export const config = {
   },
 
   agentRuntime: env.AGENT_RUNTIME,
+  processRole: env.PROCESS_ROLE,
 
   openclaw: {
     agentCoreRuntimeArn: env.OPENCLAW_AGENTCORE_RUNTIME_ARN,
@@ -225,6 +240,18 @@ export const config = {
 
   rag: {
     enabled: env.RAG_ENABLED === 'true' || env.RAG_ENABLED === '1',
+  },
+
+  connectorOAuth: {
+    google: {
+      clientId: env.GOOGLE_OAUTH_CLIENT_ID ?? '',
+      clientSecret: env.GOOGLE_OAUTH_CLIENT_SECRET ?? '',
+    },
+    salesforce: {
+      clientId: env.SALESFORCE_OAUTH_CLIENT_ID ?? '',
+      clientSecret: env.SALESFORCE_OAUTH_CLIENT_SECRET ?? '',
+    },
+    redirectBaseUrl: env.OAUTH_REDIRECT_BASE_URL ?? `http://localhost:${env.PORT}`,
   },
 
   logLevel: env.LOG_LEVEL,

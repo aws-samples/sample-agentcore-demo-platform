@@ -8,6 +8,7 @@
 import { useState } from 'react';
 import { X, Play, AlertCircle } from 'lucide-react';
 import type { WorkflowVariableDefinition } from '@/types/canvas/metadata';
+import { useTranslation } from '@/i18n';
 
 interface Props {
   workflowName: string;
@@ -28,6 +29,7 @@ function isSystemVariable(name: string): boolean {
 }
 
 export function RunWorkflowModal({ workflowName, workflowId, variables, onRun, onClose }: Props) {
+  const { t } = useTranslation();
   const [values, setValues] = useState<Record<string, string>>(() => {
     const initial: Record<string, string> = {};
     for (const v of variables) {
@@ -54,7 +56,7 @@ export function RunWorkflowModal({ workflowName, workflowId, variables, onRun, o
       .map(v => v.name);
 
     if (missing.length > 0) {
-      setError(`Required fields missing: ${missing.join(', ')}`);
+      setError(t('runWorkflow.requiredMissing').replace('{fields}', missing.join(', ')));
       return;
     }
 
@@ -78,7 +80,7 @@ export function RunWorkflowModal({ workflowName, workflowId, variables, onRun, o
         {/* Header */}
         <div className="flex items-center justify-between px-6 py-4 border-b border-gray-700">
           <div>
-            <h2 className="text-lg font-semibold text-white">Run Workflow</h2>
+            <h2 className="text-lg font-semibold text-white">{t('runWorkflow.title')}</h2>
             <p className="text-xs text-gray-400 mt-0.5">{workflowName}</p>
           </div>
           <button onClick={onClose} className="p-1.5 hover:bg-gray-800 rounded-lg">
@@ -89,11 +91,11 @@ export function RunWorkflowModal({ workflowName, workflowId, variables, onRun, o
         {/* Body */}
         <div className="px-6 py-4 space-y-4 max-h-[60vh] overflow-y-auto">
           {variables.length === 0 ? (
-            <p className="text-sm text-gray-400">This workflow has no input variables. Click Run to start.</p>
+            <p className="text-sm text-gray-400">{t('runWorkflow.noVariables')}</p>
           ) : (
             <>
               <p className="text-sm text-gray-400">
-                Fill in the input variables for this workflow run.
+                {t('runWorkflow.fillVariables')}
               </p>
               {variables.filter(v => !isSystemVariable(v.name)).map(v => (
                 <div key={v.variableId}>
@@ -146,14 +148,14 @@ export function RunWorkflowModal({ workflowName, workflowId, variables, onRun, o
             onClick={onClose}
             className="px-4 py-2 text-sm text-gray-400 hover:text-white transition-colors"
           >
-            Cancel
+            {t('common.cancel')}
           </button>
           <button
             onClick={handleRun}
             className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium rounded-lg transition-colors"
           >
             <Play className="w-4 h-4" />
-            Run
+            {t('runWorkflow.run')}
           </button>
         </div>
       </div>

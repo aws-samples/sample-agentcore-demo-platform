@@ -1,5 +1,6 @@
 import React from 'react'
 import { Loader2 } from 'lucide-react'
+import { useTranslation } from '@/i18n'
 
 interface LoadingSpinnerProps {
   size?: 'sm' | 'md' | 'lg' | 'xl'
@@ -56,10 +57,11 @@ interface FullPageLoadingProps {
   text?: string
 }
 
-export const FullPageLoading: React.FC<FullPageLoadingProps> = ({ text = 'Loading...' }) => {
+export const FullPageLoading: React.FC<FullPageLoadingProps> = ({ text }) => {
+  const { t } = useTranslation()
   return (
     <div className="min-h-screen bg-gray-900 flex items-center justify-center">
-      <LoadingSpinner size="xl" text={text} />
+      <LoadingSpinner size="xl" text={text ?? t('common.loading')} />
     </div>
   )
 }

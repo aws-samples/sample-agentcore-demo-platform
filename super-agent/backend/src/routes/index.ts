@@ -64,6 +64,10 @@ import { documentGroupRoutes, scopeDocGroupRoutes } from './document-groups.rout
 import { rehearsalRoutes } from './rehearsal.routes.js';
 import { ragRoutes } from './rag.routes.js';
 import { userGroupRoutes } from './userGroups.routes.js';
+import { tokenUsageRoutes } from './token-usage.routes.js';
+import { showcaseRoutes } from './showcase.routes.js';
+import { llmProxyRoutes } from './llm-proxy.routes.js';
+import { connectorRoutes } from './connectors.routes.js';
 
 /**
  * Register all API routes on the Fastify instance.
@@ -219,12 +223,28 @@ export async function registerRoutes(fastify: FastifyInstance): Promise<void> {
   // User Group Routes (RBAC for skills and MCP servers)
   await fastify.register(userGroupRoutes, { prefix: '/api/user-groups' });
 
+  // Token Usage Routes (per-user token consumption monitoring)
+  await fastify.register(tokenUsageRoutes, { prefix: '/api/token-usage' });
+
+  // Showcase Routes (企业Agent大赏)
+  await fastify.register(showcaseRoutes, { prefix: '/api/showcase' });
+
   // IM Webhook Routes (receive messages from Slack, Discord, etc. — no JWT auth)
   await fastify.register(imWebhookRoutes, { prefix: '/api/im' });
 
   // Published Apps / Marketplace Routes
   await fastify.register(appsRoutes, { prefix: '/api/apps' });
   await fastify.register(appDataRoutes, { prefix: '/api/apps' });
+
+  // Data Connector Routes (credentials, connectors, scope bindings)
+  await fastify.register(connectorRoutes, { prefix: '/api/data-connectors' });
+
+  // ============================================================================
+  // LLM Proxy Routes (OpenAI-compatible, API Key Authentication)
+  // ============================================================================
+
+  // /v1/chat/completions and /v1/models — drop-in for OpenAI SDK base_url
+  await fastify.register(llmProxyRoutes);
 
   // ============================================================================
   // Public OpenAPI Routes (API Key Authentication)

@@ -7,6 +7,7 @@
 import { useState, useEffect } from 'react';
 import { X, CheckCircle2, XCircle, Clock, Loader2, AlertTriangle, ChevronDown, ChevronRight } from 'lucide-react';
 import { getAuthToken } from '@/services/api/restClient';
+import { useTranslation } from '@/i18n';
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? 'http://localhost:3000';
 
@@ -76,6 +77,7 @@ function StatusBadge({ status }: { status: string }) {
 
 function NodeRow({ node }: { node: NodeExecution }) {
   const [expanded, setExpanded] = useState(node.status === 'failed');
+  const { t } = useTranslation();
   const title = node.node_data?.title || node.node_id;
   const hasDetails = node.output_data || node.error_message;
 
@@ -123,7 +125,7 @@ function NodeRow({ node }: { node: NodeExecution }) {
           )}
           {node.output_data && (
             <div className="mt-2 p-3 bg-gray-800/50 border border-gray-700/50 rounded-lg">
-              <div className="text-xs font-medium text-gray-400 mb-1">Output</div>
+              <div className="text-xs font-medium text-gray-400 mb-1">{t('execution.output')}</div>
               <pre className="text-xs text-gray-300 whitespace-pre-wrap break-words font-mono max-h-48 overflow-y-auto">
                 {typeof node.output_data === 'string'
                   ? node.output_data
@@ -141,6 +143,7 @@ export function ExecutionDetailModal({ executionId, onClose }: Props) {
   const [detail, setDetail] = useState<ExecutionDetail | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const { t } = useTranslation();
 
   useEffect(() => {
     const token = getAuthToken();
@@ -184,7 +187,7 @@ export function ExecutionDetailModal({ executionId, onClose }: Props) {
         <div className="flex items-center justify-between px-6 py-4 border-b border-gray-700">
           <div>
             <h2 className="text-lg font-semibold text-white">
-              {detail?.title || 'Execution Detail'}
+              {detail?.title || t('execution.title')}
             </h2>
             {detail && (
               <div className="flex items-center gap-3 mt-1">
@@ -194,7 +197,7 @@ export function ExecutionDetailModal({ executionId, onClose }: Props) {
                 </span>
                 {detail.completed_at && (
                   <span className="text-xs text-gray-500">
-                    Duration: {Math.round((new Date(detail.completed_at).getTime() - new Date(detail.started_at).getTime()) / 1000)}s
+                    {t('execution.duration').replace('{n}', String(Math.round((new Date(detail.completed_at).getTime() - new Date(detail.started_at).getTime()) / 1000)))}
                   </span>
                 )}
               </div>
@@ -210,7 +213,7 @@ export function ExecutionDetailModal({ executionId, onClose }: Props) {
           {loading && (
             <div className="flex items-center justify-center py-12">
               <Loader2 className="w-6 h-6 text-blue-400 animate-spin" />
-              <span className="ml-2 text-sm text-gray-400">Loading execution details...</span>
+              <span className="ml-2 text-sm text-gray-400">{t('execution.loading')}</span>
             </div>
           )}
 
@@ -224,9 +227,9 @@ export function ExecutionDetailModal({ executionId, onClose }: Props) {
             <div className="space-y-4">
               {/* Summary */}
               <div className="flex items-center gap-4 text-sm">
-                <span className="text-green-400">{completedCount} completed</span>
-                {failedCount > 0 && <span className="text-red-400">{failedCount} failed</span>}
-                <span className="text-gray-500">{totalCount} total nodes</span>
+                <span className="text-green-400">{t('execution.completed').replace('{n}', String(completedCount))}</span>
+                {failedCount > 0 && <span className="text-red-400">{t('execution.failed').replace('{n}', String(failedCount))}</span>}
+                <span className="text-gray-500">{t('execution.totalNodes').replace('{n}', String(totalCount))}</span>
               </div>
 
               {/* Execution error */}
@@ -234,7 +237,7 @@ export function ExecutionDetailModal({ executionId, onClose }: Props) {
                 <div className="p-3 bg-red-500/10 border border-red-500/20 rounded-lg">
                   <div className="flex items-center gap-2 mb-1">
                     <AlertTriangle className="w-4 h-4 text-red-400" />
-                    <span className="text-sm font-medium text-red-400">Execution Error</span>
+                    <span className="text-sm font-medium text-red-400">{t('execution.error')}</span>
                   </div>
                   <pre className="text-xs text-red-300 whitespace-pre-wrap font-mono">{detail.error_message}</pre>
                 </div>
@@ -243,7 +246,7 @@ export function ExecutionDetailModal({ executionId, onClose }: Props) {
               {/* Variables */}
               {detail.variables && detail.variables.length > 0 && (
                 <div>
-                  <h3 className="text-xs font-medium text-gray-400 uppercase tracking-wider mb-2">Input Variables</h3>
+                  <h3 className="text-xs font-medium text-gray-400 uppercase tracking-wider mb-2">{t('execution.inputVariables')}</h3>
                   <div className="flex flex-wrap gap-2">
                     {detail.variables.map((v, i) => (
                       <span key={i} className="text-xs px-2 py-1 bg-gray-800 border border-gray-700 rounded text-gray-300">
@@ -256,7 +259,7 @@ export function ExecutionDetailModal({ executionId, onClose }: Props) {
 
               {/* Node executions — sorted by plan order */}
               <div>
-                <h3 className="text-xs font-medium text-gray-400 uppercase tracking-wider mb-2">Node Execution Log</h3>
+                <h3 className="text-xs font-medium text-gray-400 uppercase tracking-wider mb-2">{t('execution.nodeLog')}</h3>
                 <div className="space-y-2">
                   {sortedNodes.map((node) => (
                     <NodeRow key={node.id} node={node} />

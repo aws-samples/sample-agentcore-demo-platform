@@ -167,6 +167,9 @@ export async function apiKeysRoutes(fastify: FastifyInstance): Promise<void> {
           keyPrefix: result.data.keyPrefix,
           scopes: result.data.scopes,
           rateLimitPerMinute: result.data.rateLimitPerMinute,
+          isActive: result.data.isActive,
+          lastUsedAt: null,
+          expiresAt: result.data.expiresAt?.toISOString() || null,
           createdAt: result.data.createdAt.toISOString(),
         },
       });

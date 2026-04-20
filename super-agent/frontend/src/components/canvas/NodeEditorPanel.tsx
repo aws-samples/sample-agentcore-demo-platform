@@ -24,6 +24,7 @@ import type {
   WorkflowVariableDefinition,
 } from '@/types/canvas/metadata';
 import type { Agent } from '@/types';
+import { useTranslation } from '@/i18n';
 
 interface NodeEditorPanelProps {
   node: CanvasNode | null;
@@ -35,23 +36,23 @@ interface NodeEditorPanelProps {
 
 const nodeTypeConfig: Record<CanvasNodeType, { 
   icon: typeof Bot; 
-  label: string;
+  labelKey: string;
   color: string;
 }> = {
-  agent: { icon: Bot, label: 'Agent', color: 'text-blue-400' },
-  start: { icon: Play, label: 'Start', color: 'text-green-400' },
-  end: { icon: Square, label: 'End', color: 'text-gray-400' },
-  humanApproval: { icon: Zap, label: 'Approval (legacy)', color: 'text-purple-400' },
-  action: { icon: Zap, label: 'Action', color: 'text-orange-400' },
-  condition: { icon: GitBranch, label: 'Condition', color: 'text-yellow-400' },
-  document: { icon: FileText, label: 'Document', color: 'text-cyan-400' },
-  codeArtifact: { icon: Code, label: 'Code', color: 'text-pink-400' },
-  resource: { icon: FileText, label: 'Resource', color: 'text-gray-400' },
-  trigger: { icon: Play, label: 'Trigger', color: 'text-green-400' },
-  loop: { icon: GitBranch, label: 'Loop', color: 'text-yellow-400' },
-  parallel: { icon: GitBranch, label: 'Parallel', color: 'text-blue-400' },
-  group: { icon: Square, label: 'Group', color: 'text-gray-400' },
-  memo: { icon: FileText, label: 'Note', color: 'text-gray-400' },
+  agent: { icon: Bot, labelKey: 'nodeType.agent', color: 'text-blue-400' },
+  start: { icon: Play, labelKey: 'nodeType.start', color: 'text-green-400' },
+  end: { icon: Square, labelKey: 'nodeType.end', color: 'text-gray-400' },
+  humanApproval: { icon: Zap, labelKey: 'nodeType.humanApproval', color: 'text-purple-400' },
+  action: { icon: Zap, labelKey: 'nodeType.action', color: 'text-orange-400' },
+  condition: { icon: GitBranch, labelKey: 'nodeType.condition', color: 'text-yellow-400' },
+  document: { icon: FileText, labelKey: 'nodeType.document', color: 'text-cyan-400' },
+  codeArtifact: { icon: Code, labelKey: 'nodeType.codeArtifact', color: 'text-pink-400' },
+  resource: { icon: FileText, labelKey: 'nodeType.resource', color: 'text-gray-400' },
+  trigger: { icon: Play, labelKey: 'nodeType.trigger', color: 'text-green-400' },
+  loop: { icon: GitBranch, labelKey: 'nodeType.loop', color: 'text-yellow-400' },
+  parallel: { icon: GitBranch, labelKey: 'nodeType.parallel', color: 'text-blue-400' },
+  group: { icon: Square, labelKey: 'nodeType.group', color: 'text-gray-400' },
+  memo: { icon: FileText, labelKey: 'nodeType.memo', color: 'text-gray-400' },
 };
 
 export function NodeEditorPanel({ 
@@ -62,6 +63,7 @@ export function NodeEditorPanel({
   onClose 
 }: NodeEditorPanelProps) {
   const [title, setTitle] = useState('');
+  const { t } = useTranslation();
 
   // Reset form when node changes
   useEffect(() => {
@@ -82,7 +84,7 @@ export function NodeEditorPanel({
 
   const handleDelete = useCallback(() => {
     if (!node) return;
-    if (confirm('Are you sure you want to delete this node?')) {
+    if (confirm(t('editor.confirmDelete'))) {
       onDelete(node.id);
       onClose();
     }
@@ -91,7 +93,7 @@ export function NodeEditorPanel({
   if (!node) {
     return (
       <div className="w-80 bg-gray-900 border-l border-gray-800 p-4 flex items-center justify-center">
-        <p className="text-gray-500 text-sm">Select a node to edit</p>
+        <p className="text-gray-500 text-sm">{t('editor.selectNode')}</p>
       </div>
     );
   }
@@ -105,7 +107,7 @@ export function NodeEditorPanel({
       <div className="p-4 border-b border-gray-800 flex items-center justify-between">
         <div className="flex items-center gap-2">
           <Icon className={`w-5 h-5 ${config.color}`} />
-          <span className="font-medium text-white">{config.label}</span>
+          <span className="font-medium text-white">{t(config.labelKey)}</span>
         </div>
         <button
           onClick={onClose}
@@ -120,7 +122,7 @@ export function NodeEditorPanel({
         {/* Title */}
         <div>
           <label className="block text-sm font-medium text-gray-400 mb-2">
-            Title
+            {t('editor.title')}
           </label>
           <input
             type="text"
@@ -196,10 +198,10 @@ export function NodeEditorPanel({
           className="flex items-center gap-2 px-3 py-2 bg-red-500/10 hover:bg-red-500/20 text-red-400 rounded-lg transition-colors text-sm"
         >
           <Trash2 className="w-4 h-4" />
-          Delete
+          {t('editor.delete')}
         </button>
         <p className="mt-2 text-xs text-gray-500">
-          Changes are auto-saved. Click the main Save button to persist to database.
+          {t('editor.autoSaveHint')}
         </p>
       </div>
     </div>
@@ -219,6 +221,7 @@ function AgentNodeEditor({
   const metadata = node.data.metadata as AgentNodeMeta | undefined;
   const [selectedAgentId, setSelectedAgentId] = useState(metadata?.agentId || '');
   const [query, setQuery] = useState(metadata?.query || (metadata as any)?.prompt || '');
+  const { t } = useTranslation();
 
   // Sync local state when a different node is selected
   useEffect(() => {
@@ -266,14 +269,14 @@ function AgentNodeEditor({
       {/* Agent Selection */}
       <div>
         <label className="block text-sm font-medium text-gray-400 mb-2">
-          Select Agent
+          {t('editor.selectAgent')}
         </label>
         <select
           value={selectedAgentId}
           onChange={(e) => handleAgentChange(e.target.value)}
           className="w-full px-3 py-2 bg-gray-800 border border-gray-700 rounded-lg text-white focus:border-blue-500 focus:ring-1 focus:ring-blue-500 outline-none text-sm"
         >
-          <option value="">Choose an agent...</option>
+          <option value="">{t('editor.chooseAgent')}</option>
           {agents.map((agent) => (
             <option key={agent.id} value={agent.id}>
               {agent.displayName} - {agent.role}
@@ -285,16 +288,16 @@ function AgentNodeEditor({
       {/* Query/Prompt */}
       <div className="flex flex-col flex-1 min-h-0">
         <label className="block text-sm font-medium text-gray-400 mb-2">
-          Query / Prompt
+          {t('editor.queryPrompt')}
         </label>
         <textarea
           value={query}
           onChange={(e) => handleQueryChange(e.target.value)}
-          placeholder="Enter the task or question for this agent..."
+          placeholder={t('editor.queryPlaceholder')}
           className="w-full flex-1 min-h-[120px] px-3 py-2 bg-gray-800 border border-gray-700 rounded-lg text-white focus:border-blue-500 focus:ring-1 focus:ring-blue-500 outline-none text-sm resize-none"
         />
         <p className="mt-1 text-xs text-gray-500">
-          Use {'{{variableName}}'} to reference workflow variables
+          {t('editor.variableRefHint')}
         </p>
       </div>
     </div>
@@ -313,6 +316,7 @@ function StartNodeEditor({
   const [variables, setVariables] = useState<WorkflowVariableDefinition[]>(
     metadata?.inputVariables || []
   );
+  const { t } = useTranslation();
 
   // Sync local state when a different node is selected
   useEffect(() => {
@@ -366,14 +370,14 @@ function StartNodeEditor({
     <div className="space-y-4">
       <div className="flex items-center justify-between">
         <label className="text-sm font-medium text-gray-400">
-          Input Variables
+          {t('editor.inputVariables')}
         </label>
         <button
           onClick={addVariable}
           className="flex items-center gap-1 px-2 py-1 text-xs bg-green-500/10 hover:bg-green-500/20 text-green-400 rounded transition-colors"
         >
           <Plus className="w-3 h-3" />
-          Add
+          {t('editor.addVariable')}
         </button>
       </div>
 
@@ -385,7 +389,7 @@ function StartNodeEditor({
                 type="text"
                 value={variable.name}
                 onChange={(e) => updateVariable(index, { name: e.target.value })}
-                placeholder="Variable name"
+                placeholder={t('editor.variableName')}
                 className="flex-1 px-2 py-1 bg-gray-800 border border-gray-700 rounded text-white text-sm"
               />
               <button
@@ -403,9 +407,9 @@ function StartNodeEditor({
                 })}
                 className="flex-1 px-2 py-1 bg-gray-800 border border-gray-700 rounded text-white text-sm"
               >
-                <option value="string">Text</option>
-                <option value="option">Option</option>
-                <option value="resource">Resource</option>
+                <option value="string">{t('editor.typeText')}</option>
+                <option value="option">{t('editor.typeOption')}</option>
+                <option value="resource">{t('editor.typeResource')}</option>
               </select>
               <label className="flex items-center gap-1 text-xs text-gray-400">
                 <input
@@ -414,7 +418,7 @@ function StartNodeEditor({
                   onChange={(e) => updateVariable(index, { required: e.target.checked })}
                   className="rounded border-gray-600"
                 />
-                Required
+                {t('editor.required')}
               </label>
             </div>
           </div>
@@ -422,7 +426,7 @@ function StartNodeEditor({
 
         {variables.length === 0 && (
           <p className="text-sm text-gray-500 text-center py-4">
-            No input variables defined
+            {t('editor.noVariables')}
           </p>
         )}
       </div>
@@ -442,6 +446,7 @@ function ActionNodeEditor({
   const [description, setDescription] = useState(
     (metadata as Record<string, unknown>)?.prompt as string || node.data.contentPreview || ''
   );
+  const { t } = useTranslation();
 
   // Sync local state when a different node is selected
   useEffect(() => {
@@ -464,7 +469,7 @@ function ActionNodeEditor({
     <div className="flex flex-col flex-1 min-h-0">
       <div className="flex flex-col flex-1 min-h-0">
         <label className="block text-sm font-medium text-gray-400 mb-2">
-          What should this action do?
+          {t('editor.actionLabel')}
         </label>
         <textarea
           value={description}
@@ -473,7 +478,7 @@ function ActionNodeEditor({
           className="w-full flex-1 min-h-[120px] px-3 py-2 bg-gray-800 border border-gray-700 rounded-lg text-white focus:border-blue-500 focus:ring-1 focus:ring-blue-500 outline-none text-sm resize-none"
         />
         <p className="mt-1 text-xs text-gray-500">
-          Claude will use available API skills to execute this action during workflow run.
+          {t('editor.actionHint')}
         </p>
       </div>
     </div>
@@ -492,6 +497,7 @@ function ConditionNodeEditor({
   const [description, setDescription] = useState(
     (metadata as Record<string, unknown>)?.prompt as string || node.data.contentPreview || ''
   );
+  const { t } = useTranslation();
 
   // Sync local state when a different node is selected
   useEffect(() => {
@@ -514,7 +520,7 @@ function ConditionNodeEditor({
     <div className="flex flex-col flex-1 min-h-0">
       <div className="flex flex-col flex-1 min-h-0">
         <label className="block text-sm font-medium text-gray-400 mb-2">
-          Condition
+          {t('editor.conditionLabel')}
         </label>
         <textarea
           value={description}
@@ -523,7 +529,7 @@ function ConditionNodeEditor({
           className="w-full flex-1 min-h-[120px] px-3 py-2 bg-gray-800 border border-gray-700 rounded-lg text-white focus:border-blue-500 focus:ring-1 focus:ring-blue-500 outline-none text-sm resize-none"
         />
         <p className="mt-1 text-xs text-gray-500">
-          Claude will evaluate this condition naturally during execution.
+          {t('editor.conditionHint')}
         </p>
       </div>
     </div>

@@ -9,6 +9,7 @@ import type { CanvasNodeData, ActionStatus } from '@/types/canvas';
 import type { EndNodeMeta } from '@/types/canvas/metadata';
 import { BaseNode } from './BaseNode';
 import { NodeStatusIndicator } from '../NodeStatusIndicator';
+import { useTranslation } from '@/i18n';
 
 type EndNodeData = CanvasNodeData<EndNodeMeta>;
 
@@ -17,6 +18,7 @@ export const EndNode = memo(function EndNode(props: NodeProps) {
   const data = props.data as EndNodeData;
   const metadata = data.metadata as EndNodeMeta | undefined;
   const endStatus = metadata?.status ?? 'success';
+  const { t } = useTranslation();
   
   // Get execution status from hook (passed via Canvas)
   // executionStatus is injected by Canvas component from nodeExecutionStates
@@ -54,7 +56,7 @@ export const EndNode = memo(function EndNode(props: NodeProps) {
       {/* Output Mapping */}
       {metadata?.outputMapping && Object.keys(metadata.outputMapping).length > 0 && (
         <div className="mt-3 space-y-1.5">
-          <div className="text-xs text-gray-400">Output Mapping</div>
+          <div className="text-xs text-gray-400">{t('node.outputMapping')}</div>
           <div className="space-y-1">
             {Object.entries(metadata.outputMapping).slice(0, 3).map(([key, value]) => (
               <div 

@@ -23,7 +23,7 @@ import { Readable } from 'stream';
 import { S3Client, GetObjectCommand } from '@aws-sdk/client-s3';
 import { config } from '../config/index.js';
 
-// Built-in skills directory: super-agent-backend/skills/
+// Built-in skills directory: backend/skills/
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 const BUILTIN_SKILLS_DIR = join(__dirname, '..', '..', 'skills');
@@ -170,6 +170,9 @@ export class WorkspaceManager {
     await this.generateAgentSubagentFiles(join(workspacePath, '.claude', 'agents'), scope.agents, join(workspacePath, '.claude', 'skills'));
     await this.generateSettings(workspacePath, scope.mcpServers);
 
+    // Write scope memories as files in memories/ directory (not inlined in CLAUDE.md)
+    await this.writeMemoryFiles(workspacePath, scope.id);
+
     // Download S3 skills, then layer in built-in skills (won't overwrite S3 ones)
     const skillsDir = join(workspacePath, '.claude', 'skills');
 
@@ -305,6 +308,9 @@ export class WorkspaceManager {
     // 1. Regenerate CLAUDE.md
     await this.generateScopeClaudeMd(workspacePath, scope, selectedAgentId);
 
+    // 1b. Refresh memory files
+    await this.writeMemoryFiles(workspacePath, scope.id);
+
     // 2. Regenerate agent subagent files
     const agentsDir = join(workspacePath, '.claude', 'agents');
     await rm(agentsDir, { recursive: true, force: true });
@@ -425,18 +431,19 @@ export class WorkspaceManager {
     if (scope.agents.length > 0) {
       lines.push('## Available Agents', '');
       lines.push('You have access to specialized subagents for this business scope.');
-      lines.push('When the user\'s request matches a specific agent\'s expertise, delegate to that subagent.', '');
+      lines.push('When the user\'s request matches a specific agent\'s expertise, delegate to that subagent.');
+      lines.push('**IMPORTANT**: When calling a subagent via the Task tool, you MUST use the agent\'s `name` (the identifier shown in parentheses), NOT the display name.', '');
 
       if (selectedAgentId) {
         const selected = scope.agents.find(a => a.id === selectedAgentId);
         if (selected) {
-          lines.push(`The user has selected the "${selected.displayName}" agent. Use this agent's expertise`);
+          lines.push(`The user has selected the "${selected.displayName}" agent (name: \`${selected.name}\`). Use this agent's expertise`);
           lines.push('as your primary mode of operation. You may still delegate to other agents if needed.', '');
         }
       }
 
       for (const agent of scope.agents) {
-        lines.push(`- **${agent.displayName}**: ${agent.role ?? 'General assistant'}`);
+        lines.push(`- **${agent.displayName}** (name: \`${agent.name}\`): ${agent.role ?? 'General assistant'}`);
       }
       lines.push('');
     }
@@ -452,27 +459,12 @@ export class WorkspaceManager {
     lines.push(`- The workspace root is: ${workspacePath}`);
     lines.push('- If a user asks to access files outside this workspace, politely decline and explain the restriction.');
 
-    // AgentCore tools configuration
-    if (config.agentRuntime === 'agentcore') {
-      const agentcoreRegion = config.agentcore.runtimeArn?.split(':')[3] || config.aws.region;
-      const browserId = process.env.AGENTCORE_BROWSER_ID || '';
-      const codeInterpreterId = process.env.AGENTCORE_CODE_INTERPRETER_ID || '';
-      lines.push('');
-      lines.push('## AgentCore Tools Configuration', '');
-      lines.push(`- When calling any browser tool (start_browser_session, get_browser_session, list_browser_sessions, stop_browser_session, browser_navigate, browser_click, browser_type, browser_snapshot, browser_take_screenshot, etc.), you MUST always pass \`region="${agentcoreRegion}"\`.`);
-      if (browserId) {
-        lines.push(`- For start_browser_session, you MUST pass \`browser_id="${browserId}"\` to use the custom browser with Web Bot Auth enabled.`);
-      }
-      lines.push(`- When calling any code interpreter tool (start_code_interpreter_session, invoke_code_interpreter, stop_code_interpreter_session, etc.), you MUST always pass \`region="${agentcoreRegion}"\`.`);
-      if (codeInterpreterId) {
-        lines.push(`- For start_code_interpreter_session, you MUST pass \`code_interpreter_id="${codeInterpreterId}"\` to use the custom code interpreter with public internet access.`);
-      }
-      lines.push(`- NEVER omit the region parameter. NEVER use us-east-1. Always use region="${agentcoreRegion}".`);
-    }
-
-    // Inject scope memories
-    const { scopeMemoryRepository } = await import('../repositories/scope-memory.repository.js');
-    const memories = await scopeMemoryRepository.findForContext(scope.id);
+    lines.push('');
+    lines.push('## Application Code Directory', '');
+    lines.push('- All application source code MUST be placed inside the `app/` directory.');
+    lines.push('- The workspace root is reserved for system files (.claude/, documents/, memories/).');
+    lines.push('- When creating new projects or features, always use `app/` as the base directory.');
+    lines.push('- Example structure: `app/src/`, `app/public/`, `app/package.json`, etc.');
 
     // Inject document groups (Knowledge Base)
     const docGroups = scope.documentGroups ?? [];
@@ -497,42 +489,116 @@ export class WorkspaceManager {
       lines.push('');
     }
 
-    if (memories.length > 0) {
+    // Memory — pinned memories inlined for instant recall, others on-demand
+    const { scopeMemoryRepository: memRepo } = await import('../repositories/scope-memory.repository.js');
+    const pinnedMemories = await memRepo.findForContext(scope.id).then(
+      (all) => all.filter((m) => m.is_pinned),
+    );
+
+    lines.push('');
+    lines.push('## Memory');
+    lines.push('');
+
+    // Inline pinned memories so the agent "just knows" critical info
+    if (pinnedMemories.length > 0) {
+      lines.push('### What you already know (pinned by user)');
       lines.push('');
-      lines.push('## Scope Memory', '');
-      lines.push('The following knowledge has been accumulated for this scope:', '');
-      for (const m of memories) {
-        const pinLabel = m.is_pinned ? '[Pinned] ' : '';
-        const autoLabel = m.tags.includes('auto-distilled') ? '[Auto] ' : '';
-        lines.push(`### ${pinLabel}${autoLabel}${m.title}`);
-        lines.push(`*Category: ${m.category}*`);
-        lines.push(m.content, '');
+      for (const m of pinnedMemories) {
+        lines.push(`- **${m.title}**: ${m.content}`);
       }
+      lines.push('');
+      lines.push('The above is ground truth — if it conflicts with other context, trust this.');
+      lines.push('');
     }
 
-    // Optionally append vector-search semantic memories (if configured)
-    const { isVectorMemoryEnabled, getVectorProvider } = await import('./memory-provider.js');
-    if (isVectorMemoryEnabled()) {
-      const vectorProvider = getVectorProvider();
-      if (vectorProvider) {
-        try {
-          const semanticMemories = await vectorProvider.loadForContext(scope.id);
-          if (semanticMemories.length > 0) {
-            lines.push('');
-            lines.push('## Semantic Memory', '');
-            lines.push('Additional knowledge retrieved via semantic similarity:', '');
-            for (const m of semanticMemories) {
-              lines.push(`- **${m.title}** *(${m.category})*: ${m.content}`);
-            }
-            lines.push('');
-          }
-        } catch (err) {
-          console.error('[workspace-manager] Vector memory loadForContext failed:', err instanceof Error ? err.message : err);
-        }
-      }
-    }
+    lines.push('### Past knowledge (read on demand)');
+    lines.push('');
+    lines.push('Additional memories from past conversations are in `memories/`:');
+    lines.push('');
+    lines.push('- `memories/lessons.md` — Mistakes, corrections, and improvements');
+    lines.push('- `memories/patterns.md` — Recurring user needs and effective solution paths');
+    lines.push('- `memories/gaps.md` — Capability gaps and unresolved requests');
+    lines.push('');
+    lines.push('On your FIRST response, read `memories/lessons.md` to refresh context.');
+    lines.push('Also check `memories/patterns.md` when a task feels familiar, and `memories/gaps.md` when stuck.');
+    lines.push('');
+    lines.push('These files are managed by the system — do not edit them.');
+    lines.push('');
 
     await writeFile(join(workspacePath, 'CLAUDE.md'), lines.join('\n'), 'utf-8');
+  }
+
+  /**
+   * Write scope memories as separate files in the workspace memories/ directory.
+   * Agent reads these on-demand via Read/Grep tools instead of having them
+   * inlined in CLAUDE.md (avoids context window bloat).
+   *
+   * File layout:
+   *   memories/pinned.md   — User-pinned important knowledge (check first)
+   *   memories/lessons.md  — Mistakes, corrections, improvements
+   *   memories/patterns.md — Recurring needs and effective solutions
+   *   memories/gaps.md     — Capability gaps and unresolved requests
+   */
+  async writeMemoryFiles(workspacePath: string, scopeId: string): Promise<void> {
+    const { scopeMemoryRepository } = await import('../repositories/scope-memory.repository.js');
+    const memories = await scopeMemoryRepository.findForContext(scopeId);
+    if (memories.length === 0) return;
+
+    const memoriesDir = join(workspacePath, 'memories');
+    await mkdir(memoriesDir, { recursive: true });
+
+    // Group memories by file target
+    const pinned: typeof memories = [];
+    const lessons: typeof memories = [];
+    const patterns: typeof memories = [];
+    const gaps: typeof memories = [];
+
+    for (const m of memories) {
+      if (m.is_pinned) {
+        pinned.push(m);
+      } else if (m.category === 'lesson') {
+        lessons.push(m);
+      } else if (m.category === 'pattern') {
+        patterns.push(m);
+      } else if (m.category === 'gap') {
+        gaps.push(m);
+      } else {
+        // Uncategorized goes to lessons as a safe default
+        lessons.push(m);
+      }
+    }
+
+    const formatMemories = (items: typeof memories): string => {
+      if (items.length === 0) return '*No entries yet.*\n';
+      return items.map(m => {
+        const autoLabel = m.tags.includes('auto-distilled') ? ' *(auto)* ' : ' ';
+        const date = m.created_at instanceof Date
+          ? m.created_at.toISOString().split('T')[0]
+          : '';
+        return `### ${date}: ${m.title}\n${autoLabel}\n${m.content}\n`;
+      }).join('\n');
+    };
+
+    await writeFile(
+      join(memoriesDir, 'pinned.md'),
+      `# Pinned Knowledge\n\nImportant knowledge pinned by the user. Always check before complex work.\n\n${formatMemories(pinned)}`,
+      'utf-8',
+    );
+    await writeFile(
+      join(memoriesDir, 'lessons.md'),
+      `# Lessons Learned\n\nMistakes, corrections, and improvements from past conversations.\n\n${formatMemories(lessons)}`,
+      'utf-8',
+    );
+    await writeFile(
+      join(memoriesDir, 'patterns.md'),
+      `# Patterns\n\nRecurring user needs and effective solution paths.\n\n${formatMemories(patterns)}`,
+      'utf-8',
+    );
+    await writeFile(
+      join(memoriesDir, 'gaps.md'),
+      `# Capability Gaps\n\nKnown limitations and unresolved requests.\n\n${formatMemories(gaps)}`,
+      'utf-8',
+    );
   }
 
   /** Generate .claude/agents/{name}.md subagent files from DB agents. */
@@ -563,7 +629,7 @@ export class WorkspaceManager {
 
       const lines: string[] = ['---'];
       lines.push(`name: ${agent.name}`);
-      lines.push(`description: ${agent.role ?? agent.displayName}. Use when the user needs help with ${agent.role ?? 'this domain'}.`);
+      lines.push(`description: ${agent.displayName} — ${agent.role ?? 'General assistant'}. Use when the user needs help with ${agent.role ?? 'this domain'}.`);
       lines.push('model: inherit');
       lines.push('permissionMode: bypassPermissions');
       if (allSkillNames.length > 0) {
@@ -598,8 +664,6 @@ export class WorkspaceManager {
         args: ['awslabs.amazon-bedrock-agentcore-mcp-server@latest'],
         env: {
           AWS_REGION: agentcoreRegion,
-          AWS_DEFAULT_REGION: agentcoreRegion,
-          BEDROCK_AGENTCORE_REGION: agentcoreRegion,
           FASTMCP_LOG_LEVEL: 'ERROR',
         },
       };
@@ -1223,6 +1287,34 @@ export class WorkspaceManager {
       }));
       if (response.Body && typeof (response.Body as any).transformToString === 'function') {
         return await (response.Body as any).transformToString();
+      }
+      return null;
+    } catch {
+      return null;
+    }
+  }
+
+  /**
+   * Read a workspace file from S3 as raw binary Buffer.
+   * Used for binary files (images, xlsx, etc.) that cannot be safely converted to UTF-8 strings.
+   */
+  async readWorkspaceFileFromS3Raw(
+    orgId: string,
+    scopeId: string,
+    sessionId: string,
+    filePath: string,
+  ): Promise<Buffer | null> {
+    const s3Bucket = config.agentcore.workspaceS3Bucket;
+    const key = `${orgId}/${scopeId}/${sessionId}/${filePath}`;
+    try {
+      const { GetObjectCommand } = await import('@aws-sdk/client-s3');
+      const response = await this.s3Client.send(new GetObjectCommand({
+        Bucket: s3Bucket,
+        Key: key,
+      }));
+      if (response.Body && typeof (response.Body as any).transformToByteArray === 'function') {
+        const bytes = await (response.Body as any).transformToByteArray();
+        return Buffer.from(bytes);
       }
       return null;
     } catch {

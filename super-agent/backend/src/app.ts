@@ -19,6 +19,7 @@ import { registerRoutes } from './routes/index.js';
 import { executionWebSocketGateway } from './websocket/index.js';
 import { initializeEventWebSocketBridge, initializeWorkflowQueues } from './setup/index.js';
 import { startScheduleProcessor, stopScheduleProcessor } from './setup/index.js';
+import { startProjectAutoProcessor, stopProjectAutoProcessor } from './setup/index.js';
 import { claudeAgentService } from './services/claude-agent.service.js';
 import { devServerManager } from './services/dev-server-manager.js';
 import { workspaceManager } from './services/workspace-manager.js';
@@ -26,6 +27,8 @@ import { shutdownLangfuse } from './services/langfuse.service.js';
 import { briefingScheduler } from './services/briefing-scheduler.service.js';
 import { imService } from './services/im.service.js';
 import { imQueueService } from './services/im-queue.service.js';
+import { distillationService } from './services/distillation.service.js';
+import { redisService } from './services/redis.service.js';
 
 export async function buildApp(): Promise<FastifyInstance> {
   // Configure logger based on environment
@@ -201,48 +204,76 @@ export async function buildApp(): Promise<FastifyInstance> {
   // Requirements: 5.1 - WHEN a node's status changes, emit a Workflow_Event to all subscribed clients
   initializeEventWebSocketBridge();
 
-  // Initialize workflow queues and processors for BullMQ job processing
-  // Requirements: 1.1, 2.2 - Execute workflow nodes via job queues
-  await initializeWorkflowQueues();
+  const role = config.processRole; // 'all' | 'api' | 'worker' | 'gateway'
 
-  // Start briefing generation scheduler (runs every 5 minutes)
-  briefingScheduler.start();
+  // ── BullMQ Workers + Schedulers (worker + all) ──
+  if (role === 'worker' || role === 'all') {
+    // Initialize workflow queues and processors for BullMQ job processing
+    await initializeWorkflowQueues();
 
-  // Start schedule processor for cron-based workflow triggers (polls every minute)
-  startScheduleProcessor();
+    // Start briefing generation scheduler (runs every 5 minutes)
+    briefingScheduler.start();
 
-  // Initialize IM message queue (BullMQ) for async message processing
-  await imQueueService.initialize();
+    // Start schedule processor for cron-based workflow triggers (polls every 15s)
+    startScheduleProcessor();
 
-  // Start IM gateway connections (Discord Gateway, DingTalk Stream, Feishu WSClient)
-  imService.startGateways().catch((err) => {
-    app.log.error({ err }, 'Failed to start IM gateways');
-  });
+    // Start project auto-processor for kanban board automation (polls every 15s)
+    startProjectAutoProcessor();
 
-  // Start Claude session cleanup timer and periodic workspace pruning
-  claudeAgentService.startCleanupTimer();
-  const workspacePruneInterval = setInterval(async () => {
-    try {
-      const removed = await workspaceManager.pruneStaleWorkspaces();
-      if (removed > 0) app.log.info(`Pruned ${removed} stale workspace(s)`);
-    } catch (err) {
-      app.log.error({ err }, 'Workspace pruning failed');
-    }
-  }, 60 * 60 * 1000); // every hour
-  if (workspacePruneInterval.unref) workspacePruneInterval.unref();
+    // Initialize IM message queue worker
+    await imQueueService.initialize();
 
-  // Register graceful shutdown hook to clean up Claude Agent SDK sessions
-  // Requirements: 10.1, 10.2, 10.3
+    // Initialize distillation queue worker for memory extraction
+    await distillationService.initialize();
+
+    // Periodic workspace pruning (every hour)
+    const workspacePruneInterval = setInterval(async () => {
+      try {
+        const removed = await workspaceManager.pruneStaleWorkspaces();
+        if (removed > 0) app.log.info(`Pruned ${removed} stale workspace(s)`);
+      } catch (err) {
+        app.log.error({ err }, 'Workspace pruning failed');
+      }
+    }, 60 * 60 * 1000);
+    if (workspacePruneInterval.unref) workspacePruneInterval.unref();
+
+    app.addHook('onClose', async () => {
+      clearInterval(workspacePruneInterval);
+      briefingScheduler.stop();
+      stopScheduleProcessor();
+      stopProjectAutoProcessor();
+      await imQueueService.shutdown();
+      await distillationService.shutdown();
+    });
+  }
+
+  // ── API-side queue initialization (api + all) ──
+  // API needs Queue instances (for enqueue) but NOT Workers
+  if (role === 'api') {
+    await redisService.initialize();
+    // Distillation: only init queue (no worker) so chat.service can enqueue
+    await distillationService.initializeQueue();
+  }
+
+  // ── IM Gateways (gateway + all) ──
+  if (role === 'gateway' || role === 'all') {
+    imService.startGateways().catch((err) => {
+      app.log.error({ err }, 'Failed to start IM gateways');
+    });
+
+    app.addHook('onClose', async () => {
+      app.log.info('Stopping IM gateways...');
+      await imService.stopGateways();
+    });
+  }
+
+  // ── Claude session management (api + all — needs to be co-located with HTTP) ──
+  if (role === 'api' || role === 'all') {
+    claudeAgentService.startCleanupTimer();
+  }
+
+  // ── Graceful shutdown for Claude sessions (api + all) ──
   app.addHook('onClose', async (_instance) => {
-    clearInterval(workspacePruneInterval);
-    briefingScheduler.stop();
-    stopScheduleProcessor();
-
-    // Stop IM gateways and queue
-    app.log.info('Stopping IM gateways and message queue...');
-    await imService.stopGateways();
-    await imQueueService.shutdown();
-
     app.log.info('Server shutting down — disconnecting all Claude Agent SDK sessions...');
     try {
       const count = await claudeAgentService.disconnectAll();

@@ -2,7 +2,7 @@
  * REST Agent Service
  * 
  * Implements the agent service interface using the REST API backend.
- * Replaces Supabase direct access with HTTP calls to super-agent-backend.
+ * Replaces Supabase direct access with HTTP calls to backend.
  */
 
 import { restClient } from './restClient';

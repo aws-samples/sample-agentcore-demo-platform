@@ -1,16 +1,18 @@
 /**
  * Scope Generator Service
  *
- * Uses the Claude Agent SDK to generate a business scope + agents
- * from a free-text business description.
+ * Uses the configured Agent Runtime (claude or agentcore) to generate a
+ * business scope + agents from a free-text business description.
+ *
+ * The active runtime is determined by the AGENT_RUNTIME env var via the
+ * shared agent-runtime-factory. When running under AgentCore the workspace
+ * is automatically synced to/from S3 by the AgentCore runtime, so the
+ * file-based flow (write scope-config.json → read it back) works in both
+ * modes without special handling here.
  */
 
-import { ClaudeAgentRuntime } from './agent-runtime-claude.js';
+import { agentRuntime } from './agent-runtime-factory.js';
 import type { AgentConfig, ConversationEvent } from './agent-runtime.js';
-
-// Scope/twin generation always uses local Claude runtime (not AgentCore),
-// because the generator needs direct workspace file access.
-const generatorRuntime = new ClaudeAgentRuntime();
 import { mkdtemp, readFile, rm, writeFile } from 'fs/promises';
 import { join } from 'path';
 import { tmpdir } from 'os';
@@ -101,6 +103,99 @@ Skill guidelines:
 Remember: Write the final JSON to "scope-config.json" in the current directory. This is mandatory.`;
 
 // ---------------------------------------------------------------------------
+// Language instruction helpers
+// ---------------------------------------------------------------------------
+
+const LANGUAGE_INSTRUCTIONS: Record<string, string> = {
+  en: `
+LANGUAGE REQUIREMENT: All generated content MUST be in English.
+- scope.name, scope.description: English
+- agent.displayName, agent.role, agent.systemPrompt: English
+- skill.name (kebab-case, always English), skill.description, skill.body: English
+- Even if the user's business description is in another language, translate and generate all output in English.`,
+  cn: `
+LANGUAGE REQUIREMENT: All generated content MUST be in Chinese (中文).
+- scope.name, scope.description: 中文
+- agent.displayName, agent.role, agent.systemPrompt: 中文
+- skill.name: 保持 kebab-case 英文格式（如 "analyze-risk"），但 skill.description 和 skill.body 必须使用中文
+- 即使用户的业务描述是英文的，也必须将所有输出翻译为中文生成。
+- 请确保系统提示词（systemPrompt）使用流畅、专业的中文撰写。`,
+};
+
+/**
+ * Build the full system prompt with language-specific instructions appended.
+ */
+function buildSystemPrompt(language?: string): string {
+  const langKey = language === 'cn' ? 'cn' : 'en';
+  return SCOPE_GENERATOR_SYSTEM_PROMPT + '\n' + LANGUAGE_INSTRUCTIONS[langKey];
+}
+
+// ---------------------------------------------------------------------------
+// Validation helpers
+// ---------------------------------------------------------------------------
+
+/** Maximum number of repair attempts when the generated JSON is invalid. */
+const MAX_REPAIR_ATTEMPTS = 2;
+
+/**
+ * Validate that a string is valid JSON conforming to the GeneratedScopeConfig
+ * schema. Returns the parsed config on success, or a descriptive error string
+ * on failure.
+ */
+function validateScopeConfigJson(raw: string): { ok: true; config: GeneratedScopeConfig } | { ok: false; error: string } {
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(raw);
+  } catch (e) {
+    return { ok: false, error: `Invalid JSON: ${e instanceof Error ? e.message : String(e)}` };
+  }
+
+  if (typeof parsed !== 'object' || parsed === null || Array.isArray(parsed)) {
+    return { ok: false, error: 'Root value must be a JSON object' };
+  }
+
+  const obj = parsed as Record<string, unknown>;
+
+  // --- scope ---
+  if (!obj.scope || typeof obj.scope !== 'object' || Array.isArray(obj.scope)) {
+    return { ok: false, error: 'Missing or invalid "scope" object' };
+  }
+  const scope = obj.scope as Record<string, unknown>;
+  for (const field of ['name', 'description', 'icon', 'color']) {
+    if (typeof scope[field] !== 'string' || (scope[field] as string).trim().length === 0) {
+      return { ok: false, error: `scope.${field} must be a non-empty string` };
+    }
+  }
+
+  // --- agents ---
+  if (!Array.isArray(obj.agents) || obj.agents.length === 0) {
+    return { ok: false, error: '"agents" must be a non-empty array' };
+  }
+
+  for (let i = 0; i < obj.agents.length; i++) {
+    const agent = obj.agents[i] as Record<string, unknown>;
+    for (const field of ['name', 'displayName', 'role', 'systemPrompt']) {
+      if (typeof agent[field] !== 'string' || (agent[field] as string).trim().length === 0) {
+        return { ok: false, error: `agents[${i}].${field} must be a non-empty string` };
+      }
+    }
+    if (!Array.isArray(agent.skills)) {
+      return { ok: false, error: `agents[${i}].skills must be an array` };
+    }
+    for (let j = 0; j < (agent.skills as unknown[]).length; j++) {
+      const skill = (agent.skills as Record<string, unknown>[])[j];
+      for (const field of ['name', 'description', 'body']) {
+        if (typeof skill[field] !== 'string' || (skill[field] as string).trim().length === 0) {
+          return { ok: false, error: `agents[${i}].skills[${j}].${field} must be a non-empty string` };
+        }
+      }
+    }
+  }
+
+  return { ok: true, config: parsed as GeneratedScopeConfig };
+}
+
+// ---------------------------------------------------------------------------
 // Service
 // ---------------------------------------------------------------------------
 
@@ -109,17 +204,21 @@ export class ScopeGeneratorService {
    * Generate a scope configuration by streaming Claude's response.
    * Yields ConversationEvents that can be forwarded as SSE.
    *
+   * After the initial generation, the service validates the produced JSON.
+   * If it is malformed or structurally invalid, the agent is asked to repair
+   * it (up to {@link MAX_REPAIR_ATTEMPTS} times) before giving up.
+   *
    * @param businessDescription - The text prompt for the agent.
    * @param sopDocument - Optional SOP document buffer + filename to place in the workspace.
    *                      The agent will be instructed to read and parse it using its tools.
    */
-  async *generate(businessDescription: string, sopDocument?: { buffer: Buffer; fileName: string }): AsyncGenerator<ConversationEvent> {
+  async *generate(businessDescription: string, sopDocument?: { buffer: Buffer; fileName: string }, language?: string): AsyncGenerator<ConversationEvent> {
       const agentConfig: AgentConfig = {
         id: 'scope-generator',
         name: 'scope-generator',
         displayName: 'Scope Generator',
         organizationId: 'system',
-        systemPrompt: SCOPE_GENERATOR_SYSTEM_PROMPT,
+        systemPrompt: buildSystemPrompt(language),
         skillIds: [],
         mcpServerIds: [],
       };
@@ -152,35 +251,122 @@ export class ScopeGeneratorService {
         message = `Analyze this business and generate a scope configuration with specialized AI agents. Write the final JSON result to "scope-config.json" in the current directory.\n\n${businessDescription}`;
       }
 
+      // Use a stable session ID so repair turns share the same conversation context
+      const sessionId = `scope-gen-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+
       try {
-        yield* generatorRuntime.runConversation(
+        // ---- Initial generation ----
+        yield* agentRuntime.runConversation(
           {
             agentId: 'scope-generator',
-            sessionId: `scope-gen-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+            sessionId,
             message,
             organizationId: 'system',
             userId: 'system',
             workspacePath: tempWorkspace,
+            scopeId: 'system',
           },
           agentConfig,
           [], // no skills needed for generation
         );
 
-        // After conversation ends, read the generated JSON file from workspace
-        if (existsSync(configFilePath)) {
+        // ---- Validate & repair loop ----
+        let validConfig: GeneratedScopeConfig | null = null;
+
+        for (let attempt = 0; attempt <= MAX_REPAIR_ATTEMPTS; attempt++) {
+          if (!existsSync(configFilePath)) {
+            if (attempt === MAX_REPAIR_ATTEMPTS) {
+              console.error('[scope-generator] scope-config.json still not found after repair attempts');
+              break;
+            }
+            console.warn(`[scope-generator] scope-config.json not found (attempt ${attempt}), asking agent to repair...`);
+
+            yield* this.requestRepair(
+              sessionId,
+              tempWorkspace,
+              agentConfig,
+              'The file "scope-config.json" was not found in the working directory. You MUST write the complete scope configuration JSON to "scope-config.json" now. Do not output anything else — just write the file.',
+            );
+            continue;
+          }
+
           const fileContent = await readFile(configFilePath, 'utf-8');
+          const result = validateScopeConfigJson(fileContent);
+
+          if (result.ok) {
+            validConfig = result.config;
+            console.log('[scope-generator] scope-config.json validated successfully');
+            break;
+          }
+
+          // Validation failed
+          if (attempt === MAX_REPAIR_ATTEMPTS) {
+            console.error(`[scope-generator] scope-config.json still invalid after ${MAX_REPAIR_ATTEMPTS} repair attempts: ${result.error}`);
+            break;
+          }
+
+          console.warn(`[scope-generator] scope-config.json validation failed (attempt ${attempt}): ${result.error}. Asking agent to repair...`);
+
+          // Delete the broken file so the agent writes a fresh one
+          await rm(configFilePath, { force: true });
+
+          yield* this.requestRepair(
+            sessionId,
+            tempWorkspace,
+            agentConfig,
+            [
+              `The "scope-config.json" you wrote is invalid. Validation error:`,
+              `  ${result.error}`,
+              ``,
+              `Please fix the issue and write a corrected version to "scope-config.json". The file must contain ONLY valid JSON conforming to the required schema (with "scope" and "agents" fields). Do not include any markdown or extra text in the file.`,
+            ].join('\n'),
+          );
+        }
+
+        // Emit the validated config to the frontend
+        if (validConfig) {
           yield {
             type: 'scope_config' as ConversationEvent['type'],
-            content: fileContent,
+            content: JSON.stringify(validConfig),
           } as unknown as ConversationEvent;
-        } else {
-          console.warn('[scope-generator] scope-config.json not found in workspace');
         }
       } finally {
         // Clean up temp workspace
         rm(tempWorkspace, { recursive: true, force: true }).catch(() => {});
       }
     }
+
+  /**
+   * Ask the agent to repair the scope-config.json file within the same
+   * conversation session. Yields all conversation events so the frontend
+   * can display progress.
+   */
+  private async *requestRepair(
+    sessionId: string,
+    workspacePath: string,
+    agentConfig: AgentConfig,
+    repairMessage: string,
+  ): AsyncGenerator<ConversationEvent> {
+    // Notify the frontend that a repair is in progress
+    yield {
+      type: 'assistant' as ConversationEvent['type'],
+      content: [{ type: 'text', text: '\n\n🔄 Validating and repairing scope configuration...\n' }],
+    } as unknown as ConversationEvent;
+
+    yield* agentRuntime.runConversation(
+      {
+        agentId: 'scope-generator',
+        sessionId,
+        message: repairMessage,
+        organizationId: 'system',
+        userId: 'system',
+        workspacePath,
+        scopeId: 'system',
+      },
+      agentConfig,
+      [],
+    );
+  }
 
   /**
    * Generate a Digital Twin configuration by streaming Claude's response.
@@ -276,8 +462,8 @@ QUALITY CHECK — before outputting, verify:
       // Use a unique session ID per generation to avoid AgentCore session reuse
       const uniqueSessionId = `twin-gen-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
 
-      for await (const event of generatorRuntime.runConversation(
-        { agentId: 'twin-generator', sessionId: uniqueSessionId, message, organizationId: 'system', userId: 'system', workspacePath: tempWorkspace },
+      for await (const event of agentRuntime.runConversation(
+        { agentId: 'twin-generator', sessionId: uniqueSessionId, message, organizationId: 'system', userId: 'system', workspacePath: tempWorkspace, scopeId: 'system' },
         agentConfig,
         [],
       )) {

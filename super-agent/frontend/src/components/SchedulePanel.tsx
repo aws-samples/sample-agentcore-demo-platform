@@ -20,6 +20,7 @@ import {
 import { useSchedules } from '@/services/useSchedules';
 import type { Schedule, ScheduleRecord } from '@/services/useSchedules';
 import type { ScheduleExecutionLog } from '@/services/api/restScheduleService';
+import { useTranslation } from '@/i18n';
 
 interface SchedulePanelProps {
   workflowId: string;
@@ -28,10 +29,10 @@ interface SchedulePanelProps {
 
 // Common cron presets
 const CRON_PRESETS = [
-  { label: 'Every minute', value: '* * * * *' },
-  { label: 'Every 5 minutes', value: '*/5 * * * *' },
-  { label: 'Every hour', value: '0 * * * *' },
-  { label: 'Every day at midnight', value: '0 0 * * *' },
+  { label: 'schedule.cronEveryMinute', value: '* * * * *' },
+  { label: 'schedule.cronEvery5Min', value: '*/5 * * * *' },
+  { label: 'schedule.cronEveryHour', value: '0 * * * *' },
+  { label: 'schedule.cronDailyMidnight', value: '0 0 * * *' },
   { label: 'Every day at 9am', value: '0 9 * * *' },
   { label: 'Every Monday at 9am', value: '0 9 * * 1' },
   { label: 'First of month at midnight', value: '0 0 1 * *' },
@@ -50,6 +51,7 @@ export function SchedulePanel({ workflowId, onClose }: SchedulePanelProps) {
     getExecutionRecords,
     clearError,
   } = useSchedules();
+  const { t } = useTranslation();
 
   const [selectedSchedule, setSelectedSchedule] = useState<Schedule | null>(null);
   const [executionRecords, setExecutionRecords] = useState<ScheduleRecord[]>([]);
@@ -129,7 +131,7 @@ export function SchedulePanel({ workflowId, onClose }: SchedulePanelProps) {
   };
 
   const handleDelete = async (schedule: Schedule) => {
-    if (confirm('Are you sure you want to delete this schedule?')) {
+    if (confirm(t('schedule.confirmDelete'))) {
       await deleteSchedule(schedule.id);
       if (selectedSchedule?.id === schedule.id) {
         setSelectedSchedule(null);
@@ -170,15 +172,15 @@ export function SchedulePanel({ workflowId, onClose }: SchedulePanelProps) {
   };
 
   const formatNextRun = (nextRunAt: string | null) => {
-    if (!nextRunAt) return 'Not scheduled';
+    if (!nextRunAt) return t('schedule.notScheduled');
     const date = new Date(nextRunAt);
     const now = new Date();
     const diff = date.getTime() - now.getTime();
     
-    if (diff < 0) return 'Overdue';
-    if (diff < 60000) return 'In less than a minute';
-    if (diff < 3600000) return `In ${Math.round(diff / 60000)} minutes`;
-    if (diff < 86400000) return `In ${Math.round(diff / 3600000)} hours`;
+    if (diff < 0) return t('schedule.overdue');
+    if (diff < 60000) return t('schedule.inLessThanMinute');
+    if (diff < 3600000) return t('schedule.inMinutes').replace('{n}', String(Math.round(diff / 60000)));
+    if (diff < 86400000) return t('schedule.inHours').replace('{n}', String(Math.round(diff / 3600000)));
     return date.toLocaleString();
   };
 
@@ -186,7 +188,7 @@ export function SchedulePanel({ workflowId, onClose }: SchedulePanelProps) {
     <div className="w-96 border-l border-gray-800 bg-gray-900/95 flex flex-col h-full">
       {/* Header */}
       <div className="p-4 border-b border-gray-800 flex items-center justify-between">
-        <h3 className="text-sm font-medium text-white">Schedules</h3>
+        <h3 className="text-sm font-medium text-white">{t('schedule.title')}</h3>
         <button onClick={onClose} className="p-1 hover:bg-gray-800 rounded">
           <X className="w-4 h-4 text-gray-400" />
         </button>
@@ -206,11 +208,11 @@ export function SchedulePanel({ workflowId, onClose }: SchedulePanelProps) {
       {/* Create Form */}
       {showCreateForm && (
         <div className="mx-4 mt-4 p-4 bg-gray-800/50 border border-gray-700 rounded-lg">
-          <h4 className="text-sm font-medium text-white mb-3">New Schedule</h4>
+          <h4 className="text-sm font-medium text-white mb-3">{t('schedule.newSchedule')}</h4>
           
           <div className="space-y-3">
             <div>
-              <label className="block text-xs text-gray-400 mb-1">Name</label>
+              <label className="block text-xs text-gray-400 mb-1">{t('schedule.name')}</label>
               <input
                 type="text"
                 value={newName}
@@ -221,7 +223,7 @@ export function SchedulePanel({ workflowId, onClose }: SchedulePanelProps) {
             </div>
 
             <div>
-              <label className="block text-xs text-gray-400 mb-1">Cron Expression</label>
+              <label className="block text-xs text-gray-400 mb-1">{t('schedule.cronExpression')}</label>
               <input
                 type="text"
                 value={newCron}
@@ -236,14 +238,14 @@ export function SchedulePanel({ workflowId, onClose }: SchedulePanelProps) {
                     onClick={() => setNewCron(preset.value)}
                     className="text-xs px-2 py-1 bg-gray-700 hover:bg-gray-600 text-gray-300 rounded"
                   >
-                    {preset.label}
+                    {t(preset.label)}
                   </button>
                 ))}
               </div>
             </div>
 
             <div>
-              <label className="block text-xs text-gray-400 mb-1">Timezone</label>
+              <label className="block text-xs text-gray-400 mb-1">{t('schedule.timezone')}</label>
               <select
                 value={newTimezone}
                 onChange={(e) => setNewTimezone(e.target.value)}
@@ -264,7 +266,7 @@ export function SchedulePanel({ workflowId, onClose }: SchedulePanelProps) {
                 onClick={() => setShowCreateForm(false)}
                 className="flex-1 px-3 py-2 bg-gray-700 hover:bg-gray-600 text-white rounded text-sm"
               >
-                Cancel
+                {t('common.cancel')}
               </button>
               <button
                 onClick={handleCreate}
@@ -272,7 +274,7 @@ export function SchedulePanel({ workflowId, onClose }: SchedulePanelProps) {
                 className="flex-1 px-3 py-2 bg-blue-600 hover:bg-blue-500 disabled:opacity-50 text-white rounded text-sm flex items-center justify-center gap-2"
               >
                 {isCreating && <Loader2 className="w-4 h-4 animate-spin" />}
-                Create
+                {t('common.create')}
               </button>
             </div>
           </div>
@@ -288,13 +290,13 @@ export function SchedulePanel({ workflowId, onClose }: SchedulePanelProps) {
         ) : schedules.length === 0 && !showCreateForm ? (
           <div className="text-center py-8">
             <Calendar className="w-12 h-12 text-gray-600 mx-auto mb-3" />
-            <p className="text-sm text-gray-500 mb-4">No schedules configured</p>
+            <p className="text-sm text-gray-500 mb-4">{t('schedule.noSchedules')}</p>
             <button
               onClick={() => setShowCreateForm(true)}
               className="px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-lg text-sm flex items-center gap-2 mx-auto"
             >
               <Plus className="w-4 h-4" />
-              Create Schedule
+              {t('schedule.create')}
             </button>
           </div>
         ) : (
@@ -382,7 +384,7 @@ export function SchedulePanel({ workflowId, onClose }: SchedulePanelProps) {
                       ? 'bg-green-500/20 text-green-400' 
                       : 'bg-gray-500/20 text-gray-400'
                   }`}>
-                    {schedule.isEnabled ? 'Active' : 'Disabled'}
+                    {schedule.isEnabled ? t('schedule.active') : t('schedule.disabled')}
                   </span>
                   <span className="text-gray-500">
                     {schedule.timezone}
@@ -399,15 +401,15 @@ export function SchedulePanel({ workflowId, onClose }: SchedulePanelProps) {
 
                 {/* Stats */}
                 <div className="mt-2 flex items-center gap-3 text-xs text-gray-500">
-                  <span>{schedule.runCount} runs</span>
+                  <span>{t('schedule.runs').replace('{n}', String(schedule.runCount))}</span>
                   {schedule.failureCount > 0 && (
-                    <span className="text-red-400">{schedule.failureCount} failures</span>
+                    <span className="text-red-400">{t('schedule.failures').replace('{n}', String(schedule.failureCount))}</span>
                   )}
                   <button
                     onClick={() => handleViewRecords(schedule)}
                     className="text-blue-400 hover:text-blue-300 ml-auto"
                   >
-                    View History
+                    {t('schedule.viewHistory')}
                   </button>
                 </div>
               </div>
@@ -419,7 +421,7 @@ export function SchedulePanel({ workflowId, onClose }: SchedulePanelProps) {
                 className="w-full px-4 py-2 border border-dashed border-gray-700 hover:border-gray-600 text-gray-400 hover:text-gray-300 rounded-lg text-sm flex items-center justify-center gap-2"
               >
                 <Plus className="w-4 h-4" />
-                Add Schedule
+                {t('schedule.addSchedule')}
               </button>
             )}
           </>
@@ -431,7 +433,7 @@ export function SchedulePanel({ workflowId, onClose }: SchedulePanelProps) {
         <div className="border-t border-gray-800 p-4 max-h-64 overflow-y-auto">
           <div className="flex items-center justify-between mb-2">
             <h4 className="text-xs font-medium text-gray-400">
-              Execution History - {selectedSchedule.name}
+              {t('schedule.executionHistory')} - {selectedSchedule.name}
             </h4>
             <button
               onClick={() => handleViewRecords(selectedSchedule)}
@@ -440,7 +442,7 @@ export function SchedulePanel({ workflowId, onClose }: SchedulePanelProps) {
               {executionRecords.some(r => r.status === 'running') && (
                 <Loader2 className="w-3 h-3 animate-spin" />
               )}
-              Refresh
+              {t('webhook.refresh')}
             </button>
           </div>
           {isLoadingRecords ? (
@@ -448,7 +450,7 @@ export function SchedulePanel({ workflowId, onClose }: SchedulePanelProps) {
               <Loader2 className="w-4 h-4 text-blue-400 animate-spin" />
             </div>
           ) : executionRecords.length === 0 ? (
-            <p className="text-xs text-gray-500 text-center py-4">No executions yet</p>
+            <p className="text-xs text-gray-500 text-center py-4">{t('schedule.noExecutions')}</p>
           ) : (
             <div className="space-y-2">
               {executionRecords.map((record) => {
@@ -494,7 +496,7 @@ export function SchedulePanel({ workflowId, onClose }: SchedulePanelProps) {
                     </div>
                     {duration !== null && (
                       <div className="text-gray-500 mt-1">
-                        {record.status === 'running' ? 'Running for' : 'Duration'}: {duration >= 60 ? `${Math.floor(duration / 60)}m ${duration % 60}s` : `${duration}s`}
+                        {record.status === 'running' ? t('webhook.runningFor') : t('webhook.duration')}: {duration >= 60 ? `${Math.floor(duration / 60)}m ${duration % 60}s` : `${duration}s`}
                       </div>
                     )}
                     {record.errorMessage && (
@@ -525,6 +527,7 @@ export function SchedulePanel({ workflowId, onClose }: SchedulePanelProps) {
  */
 function ExecutionLogModal({ record, onClose }: { record: ScheduleRecord; onClose: () => void }) {
   const logsEndRef = useRef<HTMLDivElement>(null);
+  const { t } = useTranslation();
   const logs = (record.logs || []) as ScheduleExecutionLog[];
 
   useEffect(() => {
@@ -544,7 +547,7 @@ function ExecutionLogModal({ record, onClose }: { record: ScheduleRecord; onClos
         {/* Header */}
         <div className="p-4 border-b border-gray-800 flex items-center justify-between">
           <div>
-            <h3 className="text-sm font-medium text-white">Execution Log</h3>
+            <h3 className="text-sm font-medium text-white">{t('schedule.executionLog')}</h3>
             <p className="text-xs text-gray-400 mt-0.5">
               {new Date(record.scheduledAt).toLocaleString()} · <span className={
                 record.status === 'completed' ? 'text-green-400'
@@ -566,10 +569,10 @@ function ExecutionLogModal({ record, onClose }: { record: ScheduleRecord; onClos
               {record.status === 'running' ? (
                 <div className="flex items-center gap-2">
                   <Loader2 className="w-4 h-4 animate-spin" />
-                  Waiting for events...
+                  <span>{t('schedule.waitingForEvents')}</span>
                 </div>
               ) : (
-                'No log events recorded'
+                t('schedule.noLogs')
               )}
             </div>
           ) : (
@@ -631,7 +634,7 @@ function ExecutionLogModal({ record, onClose }: { record: ScheduleRecord; onClos
         {record.status === 'running' && (
           <div className="p-3 border-t border-gray-800 flex items-center gap-2 text-xs text-blue-400">
             <Loader2 className="w-3 h-3 animate-spin" />
-            Execution in progress — logs update automatically
+            {t('schedule.logsAutoUpdate')}
           </div>
         )}
       </div>

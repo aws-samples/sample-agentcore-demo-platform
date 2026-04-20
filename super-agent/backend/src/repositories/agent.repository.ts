@@ -105,15 +105,21 @@ export class AgentRepository extends BaseRepository<AgentEntity> {
   }
 
   /**
-   * Find agent by name within an organization.
-   * Useful for checking uniqueness.
+   * Find agent by name within an organization and optional business scope.
+   * When businessScopeId is provided, checks uniqueness within that scope.
+   * When businessScopeId is undefined, checks across the whole organization.
    *
    * @param organizationId - The organization ID to filter by
    * @param name - The agent name to search for
+   * @param businessScopeId - Optional business scope ID to narrow the search
    * @returns The agent if found, null otherwise
    */
-  async findByName(organizationId: string, name: string): Promise<AgentEntity | null> {
-    return this.findFirst(organizationId, { name });
+  async findByName(organizationId: string, name: string, businessScopeId?: string | null): Promise<AgentEntity | null> {
+    const where: Partial<AgentEntity> = { name };
+    if (businessScopeId !== undefined) {
+      where.business_scope_id = businessScopeId;
+    }
+    return this.findFirst(organizationId, where);
   }
 
   /**

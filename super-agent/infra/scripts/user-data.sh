@@ -12,6 +12,11 @@ echo ">>> Updating system packages..."
 apt-get update -y
 apt-get upgrade -y
 
+# LibreOffice (headless, for document conversion: pptx/docx/xlsx → PDF)
+echo ">>> Installing LibreOffice..."
+apt-get install -y libreoffice-core libreoffice-impress libreoffice-writer libreoffice-calc \
+  fonts-noto-cjk fonts-wqy-zenhei
+
 # Node.js 22
 echo ">>> Installing Node.js 22..."
 curl -fsSL https://deb.nodesource.com/setup_22.x | bash -
@@ -63,6 +68,9 @@ curl -fsSL https://packages.redis.io/gpg | gpg --dearmor -o /usr/share/keyrings/
 echo "deb [signed-by=/usr/share/keyrings/redis-archive-keyring.gpg] https://packages.redis.io/deb $(lsb_release -cs) main" > /etc/apt/sources.list.d/redis.list
 apt-get update -y
 apt-get install -y redis-server
+# Local Redis kept as fallback — disabled when ElastiCache is configured.
+# deploy.sh sets REDIS_HOST to the ElastiCache endpoint; the backend
+# connects to whichever host is in .env.
 sed -i 's/^# requirepass .*/requirepass super-agent-redis-password/' /etc/redis/redis.conf
 sed -i 's/^requirepass .*/requirepass super-agent-redis-password/' /etc/redis/redis.conf
 systemctl restart redis-server
@@ -136,7 +144,7 @@ server {
     gzip_types text/plain text/css application/json application/javascript text/xml application/xml text/javascript image/svg+xml;
     gzip_min_length 1000;
 
-    root /opt/super-agent/super-agent-platform/dist;
+    root /opt/super-agent/frontend/dist;
     index index.html;
 
     location /api/ {
@@ -176,7 +184,7 @@ systemctl restart nginx
 systemctl enable nginx
 
 # Systemd service
-cat > /etc/systemd/system/super-agent-backend.service << 'SERVICE'
+cat > /etc/systemd/system/backend.service << 'SERVICE'
 [Unit]
 Description=Super Agent Backend
 After=network.target redis-server.service
@@ -184,7 +192,7 @@ After=network.target redis-server.service
 [Service]
 Type=simple
 User=ubuntu
-WorkingDirectory=/opt/super-agent/super-agent-backend
+WorkingDirectory=/opt/super-agent/backend
 EnvironmentFile=/opt/super-agent/.env
 ExecStart=/usr/bin/node dist/index.js
 Restart=always

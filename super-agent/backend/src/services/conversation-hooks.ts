@@ -10,12 +10,16 @@
 
 import type { ConversationEvent, ContentBlock } from './claude-agent.service.js';
 import { recordAgentEvent } from './agent-metrics.service.js';
+import { recordTokenUsage } from './token-usage.service.js';
 import { agentStatusService } from './agent-status.service.js';
 
 export interface ConversationHookContext {
   organizationId: string;
   sessionId: string;
   agentId: string;
+  userId: string;
+  /** Source of the conversation: chat, workflow, or scope_generator */
+  source: 'chat' | 'workflow' | 'scope_generator';
   /** Names of sub-agents available in this session's workspace */
   subAgentNames: Set<string>;
   /** Maps sub-agent name → agent UUID for populating target_agent_id */
@@ -57,6 +61,18 @@ export function processConversationEvent(
         numTurns: event.numTurns,
       },
     });
+
+    // Record token usage if available
+    if (event.tokenUsage) {
+      recordTokenUsage({
+        organizationId: ctx.organizationId,
+        userId: ctx.userId,
+        sessionId: ctx.sessionId,
+        agentId: ctx.agentId,
+        source: ctx.source,
+        tokenUsage: event.tokenUsage,
+      });
+    }
 
     // Safety net: set any still-tracked sub-agents back to active
     flushActiveSubAgents(ctx);

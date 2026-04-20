@@ -1,0 +1,36 @@
+{
+  "id": "gmail",
+  "version": "1.0.0",
+  "name": "Gmail",
+  "icon": "📧",
+  "category": "saas",
+  "description": {
+    "en": "Email search, read, send, reply, and label management",
+    "cn": "邮件搜索、读取、发送、回复和标签管理"
+  },
+
+  "auth": {
+    "type": "oauth2",
+    "oauth": {
+      "provider": "google",
+      "scopes": [
+        "https://www.googleapis.com/auth/gmail.readonly",
+        "https://www.googleapis.com/auth/gmail.send",
+        "https://www.googleapis.com/auth/gmail.modify"
+      ],
+      "authorize_url": "https://accounts.google.com/o/oauth2/v2/auth",
+      "token_url": "https://oauth2.googleapis.com/token",
+      "extra_params": {
+        "access_type": "offline",
+        "prompt": "consent"
+      }
+    },
+    "credential_fields": []
+  },
+
+  "config_fields": [],
+
+  "setup_guide": "setup-guide.md",
+  "tools_definition": "tools.json",
+  "lambda_handler": "handler.ts"
+}

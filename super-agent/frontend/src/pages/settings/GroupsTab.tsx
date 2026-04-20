@@ -6,6 +6,7 @@
 import { useState } from 'react';
 import { Plus, Trash2, Users, ChevronRight, Loader2, AlertCircle, X, UserPlus } from 'lucide-react';
 import { useUserGroups } from '@/services/useUserGroups';
+import { useTranslation } from '@/i18n';
 import type { UserGroup } from '@/services/api/restUserGroupService';
 
 interface Props {
@@ -15,6 +16,7 @@ interface Props {
 
 export function GroupsTab({ isAdmin, orgMembers }: Props) {
   const { groups, isLoading, error, clearError, createGroup, deleteGroup, addMember, removeMember } = useUserGroups();
+  const { t } = useTranslation();
   const [showCreate, setShowCreate] = useState(false);
   const [newName, setNewName] = useState('');
   const [newDesc, setNewDesc] = useState('');
@@ -36,7 +38,7 @@ export function GroupsTab({ isAdmin, orgMembers }: Props) {
   };
 
   const handleDelete = async (group: UserGroup) => {
-    if (!confirm(`Delete group "${group.name}"? Members will lose access to skills/MCP servers granted through this group.`)) return;
+    if (!confirm(t('groups.confirmDelete').replace('{name}', group.name))) return;
     await deleteGroup(group.id);
   };
 
@@ -68,7 +70,7 @@ export function GroupsTab({ isAdmin, orgMembers }: Props) {
           className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-lg text-sm"
         >
           <Plus className="w-4 h-4" />
-          Create Group
+          {t('groups.createGroup')}
         </button>
       )}
 
@@ -77,7 +79,7 @@ export function GroupsTab({ isAdmin, orgMembers }: Props) {
           <input
             value={newName}
             onChange={e => setNewName(e.target.value)}
-            placeholder="Group name (e.g. Sales Team)"
+            placeholder={t('groups.namePlaceholder')}
             className="w-full px-3 py-2 bg-gray-900 border border-gray-700 rounded-lg text-sm text-white placeholder-gray-500 outline-none focus:border-blue-500"
             onKeyDown={e => e.key === 'Enter' && handleCreate()}
             autoFocus
@@ -85,18 +87,18 @@ export function GroupsTab({ isAdmin, orgMembers }: Props) {
           <input
             value={newDesc}
             onChange={e => setNewDesc(e.target.value)}
-            placeholder="Description (optional)"
+            placeholder={t('groups.descPlaceholder')}
             className="w-full px-3 py-2 bg-gray-900 border border-gray-700 rounded-lg text-sm text-white placeholder-gray-500 outline-none focus:border-blue-500"
           />
           <div className="flex gap-2 justify-end">
-            <button onClick={() => setShowCreate(false)} className="px-4 py-2 text-sm text-gray-400 hover:text-white">Cancel</button>
+            <button onClick={() => setShowCreate(false)} className="px-4 py-2 text-sm text-gray-400 hover:text-white">{t('common.cancel')}</button>
             <button
               onClick={handleCreate}
               disabled={isCreating || !newName.trim()}
               className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-500 disabled:opacity-50 text-white rounded-lg text-sm"
             >
               {isCreating && <Loader2 className="w-4 h-4 animate-spin" />}
-              Create
+              {t('common.create')}
             </button>
           </div>
         </div>
@@ -108,7 +110,7 @@ export function GroupsTab({ isAdmin, orgMembers }: Props) {
         </div>
       ) : groups.length === 0 ? (
         <div className="text-center py-10 text-gray-500 text-sm">
-          No groups yet. Create one to start managing access to skills and MCP servers.
+          {t('groups.empty')}
         </div>
       ) : (
         <div className="space-y-3">
@@ -129,7 +131,7 @@ export function GroupsTab({ isAdmin, orgMembers }: Props) {
                     <div className="text-sm font-medium text-white">{group.name}</div>
                     {group.description && <div className="text-xs text-gray-500 truncate">{group.description}</div>}
                   </div>
-                  <span className="text-xs text-gray-500">{group.member_count} members</span>
+                  <span className="text-xs text-gray-500">{group.member_count} {t('groups.members')}</span>
                   {isAdmin && (
                     <button
                       onClick={e => { e.stopPropagation(); handleDelete(group); }}
@@ -165,7 +167,7 @@ export function GroupsTab({ isAdmin, orgMembers }: Props) {
                         className="flex items-center gap-1.5 text-xs text-blue-400 hover:text-blue-300 mt-1"
                       >
                         <UserPlus className="w-3.5 h-3.5" />
-                        Add member
+                        {t('groups.addMember')}
                       </button>
                     )}
 
@@ -176,7 +178,7 @@ export function GroupsTab({ isAdmin, orgMembers }: Props) {
                           onChange={e => setSelectedUserId(e.target.value)}
                           className="flex-1 px-2 py-1.5 bg-gray-900 border border-gray-700 rounded text-xs text-white outline-none focus:border-blue-500"
                         >
-                          <option value="">Select a member...</option>
+                          <option value="">{t('groups.selectMember')}</option>
                           {getMembersNotInGroup(group).map(m => (
                             <option key={m.user_id} value={m.user_id}>
                               {m.name || m.email || m.user_id}
@@ -188,13 +190,13 @@ export function GroupsTab({ isAdmin, orgMembers }: Props) {
                           disabled={!selectedUserId}
                           className="px-3 py-1.5 bg-blue-600 hover:bg-blue-500 disabled:opacity-50 text-white text-xs rounded"
                         >
-                          Add
+                          {t('groups.add')}
                         </button>
                         <button
                           onClick={() => { setAddingMemberId(null); setSelectedUserId(''); }}
                           className="text-xs text-gray-400 hover:text-white"
                         >
-                          Cancel
+                          {t('common.cancel')}
                         </button>
                       </div>
                     )}

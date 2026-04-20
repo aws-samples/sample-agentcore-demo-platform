@@ -72,7 +72,7 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
-    container_name: super-agent-backend
+    container_name: backend
     restart: unless-stopped
     depends_on:
       postgres:

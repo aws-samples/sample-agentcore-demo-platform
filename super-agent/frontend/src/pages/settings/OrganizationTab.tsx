@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Loader2, AlertCircle, X, Check } from 'lucide-react';
 import { useOrganization } from '@/services/useMembers';
+import { useTranslation } from '@/i18n';
 
 interface Props {
   isOwner: boolean;
@@ -8,6 +9,7 @@ interface Props {
 
 export function OrganizationTab({ isOwner }: Props) {
   const { org, isLoading, isSaving, error, clearError, save } = useOrganization();
+  const { t } = useTranslation();
   const [name, setName] = useState('');
   const [slug, setSlug] = useState('');
   const [saved, setSaved] = useState(false);
@@ -50,7 +52,7 @@ export function OrganizationTab({ isOwner }: Props) {
       <div className="space-y-4">
         <div>
           <label className="block text-sm font-medium text-gray-300 mb-1.5">
-            Organization Name
+            {t('org.name')}
           </label>
           <input
             type="text"
@@ -63,10 +65,10 @@ export function OrganizationTab({ isOwner }: Props) {
 
         <div>
           <label className="block text-sm font-medium text-gray-300 mb-1.5">
-            Slug
+            {t('org.slug')}
           </label>
           <div className="flex items-center gap-2">
-            <span className="text-sm text-gray-500 shrink-0">org/</span>
+            <span className="text-sm text-gray-500 shrink-0">{t('org.slugPrefix')}</span>
             <input
               type="text"
               value={slug}
@@ -75,11 +77,11 @@ export function OrganizationTab({ isOwner }: Props) {
               className="flex-1 px-3 py-2 bg-gray-800 border border-gray-700 rounded-lg text-sm text-white placeholder-gray-500 focus:border-blue-500 outline-none disabled:opacity-50 disabled:cursor-not-allowed font-mono"
             />
           </div>
-          <p className="mt-1 text-xs text-gray-500">Used in URLs. Lowercase letters, numbers, and hyphens only.</p>
+          <p className="mt-1 text-xs text-gray-500">{t('org.slugHint')}</p>
         </div>
 
         <div>
-          <label className="block text-sm font-medium text-gray-300 mb-1.5">Plan</label>
+          <label className="block text-sm font-medium text-gray-300 mb-1.5">{t('org.plan')}</label>
           <div className="px-3 py-2 bg-gray-800/50 border border-gray-700 rounded-lg text-sm text-gray-400 capitalize">
             {org?.plan_type ?? '—'}
           </div>
@@ -97,12 +99,12 @@ export function OrganizationTab({ isOwner }: Props) {
           ) : saved ? (
             <Check className="w-4 h-4 text-green-300" />
           ) : null}
-          {saved ? 'Saved' : 'Save Changes'}
+          {saved ? t('org.saved') : t('org.saveChanges')}
         </button>
       )}
 
       {!isOwner && (
-        <p className="text-xs text-gray-500">Only the organization owner can edit these settings.</p>
+        <p className="text-xs text-gray-500">{t('org.ownerOnly')}</p>
       )}
     </div>
   );

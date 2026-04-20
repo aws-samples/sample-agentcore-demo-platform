@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { Search, Grid3X3, List, Rocket, Globe, Star, TrendingUp, Clock, ArrowUpDown, Heart, Trash2 } from 'lucide-react'
 import { restClient } from '@/services/api/restClient'
 import { useFavorites } from '@/hooks/useFavorites'
+import { useTranslation } from '@/i18n'
 
 // ============================================================================
 // Types
@@ -316,6 +317,7 @@ function AppListRow({ app, onClick, isFav, onToggleFav, onDelete }: { app: Publi
 export function Marketplace() {
   const navigate = useNavigate()
   const { favorites, toggle: toggleFav } = useFavorites()
+  const { t } = useTranslation()
   const [apiApps, setApiApps] = useState<PublishedApp[]>([])
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState('')
@@ -416,8 +418,8 @@ export function Marketplace() {
         <div className="flex items-center justify-between mb-4">
           <div className="flex items-center gap-3">
             <Rocket className="w-6 h-6 text-purple-400" />
-            <h1 className="text-xl font-bold text-white">App Marketplace</h1>
-            <span className="text-sm text-gray-500">{allApps.length} apps</span>
+            <h1 className="text-xl font-bold text-white">{t('marketplace.title')}</h1>
+            <span className="text-sm text-gray-500">{allApps.length} {t('marketplace.apps')}</span>
           </div>
           <div className="flex items-center gap-2">
             <button
@@ -443,7 +445,7 @@ export function Marketplace() {
               type="text"
               value={search}
               onChange={e => setSearch(e.target.value)}
-              placeholder="Search apps..."
+              placeholder={t('marketplace.searchPlaceholder')}
               className="w-full pl-10 pr-4 py-2 bg-gray-800 border border-gray-700 rounded-lg text-sm text-white placeholder-gray-500 focus:outline-none focus:border-blue-500"
             />
           </div>
@@ -480,7 +482,7 @@ export function Marketplace() {
       {/* Content */}
       <div className="flex-1 overflow-y-auto p-6 space-y-8">
         {loading ? (
-          <div className="flex items-center justify-center h-64 text-gray-500">Loading apps...</div>
+          <div className="flex items-center justify-center h-64 text-gray-500">{t('marketplace.loading')}</div>
         ) : (
           <>
             {/* Trending section */}
@@ -488,7 +490,7 @@ export function Marketplace() {
               <section>
                 <div className="flex items-center gap-2 mb-3">
                   <TrendingUp className="w-4 h-4 text-orange-400" />
-                  <h2 className="text-sm font-semibold text-white">Trending</h2>
+                  <h2 className="text-sm font-semibold text-white">{t('marketplace.trending')}</h2>
                 </div>
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
                   {trending.map(app => (
@@ -518,7 +520,7 @@ export function Marketplace() {
               <section>
                 <div className="flex items-center gap-2 mb-3">
                   <Clock className="w-4 h-4 text-blue-400" />
-                  <h2 className="text-sm font-semibold text-white">Recently Used</h2>
+                  <h2 className="text-sm font-semibold text-white">{t('marketplace.recentlyUsed')}</h2>
                 </div>
                 <div className="flex gap-3 overflow-x-auto pb-1">
                   {recentlyUsed.map(app => (
@@ -543,7 +545,7 @@ export function Marketplace() {
               <section>
                 <div className="flex items-center gap-2 mb-3">
                   <Heart className="w-4 h-4 text-red-400 fill-red-400" />
-                  <h2 className="text-sm font-semibold text-white">Favorites</h2>
+                  <h2 className="text-sm font-semibold text-white">{t('marketplace.favorites')}</h2>
                 </div>
                 <div className="flex gap-3 overflow-x-auto pb-1">
                   {favoriteApps.map(app => (
@@ -566,12 +568,12 @@ export function Marketplace() {
             {/* All apps */}
             <section>
               {(!search && category === 'all') && (
-                <h2 className="text-sm font-semibold text-white mb-3">All Apps</h2>
+                <h2 className="text-sm font-semibold text-white mb-3">{t('marketplace.allApps')}</h2>
               )}
               {allApps.length === 0 ? (
                 <div className="flex flex-col items-center justify-center h-40 gap-2">
                   <Search className="w-8 h-8 text-gray-700" />
-                  <p className="text-gray-500 text-sm">No apps match your search</p>
+                  <p className="text-gray-500 text-sm">{t('marketplace.noResults')}</p>
                 </div>
               ) : view === 'grid' ? (
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">

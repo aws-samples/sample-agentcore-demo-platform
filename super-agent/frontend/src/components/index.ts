@@ -75,6 +75,10 @@ export { PluginsPanel } from './PluginsPanel'
 export { MCPServersPanel } from './MCPServersPanel'
 export { MCPCatalogPanel } from './MCPCatalogPanel'
 
+// Business Scope Dropdown (shared selector)
+export { BusinessScopeDropdown } from './BusinessScopeDropdown'
+export type { ScopeItem } from './BusinessScopeDropdown'
+
 // AI Scope Generator
 export { AIScopeGenerator } from './AIScopeGenerator'
 

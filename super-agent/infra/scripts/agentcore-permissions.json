@@ -1,0 +1,65 @@
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Sid": "BedrockInvoke",
+      "Effect": "Allow",
+      "Action": ["bedrock:InvokeModel", "bedrock:InvokeModelWithResponseStream"],
+      "Resource": "*"
+    },
+    {
+      "Sid": "WorkspaceS3",
+      "Effect": "Allow",
+      "Action": ["s3:GetObject", "s3:PutObject", "s3:ListBucket", "s3:DeleteObject"],
+      "Resource": [
+        "arn:aws:s3:::super-agent-workspaces",
+        "arn:aws:s3:::super-agent-workspaces/*"
+      ]
+    },
+    {
+      "Sid": "SkillsS3",
+      "Effect": "Allow",
+      "Action": ["s3:GetObject", "s3:ListBucket"],
+      "Resource": [
+        "arn:aws:s3:::super-agent-skills",
+        "arn:aws:s3:::super-agent-skills/*"
+      ]
+    },
+    {
+      "Sid": "ECRPull",
+      "Effect": "Allow",
+      "Action": ["ecr:GetDownloadUrlForLayer", "ecr:BatchGetImage", "ecr:GetAuthorizationToken"],
+      "Resource": "*"
+    },
+    {
+      "Sid": "BrowserTool",
+      "Effect": "Allow",
+      "Action": [
+        "bedrock-agentcore:CreateBrowser",
+        "bedrock-agentcore:ListBrowsers",
+        "bedrock-agentcore:GetBrowser",
+        "bedrock-agentcore:DeleteBrowser",
+        "bedrock-agentcore:StartBrowserSession",
+        "bedrock-agentcore:StopBrowserSession",
+        "bedrock-agentcore:GetBrowserSession",
+        "bedrock-agentcore:ListBrowserSessions",
+        "bedrock-agentcore:ConnectBrowserAutomationStream",
+        "bedrock-agentcore:ConnectBrowserLiveViewStream",
+        "bedrock-agentcore:UpdateBrowserStream"
+      ],
+      "Resource": "arn:aws:bedrock-agentcore:*:*:browser/*"
+    },
+    {
+      "Sid": "CodeInterpreter",
+      "Effect": "Allow",
+      "Action": [
+        "bedrock-agentcore:StartCodeInterpreterSession",
+        "bedrock-agentcore:InvokeCodeInterpreter",
+        "bedrock-agentcore:StopCodeInterpreterSession",
+        "bedrock-agentcore:GetCodeInterpreterSession",
+        "bedrock-agentcore:ListCodeInterpreterSessions"
+      ],
+      "Resource": "arn:aws:bedrock-agentcore:*:*:code-interpreter/*"
+    }
+  ]
+}

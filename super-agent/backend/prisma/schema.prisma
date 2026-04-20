@@ -59,6 +59,14 @@ model organizations {
   rehearsal_sessions         rehearsal_sessions[]
   scope_evolution_proposals  scope_evolution_proposals[]
   user_groups                user_groups[]
+  showcase_industries        showcase_industries[]
+  showcase_domains           showcase_domains[]
+  showcase_cases             showcase_cases[]
+  credential_vault           credential_vault[]
+  data_connectors            data_connectors[]
+  connector_audit_log        connector_audit_log[]
+  connector_oauth_providers  connector_oauth_providers[]
+
   @@index([slug])
   @@index([plan_type])
   @@index([created_at(sort: Desc)])
@@ -88,7 +96,6 @@ model memberships {
   @@index([role])
   @@index([organization_id, user_id])
 }
-
 
 // ============================================================================
 // Profiles Table - matches Supabase migration 20250108000002
@@ -120,29 +127,29 @@ model business_scopes {
   is_default      Boolean   @default(false)
   config_version  Int       @default(1)
   scope_type      String    @default("business") @db.VarChar(20) // business | digital_twin
-  avatar          String?                                        // photo for digital twins
-  role            String?                                        // role/title for digital twins
-  system_prompt   String?                                        // system prompt for digital twins
+  avatar          String? // photo for digital twins
+  role            String? // role/title for digital twins
+  system_prompt   String? // system prompt for digital twins
   created_at      DateTime  @default(now()) @db.Timestamptz
   updated_at      DateTime  @default(now()) @updatedAt @db.Timestamptz
   deleted_at      DateTime? @db.Timestamptz
 
-  visibility      String   @default("open")
+  visibility String @default("open")
 
-  organization  organizations  @relation(fields: [organization_id], references: [id], onDelete: Cascade)
-  agents        agents[]
-  workflows     workflows[]
-  chat_sessions chat_sessions[]
-  published_apps published_apps[]
-  scope_mcp_servers scope_mcp_servers[]
-  scope_plugins     scope_plugins[]
-  im_channel_bindings im_channel_bindings[]
-  scope_memories      scope_memories[]
-  scope_briefings     scope_briefings[]
-  scope_memberships   scope_memberships[]
-  scope_document_groups scope_document_groups[]
-  agent_scope_assignments agent_scope_assignments[]
-  rehearsal_sessions      rehearsal_sessions[]
+  organization              organizations               @relation(fields: [organization_id], references: [id], onDelete: Cascade)
+  agents                    agents[]
+  workflows                 workflows[]
+  chat_sessions             chat_sessions[]
+  published_apps            published_apps[]
+  scope_mcp_servers         scope_mcp_servers[]
+  scope_plugins             scope_plugins[]
+  im_channel_bindings       im_channel_bindings[]
+  scope_memories            scope_memories[]
+  scope_briefings           scope_briefings[]
+  scope_memberships         scope_memberships[]
+  scope_document_groups     scope_document_groups[]
+  agent_scope_assignments   agent_scope_assignments[]
+  rehearsal_sessions        rehearsal_sessions[]
   scope_evolution_proposals scope_evolution_proposals[]
 
   @@unique([organization_id, name], name: "unique_scope_name_per_org")
@@ -197,14 +204,15 @@ model agents {
   created_at        DateTime @default(now()) @db.Timestamptz
   updated_at        DateTime @default(now()) @updatedAt @db.Timestamptz
 
-  organization   organizations    @relation(fields: [organization_id], references: [id], onDelete: Cascade)
-  business_scope business_scopes? @relation(fields: [business_scope_id], references: [id], onDelete: SetNull)
-  tasks          tasks[]
-  agent_skills   agent_skills[]
-  scope_briefings scope_briefings[]
+  organization      organizations             @relation(fields: [organization_id], references: [id], onDelete: Cascade)
+  business_scope    business_scopes?          @relation(fields: [business_scope_id], references: [id], onDelete: SetNull)
+  tasks             tasks[]
+  agent_skills      agent_skills[]
+  scope_briefings   scope_briefings[]
   scope_assignments agent_scope_assignments[]
   room_memberships  chat_room_members[]
 
+  @@unique([organization_id, business_scope_id, name], name: "unique_agent_name_per_scope")
   @@index([organization_id])
   @@index([business_scope_id])
   @@index([status])
@@ -236,9 +244,9 @@ model skills {
   created_at        DateTime @default(now()) @db.Timestamptz
   updated_at        DateTime @default(now()) @updatedAt @db.Timestamptz
 
-  organization organizations   @relation(fields: [organization_id], references: [id], onDelete: Cascade)
-  agent_skills agent_skills[]
-  skill_marketplace skill_marketplace[]
+  organization       organizations        @relation(fields: [organization_id], references: [id], onDelete: Cascade)
+  agent_skills       agent_skills[]
+  skill_marketplace  skill_marketplace[]
   skill_group_access skill_group_access[]
 
   @@unique([organization_id, hash_id], name: "unique_skill_hash_per_org")
@@ -271,7 +279,6 @@ model agent_skills {
   @@index([skill_id])
 }
 
-
 // ============================================================================
 // Workflows Table - matches Supabase migration 20250108000006
 // ============================================================================
@@ -289,12 +296,12 @@ model workflows {
   created_at        DateTime @default(now()) @db.Timestamptz
   updated_at        DateTime @default(now()) @updatedAt @db.Timestamptz
 
-  organization          organizations          @relation(fields: [organization_id], references: [id], onDelete: Cascade)
-  business_scope        business_scopes?       @relation(fields: [business_scope_id], references: [id], onDelete: SetNull)
-  tasks                 tasks[]
-  workflow_executions   workflow_executions[]
-  webhooks              webhooks[]
-  workflow_schedules    workflow_schedules[]
+  organization        organizations         @relation(fields: [organization_id], references: [id], onDelete: Cascade)
+  business_scope      business_scopes?      @relation(fields: [business_scope_id], references: [id], onDelete: SetNull)
+  tasks               tasks[]
+  workflow_executions workflow_executions[]
+  webhooks            webhooks[]
+  workflow_schedules  workflow_schedules[]
 
   @@index([organization_id])
   @@index([business_scope_id])
@@ -333,7 +340,6 @@ model tasks {
   @@index([organization_id, agent_id])
 }
 
-
 // ============================================================================
 // Documents Table - matches Supabase migration 20250108000008
 // ============================================================================
@@ -371,7 +377,7 @@ model mcp_servers {
   host_address    String
   oauth_secret_id String?  @db.Uuid
   headers         Json     @default("{}")
-  config          Json?    // Structured SDK config: { type, command, args, url, env }
+  config          Json? // Structured SDK config: { type, command, args, url, env }
   status          String   @default("inactive")
   created_at      DateTime @default(now()) @db.Timestamptz
   updated_at      DateTime @default(now()) @updatedAt @db.Timestamptz
@@ -417,9 +423,9 @@ model scope_mcp_servers {
 model scope_plugins {
   id                String   @id @default(uuid()) @db.Uuid
   business_scope_id String   @db.Uuid
-  name              String                          // human-readable name, e.g. "claude-mem"
-  git_url           String                          // git clone URL
-  ref               String   @default("main")      // branch / tag / commit
+  name              String // human-readable name, e.g. "claude-mem"
+  git_url           String // git clone URL
+  ref               String   @default("main") // branch / tag / commit
   assigned_at       DateTime @default(now()) @db.Timestamptz
   assigned_by       String?  @db.Uuid
 
@@ -429,35 +435,34 @@ model scope_plugins {
   @@index([business_scope_id])
 }
 
-
 // ============================================================================
 // Chat Sessions Table - matches Supabase migration 20250108000010
 // ============================================================================
 model chat_sessions {
-  id                String   @id @default(uuid()) @db.Uuid
-  organization_id   String   @db.Uuid
-  user_id           String   @db.Uuid
-  business_scope_id String?  @db.Uuid
-  agent_id          String?  @db.Uuid
+  id                String    @id @default(uuid()) @db.Uuid
+  organization_id   String    @db.Uuid
+  user_id           String    @db.Uuid
+  business_scope_id String?   @db.Uuid
+  agent_id          String?   @db.Uuid
   claude_session_id String?
   title             String?
-  status            String   @default("idle") // idle | generating | error
+  status            String    @default("idle") // idle | generating | error
   sop_context       String?
-  context           Json     @default("{}")
-  room_mode         String   @default("single") @db.VarChar(20) // single | group
-  routing_strategy  String   @default("auto") @db.VarChar(20)   // auto | mention | round_robin
-  is_starred        Boolean  @default(false)
+  context           Json      @default("{}")
+  room_mode         String    @default("single") @db.VarChar(20) // single | group
+  routing_strategy  String    @default("auto") @db.VarChar(20) // auto | mention | round_robin
+  is_starred        Boolean   @default(false)
   starred_at        DateTime? @db.Timestamptz
-  starred_by        String?  @db.Uuid
-  star_category     String?  @db.VarChar(50)
-  created_at        DateTime @default(now()) @db.Timestamptz
-  updated_at        DateTime @default(now()) @updatedAt @db.Timestamptz
+  starred_by        String?   @db.Uuid
+  star_category     String?   @db.VarChar(50)
+  created_at        DateTime  @default(now()) @db.Timestamptz
+  updated_at        DateTime  @default(now()) @updatedAt @db.Timestamptz
 
-  organization   organizations    @relation(fields: [organization_id], references: [id], onDelete: Cascade)
-  business_scope business_scopes? @relation(fields: [business_scope_id], references: [id], onDelete: SetNull)
-  chat_messages  chat_messages[]
+  organization       organizations        @relation(fields: [organization_id], references: [id], onDelete: Cascade)
+  business_scope     business_scopes?     @relation(fields: [business_scope_id], references: [id], onDelete: SetNull)
+  chat_messages      chat_messages[]
   im_thread_sessions im_thread_sessions[]
-  room_members   chat_room_members[]
+  room_members       chat_room_members[]
 
   @@index([organization_id])
   @@index([user_id])
@@ -475,14 +480,14 @@ model chat_messages {
   id               String   @id @default(uuid()) @db.Uuid
   organization_id  String   @db.Uuid
   session_id       String   @db.Uuid
-  type             String                      // user | agent | ai (legacy) | system
+  type             String // user | agent | ai (legacy) | system
   content          String
-  agent_id         String?  @db.Uuid           // which agent sent this (type=agent)
-  mention_agent_id String?  @db.Uuid           // which agent was @mentioned (type=user)
-  metadata         Json     @default("{}")     // routing info, confidence, etc.
+  agent_id         String?  @db.Uuid // which agent sent this (type=agent)
+  mention_agent_id String?  @db.Uuid // which agent was @mentioned (type=user)
+  metadata         Json     @default("{}") // routing info, confidence, etc.
   created_at       DateTime @default(now()) @db.Timestamptz
 
-  organization organizations  @relation(fields: [organization_id], references: [id], onDelete: Cascade)
+  organization organizations @relation(fields: [organization_id], references: [id], onDelete: Cascade)
   session      chat_sessions @relation(fields: [session_id], references: [id], onDelete: Cascade)
 
   @@index([organization_id])
@@ -492,7 +497,6 @@ model chat_messages {
   @@index([created_at(sort: Desc)])
   @@index([session_id, created_at])
 }
-
 
 // ============================================================================
 // Workflow Executions Table - tracks execution sessions
@@ -602,19 +606,19 @@ model execution_checkpoints {
 // API Keys Table - for programmatic workflow access
 // ============================================================================
 model api_keys {
-  id                   String    @id @default(uuid()) @db.Uuid
-  organization_id      String    @db.Uuid
-  user_id              String    @db.Uuid
-  name                 String    @db.VarChar(255)
-  key_hash             String    @unique @db.VarChar(64)
-  key_prefix           String    @db.VarChar(12)
-  scopes               Json      @default("[\"workflow:execute\"]")
-  rate_limit_per_minute Int      @default(60)
-  is_active            Boolean   @default(true)
-  last_used_at         DateTime? @db.Timestamptz
-  expires_at           DateTime? @db.Timestamptz
-  created_at           DateTime  @default(now()) @db.Timestamptz
-  updated_at           DateTime  @default(now()) @updatedAt @db.Timestamptz
+  id                    String    @id @default(uuid()) @db.Uuid
+  organization_id       String    @db.Uuid
+  user_id               String    @db.Uuid
+  name                  String    @db.VarChar(255)
+  key_hash              String    @unique @db.VarChar(64)
+  key_prefix            String    @db.VarChar(12)
+  scopes                Json      @default("[\"workflow:execute\"]")
+  rate_limit_per_minute Int       @default(60)
+  is_active             Boolean   @default(true)
+  last_used_at          DateTime? @db.Timestamptz
+  expires_at            DateTime? @db.Timestamptz
+  created_at            DateTime  @default(now()) @db.Timestamptz
+  updated_at            DateTime  @default(now()) @updatedAt @db.Timestamptz
 
   organization organizations @relation(fields: [organization_id], references: [id], onDelete: Cascade)
 
@@ -642,8 +646,8 @@ model webhooks {
   updated_at      DateTime  @default(now()) @updatedAt @db.Timestamptz
   deleted_at      DateTime? @db.Timestamptz
 
-  organization        organizations          @relation(fields: [organization_id], references: [id], onDelete: Cascade)
-  workflow            workflows              @relation(fields: [workflow_id], references: [id], onDelete: Cascade)
+  organization         organizations          @relation(fields: [organization_id], references: [id], onDelete: Cascade)
+  workflow             workflows              @relation(fields: [workflow_id], references: [id], onDelete: Cascade)
   webhook_call_records webhook_call_records[]
 
   @@index([organization_id])
@@ -655,24 +659,24 @@ model webhooks {
 // Webhook Call Records Table - tracks webhook invocations
 // ============================================================================
 model webhook_call_records {
-  id              String    @id @default(uuid()) @db.Uuid
-  webhook_id      String    @db.VarChar(64)
-  organization_id String    @db.Uuid
-  execution_id    String?   @db.Uuid
-  request_method  String?   @db.VarChar(10)
-  request_headers Json?
-  request_body    Json?
-  response_status Int?
+  id               String   @id @default(uuid()) @db.Uuid
+  webhook_id       String   @db.VarChar(64)
+  organization_id  String   @db.Uuid
+  execution_id     String?  @db.Uuid
+  request_method   String?  @db.VarChar(10)
+  request_headers  Json?
+  request_body     Json?
+  response_status  Int?
   response_time_ms Int?
-  status          String    @default("pending") @db.VarChar(50)
-  error_message   String?
-  logs            Json      @default("[]")
-  ip_address      String?   @db.VarChar(45)
-  created_at      DateTime  @default(now()) @db.Timestamptz
+  status           String   @default("pending") @db.VarChar(50)
+  error_message    String?
+  logs             Json     @default("[]")
+  ip_address       String?  @db.VarChar(45)
+  created_at       DateTime @default(now()) @db.Timestamptz
 
-  organization organizations         @relation(fields: [organization_id], references: [id], onDelete: Cascade)
-  webhook      webhooks              @relation(fields: [webhook_id], references: [webhook_id], onDelete: Cascade)
-  execution    workflow_executions?  @relation(fields: [execution_id], references: [id], onDelete: SetNull)
+  organization organizations        @relation(fields: [organization_id], references: [id], onDelete: Cascade)
+  webhook      webhooks             @relation(fields: [webhook_id], references: [webhook_id], onDelete: Cascade)
+  execution    workflow_executions? @relation(fields: [execution_id], references: [id], onDelete: SetNull)
 
   @@index([webhook_id])
   @@index([organization_id])
@@ -702,8 +706,8 @@ model workflow_schedules {
   updated_at      DateTime  @default(now()) @updatedAt @db.Timestamptz
   deleted_at      DateTime? @db.Timestamptz
 
-  organization              organizations               @relation(fields: [organization_id], references: [id], onDelete: Cascade)
-  workflow                  workflows                   @relation(fields: [workflow_id], references: [id], onDelete: Cascade)
+  organization               organizations                @relation(fields: [organization_id], references: [id], onDelete: Cascade)
+  workflow                   workflows                    @relation(fields: [workflow_id], references: [id], onDelete: Cascade)
   schedule_execution_records schedule_execution_records[]
 
   @@index([organization_id])
@@ -739,7 +743,6 @@ model schedule_execution_records {
   @@index([status])
   @@index([scheduled_at(sort: Desc)])
 }
-
 
 // ============================================================================
 // Skill Marketplace Table - enterprise skill catalog
@@ -792,27 +795,27 @@ model skill_votes {
 // Published Apps — Internal Mini-SaaS Marketplace
 // ============================================================================
 model published_apps {
-  id                String    @id @default(uuid()) @db.Uuid
-  org_id            String    @db.Uuid
-  session_id        String?   @db.Uuid
-  business_scope_id String?   @db.Uuid
+  id                String   @id @default(uuid()) @db.Uuid
+  org_id            String   @db.Uuid
+  session_id        String?  @db.Uuid
+  business_scope_id String?  @db.Uuid
   name              String
   description       String?
-  icon              String    @default("🚀")
-  category          String    @default("tool")
-  version           String    @default("1.0.0")
-  status            String    @default("published")
-  entry_point       String    @default("index.html")
+  icon              String   @default("🚀")
+  category          String   @default("tool")
+  version           String   @default("1.0.0")
+  status            String   @default("published")
+  entry_point       String   @default("index.html")
   bundle_path       String
-  published_by      String?   @db.Uuid
-  access_level      String    @default("org")
-  metadata          Json      @default("{}")
-  created_at        DateTime  @default(now()) @db.Timestamptz
-  updated_at        DateTime  @default(now()) @updatedAt @db.Timestamptz
-  published_at      DateTime  @default(now()) @db.Timestamptz
+  published_by      String?  @db.Uuid
+  access_level      String   @default("org")
+  metadata          Json     @default("{}")
+  created_at        DateTime @default(now()) @db.Timestamptz
+  updated_at        DateTime @default(now()) @updatedAt @db.Timestamptz
+  published_at      DateTime @default(now()) @db.Timestamptz
 
-  organization   organizations   @relation(fields: [org_id], references: [id], onDelete: Cascade)
-  business_scope business_scopes? @relation(fields: [business_scope_id], references: [id], onDelete: SetNull)
+  organization   organizations      @relation(fields: [org_id], references: [id], onDelete: Cascade)
+  business_scope business_scopes?   @relation(fields: [business_scope_id], references: [id], onDelete: SetNull)
   usage_events   app_usage_events[]
   ratings        app_ratings[]
   versions       app_versions[]
@@ -886,15 +889,15 @@ model app_versions {
 // Agent Events — Fact table for agent activity tracking
 // ============================================================================
 model agent_events {
-  id                String   @id @default(uuid()) @db.Uuid
-  organization_id   String   @db.Uuid
-  session_id        String?  @db.Uuid
-  agent_id          String?  @db.Uuid
-  target_agent_id   String?  @db.Uuid
-  event_type        String   @db.VarChar(50) // subagent_invocation, skill_usage, tool_call, error, turn_complete
-  event_name        String?  @db.VarChar(255) // agent name, skill name, tool name
-  metadata          Json     @default("{}")
-  created_at        DateTime @default(now()) @db.Timestamptz
+  id              String   @id @default(uuid()) @db.Uuid
+  organization_id String   @db.Uuid
+  session_id      String?  @db.Uuid
+  agent_id        String?  @db.Uuid
+  target_agent_id String?  @db.Uuid
+  event_type      String   @db.VarChar(50) // subagent_invocation, skill_usage, tool_call, error, turn_complete
+  event_name      String?  @db.VarChar(255) // agent name, skill name, tool name
+  metadata        Json     @default("{}")
+  created_at      DateTime @default(now()) @db.Timestamptz
 
   organization organizations @relation(fields: [organization_id], references: [id], onDelete: Cascade)
 
@@ -909,15 +912,15 @@ model agent_events {
 // Agent Metrics Daily — Pre-aggregated rollup for dashboards
 // ============================================================================
 model agent_metrics_daily {
-  id                String   @id @default(uuid()) @db.Uuid
-  organization_id   String   @db.Uuid
-  agent_id          String   @db.Uuid
-  metric_date       DateTime @db.Date
-  event_type        String   @db.VarChar(50)
-  event_name        String?  @db.VarChar(255)
-  count             Int      @default(0)
-  metadata          Json     @default("{}")
-  updated_at        DateTime @default(now()) @updatedAt @db.Timestamptz
+  id              String   @id @default(uuid()) @db.Uuid
+  organization_id String   @db.Uuid
+  agent_id        String   @db.Uuid
+  metric_date     DateTime @db.Date
+  event_type      String   @db.VarChar(50)
+  event_name      String?  @db.VarChar(255)
+  count           Int      @default(0)
+  metadata        Json     @default("{}")
+  updated_at      DateTime @default(now()) @updatedAt @db.Timestamptz
 
   organization organizations @relation(fields: [organization_id], references: [id], onDelete: Cascade)
 
@@ -930,23 +933,23 @@ model agent_metrics_daily {
 // IM Channel Bindings — Maps IM channels to business scopes
 // ============================================================================
 model im_channel_bindings {
-  id                String    @id @default(uuid()) @db.Uuid
-  organization_id   String    @db.Uuid
-  business_scope_id String?   @db.Uuid
-  agent_id          String?   @db.Uuid         // for agent-level IM bindings (digital twins)
-  channel_type      String    @db.VarChar(50)
-  channel_id        String    @db.VarChar(255)
-  channel_name      String?   @db.VarChar(255)
+  id                String   @id @default(uuid()) @db.Uuid
+  organization_id   String   @db.Uuid
+  business_scope_id String?  @db.Uuid
+  agent_id          String?  @db.Uuid // for agent-level IM bindings (digital twins)
+  channel_type      String   @db.VarChar(50)
+  channel_id        String   @db.VarChar(255)
+  channel_name      String?  @db.VarChar(255)
   bot_token_enc     String?
   webhook_url       String?
-  config            Json      @default("{}")
-  is_enabled        Boolean   @default(true)
-  created_by        String?   @db.Uuid
-  created_at        DateTime  @default(now()) @db.Timestamptz
-  updated_at        DateTime  @default(now()) @updatedAt @db.Timestamptz
+  config            Json     @default("{}")
+  is_enabled        Boolean  @default(true)
+  created_by        String?  @db.Uuid
+  created_at        DateTime @default(now()) @db.Timestamptz
+  updated_at        DateTime @default(now()) @updatedAt @db.Timestamptz
 
-  organization   organizations    @relation(fields: [organization_id], references: [id], onDelete: Cascade)
-  business_scope business_scopes? @relation(fields: [business_scope_id], references: [id], onDelete: Cascade)
+  organization    organizations        @relation(fields: [organization_id], references: [id], onDelete: Cascade)
+  business_scope  business_scopes?     @relation(fields: [business_scope_id], references: [id], onDelete: Cascade)
   thread_sessions im_thread_sessions[]
 
   @@unique([organization_id, channel_type, channel_id], name: "unique_channel_binding")
@@ -1010,37 +1013,37 @@ model scope_memories {
 // Scope Briefings — AI-generated insights about scope activity
 // ============================================================================
 model scope_briefings {
-  id                String   @id @default(uuid()) @db.Uuid
-  organization_id   String   @db.Uuid
-  business_scope_id String   @db.Uuid
-  
-  title             String   @db.VarChar(255)
-  summary           String
-  category          String   @db.VarChar(100)
-  status            String   @db.VarChar(50)
-  
-  source_type       String   @db.VarChar(50)
-  source_id         String   @db.VarChar(255)
-  agent_id          String?  @db.Uuid
-  
-  tags              Json     @default("[]")
-  metadata          Json     @default("{}")
-  importance        Int      @default(5)
-  
-  event_time        DateTime @db.Timestamptz
-  generated_at      DateTime @default(now()) @db.Timestamptz
-  expires_at        DateTime? @db.Timestamptz
-  
-  is_read           Boolean  @default(false)
-  is_archived       Boolean  @default(false)
-  
-  created_at        DateTime @default(now()) @db.Timestamptz
-  updated_at        DateTime @default(now()) @updatedAt @db.Timestamptz
-  
-  organization      organizations   @relation(fields: [organization_id], references: [id], onDelete: Cascade)
-  business_scope    business_scopes @relation(fields: [business_scope_id], references: [id], onDelete: Cascade)
-  agent             agents?         @relation(fields: [agent_id], references: [id], onDelete: SetNull)
-  
+  id                String @id @default(uuid()) @db.Uuid
+  organization_id   String @db.Uuid
+  business_scope_id String @db.Uuid
+
+  title    String @db.VarChar(255)
+  summary  String
+  category String @db.VarChar(100)
+  status   String @db.VarChar(50)
+
+  source_type String  @db.VarChar(50)
+  source_id   String  @db.VarChar(255)
+  agent_id    String? @db.Uuid
+
+  tags       Json @default("[]")
+  metadata   Json @default("{}")
+  importance Int  @default(5)
+
+  event_time   DateTime  @db.Timestamptz
+  generated_at DateTime  @default(now()) @db.Timestamptz
+  expires_at   DateTime? @db.Timestamptz
+
+  is_read     Boolean @default(false)
+  is_archived Boolean @default(false)
+
+  created_at DateTime @default(now()) @db.Timestamptz
+  updated_at DateTime @default(now()) @updatedAt @db.Timestamptz
+
+  organization   organizations   @relation(fields: [organization_id], references: [id], onDelete: Cascade)
+  business_scope business_scopes @relation(fields: [business_scope_id], references: [id], onDelete: Cascade)
+  agent          agents?         @relation(fields: [agent_id], references: [id], onDelete: SetNull)
+
   @@unique([business_scope_id, source_type, source_id], name: "unique_briefing_source")
   @@index([business_scope_id, event_time(sort: Desc)])
   @@index([business_scope_id, status])
@@ -1053,14 +1056,14 @@ model scope_briefings {
 // App Data — Per-app JSONB data storage for published mini-SaaS apps
 // ============================================================================
 model app_data {
-  id              String   @id @default(uuid()) @db.Uuid
-  app_id          String   @db.Uuid
-  org_id          String   @db.Uuid
-  collection      String   @db.VarChar(100)
-  data            Json
-  created_by      String?  @db.Uuid
-  created_at      DateTime @default(now()) @db.Timestamptz
-  updated_at      DateTime @default(now()) @updatedAt @db.Timestamptz
+  id         String   @id @default(uuid()) @db.Uuid
+  app_id     String   @db.Uuid
+  org_id     String   @db.Uuid
+  collection String   @db.VarChar(100)
+  data       Json
+  created_by String?  @db.Uuid
+  created_at DateTime @default(now()) @db.Timestamptz
+  updated_at DateTime @default(now()) @updatedAt @db.Timestamptz
 
   app          published_apps @relation(fields: [app_id], references: [id], onDelete: Cascade)
   organization organizations  @relation(fields: [org_id], references: [id], onDelete: Cascade)
@@ -1131,18 +1134,17 @@ model scope_document_groups {
   @@index([document_group_id])
 }
 
-
 // ============================================================================
 // Chat Room Members — agents participating in a chat room (group mode)
 // ============================================================================
 model chat_room_members {
-  id          String   @id @default(uuid()) @db.Uuid
-  session_id  String   @db.Uuid
-  agent_id    String   @db.Uuid
-  role        String   @default("member") @db.VarChar(20) // primary | member
-  is_active   Boolean  @default(true)
-  added_by    String?  @db.Uuid
-  joined_at   DateTime @default(now()) @db.Timestamptz
+  id         String   @id @default(uuid()) @db.Uuid
+  session_id String   @db.Uuid
+  agent_id   String   @db.Uuid
+  role       String   @default("member") @db.VarChar(20) // primary | member
+  is_active  Boolean  @default(true)
+  added_by   String?  @db.Uuid
+  joined_at  DateTime @default(now()) @db.Timestamptz
 
   session chat_sessions @relation(fields: [session_id], references: [id], onDelete: Cascade)
   agent   agents        @relation(fields: [agent_id], references: [id], onDelete: Cascade)
@@ -1172,7 +1174,6 @@ model agent_scope_assignments {
   @@index([business_scope_id])
 }
 
-
 // ============================================================================
 // Projects — Kanban boards for software development
 // ============================================================================
@@ -1184,16 +1185,16 @@ model projects {
   repo_url             String?
   default_branch       String   @default("main")
   business_scope_id    String?  @db.Uuid
-  agent_id             String?  @db.Uuid         // the agent in charge of this project
-  workspace_session_id String?  @db.Uuid         // persistent chat session for the project agent
+  agent_id             String?  @db.Uuid // the agent in charge of this project
+  workspace_session_id String?  @db.Uuid // persistent chat session for the project agent
   settings             Json     @default("{}")
   created_by           String   @db.Uuid
   created_at           DateTime @default(now()) @db.Timestamptz
   updated_at           DateTime @default(now()) @updatedAt @db.Timestamptz
 
-  organization   organizations    @relation(fields: [organization_id], references: [id], onDelete: Cascade)
-  issues         project_issues[]
-  members        project_members[]
+  organization organizations     @relation(fields: [organization_id], references: [id], onDelete: Cascade)
+  issues       project_issues[]
+  members      project_members[]
 
   @@index([organization_id])
   @@index([created_by])
@@ -1222,30 +1223,44 @@ model project_members {
 // Project Issues — task cards on the kanban board
 // ============================================================================
 model project_issues {
-  id                    String    @id @default(uuid()) @db.Uuid
-  project_id            String    @db.Uuid
-  organization_id       String    @db.Uuid
-  issue_number          Int
-  title                 String
-  description           String?
-  status                String    @default("backlog") @db.VarChar(20)
-  priority              String    @default("medium") @db.VarChar(20)
-  labels                Json      @default("[]")
-  sort_order            Float     @default(0)
-  branch_name           String?
-  workspace_session_id  String?   @db.Uuid
-  pr_url                String?
-  estimated_effort      String?
-  parent_issue_id       String?   @db.Uuid
-  created_by            String    @db.Uuid
-  created_at            DateTime  @default(now()) @db.Timestamptz
-  updated_at            DateTime  @default(now()) @updatedAt @db.Timestamptz
+  id                   String   @id @default(uuid()) @db.Uuid
+  project_id           String   @db.Uuid
+  organization_id      String   @db.Uuid
+  issue_number         Int
+  title                String
+  description          String?
+  status               String   @default("backlog") @db.VarChar(20)
+  priority             String   @default("medium") @db.VarChar(20)
+  labels               Json     @default("[]")
+  sort_order           Float    @default(0)
+  branch_name          String?
+  workspace_session_id String?  @db.Uuid
+  pr_url               String?
+  estimated_effort     String?
+  parent_issue_id      String?  @db.Uuid
+  created_by           String   @db.Uuid
+  created_at           DateTime @default(now()) @db.Timestamptz
+  updated_at           DateTime @default(now()) @updatedAt @db.Timestamptz
 
-  project      projects              @relation(fields: [project_id], references: [id], onDelete: Cascade)
-  organization organizations         @relation(fields: [organization_id], references: [id], onDelete: Cascade)
-  comments     project_issue_comments[]
-  children     project_issues[]      @relation("issue_parent")
-  parent       project_issues?       @relation("issue_parent", fields: [parent_issue_id], references: [id], onDelete: SetNull)
+  // AI governance fields
+  readiness_score     Float? // 0-100 readiness score
+  readiness_details   Json? // { completeness, conflicts, dependencies, executability }
+  acceptance_criteria Json? // [{ criterion: string, verified: boolean }]
+  ai_analysis_status  String?   @db.VarChar(20) // 'pending' | 'analyzing' | 'done' | 'stale'
+  last_analyzed_at    DateTime? @db.Timestamptz
+
+  // Code diff fields (populated by AgentCore after execution)
+  diff_stat       Json? // { files_changed: number, insertions: number, deletions: number, files: [{ path, status, insertions, deletions }] }
+  diff_patch      String? // Full unified diff text
+  diff_created_at DateTime? @db.Timestamptz
+
+  project             projects                  @relation(fields: [project_id], references: [id], onDelete: Cascade)
+  organization        organizations             @relation(fields: [organization_id], references: [id], onDelete: Cascade)
+  comments            project_issue_comments[]
+  children            project_issues[]          @relation("issue_parent")
+  parent              project_issues?           @relation("issue_parent", fields: [parent_issue_id], references: [id], onDelete: SetNull)
+  relations_as_source project_issue_relations[] @relation("relation_source")
+  relations_as_target project_issue_relations[] @relation("relation_target")
 
   @@unique([project_id, issue_number], name: "unique_issue_number_per_project")
   @@index([project_id])
@@ -1260,15 +1275,15 @@ model project_issues {
 // Project Issue Comments — discussion, code review, agent logs
 // ============================================================================
 model project_issue_comments {
-  id               String   @id @default(uuid()) @db.Uuid
-  issue_id         String   @db.Uuid
-  organization_id  String   @db.Uuid
-  author_user_id   String?  @db.Uuid
-  author_agent_id  String?  @db.Uuid
-  content          String
-  comment_type     String   @default("discussion") @db.VarChar(20)
-  metadata         Json     @default("{}")
-  created_at       DateTime @default(now()) @db.Timestamptz
+  id              String   @id @default(uuid()) @db.Uuid
+  issue_id        String   @db.Uuid
+  organization_id String   @db.Uuid
+  author_user_id  String?  @db.Uuid
+  author_agent_id String?  @db.Uuid
+  content         String
+  comment_type    String   @default("discussion") @db.VarChar(20)
+  metadata        Json     @default("{}")
+  created_at      DateTime @default(now()) @db.Timestamptz
 
   issue        project_issues @relation(fields: [issue_id], references: [id], onDelete: Cascade)
   organization organizations  @relation(fields: [organization_id], references: [id], onDelete: Cascade)
@@ -1279,24 +1294,68 @@ model project_issue_comments {
 }
 
 // ============================================================================
+// Project Issue Relations — AI-discovered relationships between issues
+// ============================================================================
+model project_issue_relations {
+  id              String   @id @default(uuid()) @db.Uuid
+  project_id      String   @db.Uuid
+  source_issue_id String   @db.Uuid
+  target_issue_id String   @db.Uuid
+  relation_type   String   @db.VarChar(30) // 'conflicts_with' | 'depends_on' | 'duplicates' | 'related_to'
+  confidence      Float    @default(0)
+  reasoning       String?
+  status          String   @default("pending") @db.VarChar(20) // 'pending' | 'confirmed' | 'dismissed'
+  created_by_ai   Boolean  @default(true)
+  reviewed_by     String?  @db.Uuid
+  created_at      DateTime @default(now()) @db.Timestamptz
+
+  source_issue project_issues @relation("relation_source", fields: [source_issue_id], references: [id], onDelete: Cascade)
+  target_issue project_issues @relation("relation_target", fields: [target_issue_id], references: [id], onDelete: Cascade)
+
+  @@unique([source_issue_id, target_issue_id, relation_type], name: "unique_relation")
+  @@index([project_id])
+  @@index([source_issue_id])
+  @@index([target_issue_id])
+  @@index([status])
+}
+
+// ============================================================================
+// Project Triage Reports — AI-generated sprint planning reports
+// ============================================================================
+model project_triage_reports {
+  id               String   @id @default(uuid()) @db.Uuid
+  project_id       String   @db.Uuid
+  organization_id  String   @db.Uuid
+  report_content   Json
+  issue_count      Int
+  conflict_count   Int      @default(0)
+  suggestion_count Int      @default(0)
+  status           String   @default("active") @db.VarChar(20) // 'active' | 'archived'
+  created_at       DateTime @default(now()) @db.Timestamptz
+
+  @@index([project_id])
+  @@index([created_at(sort: Desc)])
+}
+
+// ============================================================================
 // Rehearsal Sessions — automated agent evaluation sessions
 // ============================================================================
 model rehearsal_sessions {
-  id                  String    @id @default(uuid()) @db.Uuid
-  organization_id     String    @db.Uuid
-  business_scope_id   String    @db.Uuid
-  agent_id            String?   @db.Uuid
-  rehearsal_type      String    @default("memory_triggered") @db.VarChar(50)
-  trigger_memory_ids  String[]  @default([])
-  agent_config_snapshot Json    @default("{}")
-  scenario            Json      @default("{}")
-  evaluation          Json?
-  status              String    @default("pending") @db.VarChar(20)
-  created_at          DateTime  @default(now()) @db.Timestamptz
-  completed_at        DateTime? @db.Timestamptz
+  id                    String    @id @default(uuid()) @db.Uuid
+  organization_id       String    @db.Uuid
+  business_scope_id     String    @db.Uuid
+  agent_id              String?   @db.Uuid
+  rehearsal_type        String    @default("memory_triggered") @db.VarChar(50)
+  trigger_memory_ids    String[]  @default([])
+  agent_config_snapshot Json      @default("{}")
+  scenario              Json      @default("{}")
+  evaluation            Json?
+  status                String    @default("pending") @db.VarChar(20)
+  created_at            DateTime  @default(now()) @db.Timestamptz
+  completed_at          DateTime? @db.Timestamptz
 
-  organization   organizations   @relation(fields: [organization_id], references: [id], onDelete: Cascade)
-  business_scope business_scopes @relation(fields: [business_scope_id], references: [id], onDelete: Cascade)
+  organization   organizations               @relation(fields: [organization_id], references: [id], onDelete: Cascade)
+  business_scope business_scopes             @relation(fields: [business_scope_id], references: [id], onDelete: Cascade)
   proposals      scope_evolution_proposals[]
 
   @@index([organization_id])
@@ -1309,24 +1368,24 @@ model rehearsal_sessions {
 // Scope Evolution Proposals — change proposals from rehearsal evaluations
 // ============================================================================
 model scope_evolution_proposals {
-  id                     String    @id @default(uuid()) @db.Uuid
-  organization_id        String    @db.Uuid
-  business_scope_id      String    @db.Uuid
-  rehearsal_session_id   String?   @db.Uuid
-  trigger_memory_ids     String[]  @default([])
-  proposal_type          String    @db.VarChar(50)
-  proposed_changes       Json      @default("[]")
-  evaluation_score       Int?
-  evaluation_summary     String?
-  status                 String    @default("pending") @db.VarChar(20)
-  reviewed_by            String?   @db.Uuid
-  review_note            String?
-  applied_at             DateTime? @db.Timestamptz
-  created_at             DateTime  @default(now()) @db.Timestamptz
-  updated_at             DateTime  @default(now()) @updatedAt @db.Timestamptz
+  id                   String    @id @default(uuid()) @db.Uuid
+  organization_id      String    @db.Uuid
+  business_scope_id    String    @db.Uuid
+  rehearsal_session_id String?   @db.Uuid
+  trigger_memory_ids   String[]  @default([])
+  proposal_type        String    @db.VarChar(50)
+  proposed_changes     Json      @default("[]")
+  evaluation_score     Int?
+  evaluation_summary   String?
+  status               String    @default("pending") @db.VarChar(20)
+  reviewed_by          String?   @db.Uuid
+  review_note          String?
+  applied_at           DateTime? @db.Timestamptz
+  created_at           DateTime  @default(now()) @db.Timestamptz
+  updated_at           DateTime  @default(now()) @updatedAt @db.Timestamptz
 
-  organization      organizations      @relation(fields: [organization_id], references: [id], onDelete: Cascade)
-  business_scope    business_scopes    @relation(fields: [business_scope_id], references: [id], onDelete: Cascade)
+  organization      organizations       @relation(fields: [organization_id], references: [id], onDelete: Cascade)
+  business_scope    business_scopes     @relation(fields: [business_scope_id], references: [id], onDelete: Cascade)
   rehearsal_session rehearsal_sessions? @relation(fields: [rehearsal_session_id], references: [id], onDelete: SetNull)
 
   @@index([organization_id])
@@ -1396,4 +1455,257 @@ model mcp_group_access {
   @@id([mcp_server_id, group_id])
   @@index([group_id])
   @@index([mcp_server_id])
+}
+
+// ============================================================================
+// Showcase Industries — top-level industry tabs for "企业Agent大赏"
+// ============================================================================
+model showcase_industries {
+  id              String   @id @default(uuid()) @db.Uuid
+  organization_id String   @db.Uuid
+  name            String   @db.VarChar(100)
+  slug            String   @db.VarChar(100)
+  sort_order      Int      @default(0)
+  is_active       Boolean  @default(true)
+  created_at      DateTime @default(now()) @db.Timestamptz
+  updated_at      DateTime @default(now()) @updatedAt @db.Timestamptz
+
+  organization organizations      @relation(fields: [organization_id], references: [id], onDelete: Cascade)
+  domains      showcase_domains[]
+
+  @@unique([organization_id, slug], name: "unique_industry_slug_per_org")
+  @@index([organization_id])
+  @@index([sort_order])
+}
+
+// ============================================================================
+// Showcase Domains — business domain sections within an industry
+// ============================================================================
+model showcase_domains {
+  id              String   @id @default(uuid()) @db.Uuid
+  organization_id String   @db.Uuid
+  industry_id     String   @db.Uuid
+  name            String   @db.VarChar(100)
+  name_en         String?  @db.VarChar(100)
+  icon            String?  @db.VarChar(10)
+  sort_order      Int      @default(0)
+  created_at      DateTime @default(now()) @db.Timestamptz
+  updated_at      DateTime @default(now()) @updatedAt @db.Timestamptz
+
+  organization organizations       @relation(fields: [organization_id], references: [id], onDelete: Cascade)
+  industry     showcase_industries @relation(fields: [industry_id], references: [id], onDelete: Cascade)
+  cases        showcase_cases[]
+
+  @@index([organization_id])
+  @@index([industry_id])
+  @@index([sort_order])
+}
+
+// ============================================================================
+// Showcase Cases — individual agent capability cards
+// ============================================================================
+model showcase_cases {
+  id              String   @id @default(uuid()) @db.Uuid
+  organization_id String   @db.Uuid
+  domain_id       String   @db.Uuid
+  title           String   @db.VarChar(100)
+  description     String?
+  initial_prompt  String?
+  session_id      String?  @db.Uuid
+  agent_id        String?  @db.Uuid
+  workflow_id     String?  @db.Uuid
+  scope_id        String?  @db.Uuid
+  run_config      Json     @default("{}")
+  sort_order      Int      @default(0)
+  is_active       Boolean  @default(true)
+  created_by      String?  @db.Uuid
+  created_at      DateTime @default(now()) @db.Timestamptz
+  updated_at      DateTime @default(now()) @updatedAt @db.Timestamptz
+
+  organization organizations    @relation(fields: [organization_id], references: [id], onDelete: Cascade)
+  domain       showcase_domains @relation(fields: [domain_id], references: [id], onDelete: Cascade)
+
+  @@index([organization_id])
+  @@index([domain_id])
+  @@index([sort_order])
+}
+
+// ============================================================================
+// Token Usage Monthly — per-user per-month token consumption tracking
+// ============================================================================
+model token_usage_monthly {
+  id                          String   @id @default(uuid()) @db.Uuid
+  organization_id             String   @db.Uuid
+  user_id                     String   @db.Uuid
+  month                       String   @db.VarChar(7) // YYYY-MM
+  input_tokens                BigInt   @default(0)
+  output_tokens               BigInt   @default(0)
+  cache_read_input_tokens     BigInt   @default(0)
+  cache_creation_input_tokens BigInt   @default(0)
+  total_cost_usd              Decimal  @default(0) @db.Decimal(12, 6)
+  invocation_count            Int      @default(0)
+  updated_at                  DateTime @default(now()) @updatedAt @db.Timestamptz
+
+  @@unique([organization_id, user_id, month])
+  @@index([organization_id])
+  @@index([user_id])
+  @@index([month])
+  @@index([organization_id, month])
+}
+
+// ============================================================================
+// Token Usage Log — individual invocation records for audit trail
+// ============================================================================
+model token_usage_log {
+  id                          String   @id @default(uuid()) @db.Uuid
+  organization_id             String   @db.Uuid
+  user_id                     String   @db.Uuid
+  session_id                  String?  @db.Uuid
+  agent_id                    String?
+  source                      String   @db.VarChar(30) // chat | workflow | scope_generator
+  input_tokens                Int      @default(0)
+  output_tokens               Int      @default(0)
+  cache_read_input_tokens     Int      @default(0)
+  cache_creation_input_tokens Int      @default(0)
+  total_cost_usd              Decimal  @default(0) @db.Decimal(12, 6)
+  model                       String?  @db.VarChar(100)
+  created_at                  DateTime @default(now()) @db.Timestamptz
+
+  @@index([organization_id])
+  @@index([user_id])
+  @@index([session_id])
+  @@index([created_at(sort: Desc)])
+  @@index([organization_id, user_id, created_at])
+}
+
+// ============================================================================
+// Credential Vault — encrypted credential storage for Data Connectors
+// ============================================================================
+model credential_vault {
+  id                String    @id @default(uuid()) @db.Uuid
+  organization_id   String    @db.Uuid
+  name              String    @db.VarChar(255)
+  description       String?
+  auth_type         String    @db.VarChar(50)
+  encrypted_data    String
+  kms_key_arn       String?   @db.VarChar(512)
+  encrypted_dek     String?
+  oauth_provider    String?   @db.VarChar(100)
+  oauth_scopes      String[]  @default([])
+  token_expires_at  DateTime? @db.Timestamptz
+  refresh_token_enc String?
+  status            String    @default("active") @db.VarChar(50)
+  last_verified_at  DateTime? @db.Timestamptz
+  expires_at        DateTime? @db.Timestamptz
+  created_by        String?   @db.Uuid
+  created_at        DateTime  @default(now()) @db.Timestamptz
+  updated_at        DateTime  @default(now()) @updatedAt @db.Timestamptz
+
+  organization organizations     @relation(fields: [organization_id], references: [id], onDelete: Cascade)
+  connectors   data_connectors[]
+
+  @@unique([organization_id, name], name: "unique_credential_name_per_org")
+  @@index([organization_id])
+  @@index([auth_type])
+  @@index([status])
+  @@index([token_expires_at])
+}
+
+// ============================================================================
+// Data Connectors — Gateway Lambda Target + Credential binding
+// ============================================================================
+model data_connectors {
+  id                    String    @id @default(uuid()) @db.Uuid
+  organization_id       String    @db.Uuid
+  name                  String    @db.VarChar(255)
+  display_name          String    @db.VarChar(255)
+  description           String?
+  icon                  String?
+  connector_type        String    @db.VarChar(50)
+  credential_id         String    @db.Uuid
+  gateway_target_id     String?   @db.VarChar(255)
+  gateway_target_arn    String?   @db.VarChar(512)
+  identity_provider_arn String?   @db.VarChar(512)
+  config                Json      @default("{}")
+  template_id           String?   @db.VarChar(100)
+  status                String    @default("configured") @db.VarChar(50)
+  last_health_check     DateTime? @db.Timestamptz
+  health_message        String?
+  error_count           Int       @default(0)
+  usage_count           Int       @default(0)
+  last_used_at          DateTime? @db.Timestamptz
+  created_by            String?   @db.Uuid
+  created_at            DateTime  @default(now()) @db.Timestamptz
+  updated_at            DateTime  @default(now()) @updatedAt @db.Timestamptz
+
+  organization     organizations           @relation(fields: [organization_id], references: [id], onDelete: Cascade)
+  credential       credential_vault        @relation(fields: [credential_id], references: [id], onDelete: Restrict)
+  scope_connectors scope_data_connectors[]
+
+  @@unique([organization_id, name], name: "unique_connector_name_per_org")
+  @@index([organization_id])
+  @@index([connector_type])
+  @@index([credential_id])
+  @@index([status])
+}
+
+// ============================================================================
+// Scope ↔ Data Connector bindings
+// ============================================================================
+model scope_data_connectors {
+  id                String   @id @default(uuid()) @db.Uuid
+  business_scope_id String   @db.Uuid
+  connector_id      String   @db.Uuid
+  assigned_at       DateTime @default(now()) @db.Timestamptz
+  assigned_by       String?  @db.Uuid
+  scope_config      Json?    @db.JsonB
+
+  connector data_connectors @relation(fields: [connector_id], references: [id], onDelete: Cascade)
+
+  @@unique([business_scope_id, connector_id], name: "unique_scope_connector")
+  @@index([business_scope_id])
+  @@index([connector_id])
+}
+
+// ============================================================================
+// Connector Audit Log — tracks all connector and credential operations
+// ============================================================================
+model connector_audit_log {
+  id              String   @id @default(uuid()) @db.Uuid
+  organization_id String   @db.Uuid
+  connector_id    String?  @db.Uuid
+  credential_id   String?  @db.Uuid
+  action          String   @db.VarChar(50)
+  actor_id        String?  @db.Uuid
+  actor_type      String   @default("user") @db.VarChar(20)
+  details         Json     @default("{}")
+  ip_address      String?  @db.VarChar(45)
+  created_at      DateTime @default(now()) @db.Timestamptz
+
+  organization organizations @relation(fields: [organization_id], references: [id], onDelete: Cascade)
+
+  @@index([organization_id, created_at(sort: Desc)])
+  @@index([connector_id])
+  @@index([credential_id])
+}
+
+// ============================================================================
+// Connector OAuth Providers — per-org OAuth app credentials (Client ID/Secret)
+// ============================================================================
+model connector_oauth_providers {
+  id                String   @id @default(uuid()) @db.Uuid
+  organization_id   String   @db.Uuid
+  provider          String   @db.VarChar(50) // google, salesforce, microsoft, etc.
+  client_id         String
+  client_secret_enc String // encrypted via credential vault encryption
+  scopes            String[] @default([])
+  extra_config      Json     @default("{}") // provider-specific settings
+  created_by        String?  @db.Uuid
+  created_at        DateTime @default(now()) @db.Timestamptz
+  updated_at        DateTime @default(now()) @updatedAt @db.Timestamptz
+
+  organization organizations @relation(fields: [organization_id], references: [id], onDelete: Cascade)
+
+  @@unique([organization_id, provider], name: "unique_oauth_provider_per_org")
+  @@index([organization_id])
 }

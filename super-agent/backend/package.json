@@ -1,5 +1,5 @@
 {
-  "name": "super-agent-backend",
+  "name": "backend",
   "version": "1.0.0",
   "description": "Unified TypeScript backend for Super Agent Platform",
   "main": "dist/index.js",

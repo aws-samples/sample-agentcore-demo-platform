@@ -22,6 +22,21 @@ interface InstallBody {
   };
 }
 
+interface ProbeGitHubBody {
+  Body: { url: string };
+}
+
+interface ImportGitHubBody {
+  Body: {
+    url: string;
+    skillName: string;
+    installRef: string;
+    displayName?: string;
+    description?: string;
+    sessionId?: string;
+  };
+}
+
 export async function skillMarketplaceRoutes(fastify: FastifyInstance): Promise<void> {
   // GET /api/skills/marketplace/featured — popular/featured skills (no query needed)
   fastify.get('/featured', { preHandler: [authenticate] }, async (_request: FastifyRequest, reply: FastifyReply) => {
@@ -134,5 +149,87 @@ export async function skillMarketplaceRoutes(fastify: FastifyInstance): Promise<
     }
 
     return reply.status(201).send({ data: result });
+  });
+
+  // POST /api/skills/marketplace/probe-github — check a GitHub URL for SKILL.md files
+  fastify.post<ProbeGitHubBody>('/probe-github', { preHandler: [authenticate] }, async (request: FastifyRequest<ProbeGitHubBody>, reply: FastifyReply) => {
+    const { url } = request.body;
+    if (!url || !url.trim()) {
+      return reply.status(400).send({ error: 'url is required', code: 'MISSING_URL' });
+    }
+
+    try {
+      const result = await skillMarketplaceService.probeGitHubUrl(url.trim());
+      return reply.status(200).send({ data: result });
+    } catch (err) {
+      request.log.error({ err, url }, 'GitHub probe failed');
+      return reply.status(500).send({ error: 'Failed to probe GitHub URL', code: 'PROBE_FAILED' });
+    }
+  });
+
+  // POST /api/skills/marketplace/import-github — install a skill discovered via probe
+  fastify.post<ImportGitHubBody>('/import-github', { preHandler: [authenticate] }, async (request: FastifyRequest<ImportGitHubBody>, reply: FastifyReply) => {
+    const { url, skillName, installRef, displayName, description, sessionId } = request.body;
+    if (!installRef || !installRef.trim()) {
+      return reply.status(400).send({ error: 'installRef is required', code: 'MISSING_INSTALL_REF' });
+    }
+
+    let result;
+    try {
+      result = await skillMarketplaceService.install({
+        organizationId: request.user!.orgId,
+        installRef: installRef.trim(),
+        displayName: displayName || skillName,
+        description,
+        tags: ['github-import'],
+        userId: request.user!.id,
+      });
+    } catch (err) {
+      request.log.error({ err, installRef, url }, 'GitHub skill import failed');
+      return reply.status(500).send({
+        error: err instanceof Error ? err.message : 'Failed to import skill from GitHub',
+        code: 'IMPORT_FAILED',
+      });
+    }
+
+    return reply.status(201).send({ data: result });
+  });
+
+  // POST /api/skills/marketplace/upload-zip — upload a zip containing SKILL.md files
+  fastify.post('/upload-zip', { preHandler: [authenticate] }, async (request: FastifyRequest, reply: FastifyReply) => {
+    const file = await request.file();
+    if (!file) {
+      return reply.status(400).send({ error: 'No file uploaded', code: 'MISSING_FILE' });
+    }
+
+    const fileName = file.filename || 'upload.zip';
+    const ext = fileName.toLowerCase();
+    if (!ext.endsWith('.zip') && !ext.endsWith('.tar.gz') && !ext.endsWith('.tgz')) {
+      return reply.status(400).send({ error: 'Only .zip, .tar.gz, and .tgz files are supported', code: 'INVALID_FILE_TYPE' });
+    }
+
+    try {
+      // Consume the file stream into a buffer
+      const chunks: Buffer[] = [];
+      for await (const chunk of file.file) {
+        chunks.push(chunk as Buffer);
+      }
+      const zipBuffer = Buffer.concat(chunks);
+
+      const result = await skillMarketplaceService.installFromZip({
+        organizationId: request.user!.orgId,
+        zipBuffer,
+        fileName,
+        userId: request.user!.id,
+      });
+
+      return reply.status(201).send({ data: result });
+    } catch (err) {
+      request.log.error({ err, fileName }, 'Zip skill upload failed');
+      return reply.status(500).send({
+        error: err instanceof Error ? err.message : 'Failed to process uploaded archive',
+        code: 'UPLOAD_FAILED',
+      });
+    }
   });
 }

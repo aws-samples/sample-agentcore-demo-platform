@@ -1,7 +1,7 @@
 /**
  * REST API Client
  * 
- * Base HTTP client for communicating with the super-agent-backend REST API.
+ * Base HTTP client for communicating with the backend REST API.
  * Handles authentication, error mapping, and request/response processing.
  */
 

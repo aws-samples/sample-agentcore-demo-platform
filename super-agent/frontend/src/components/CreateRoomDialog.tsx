@@ -8,6 +8,7 @@ import { useState } from 'react';
 import { Users, Layers, X, Check } from 'lucide-react';
 import type { Agent } from '@/types';
 import type { BusinessScope } from '@/services/businessScopeService';
+import { useTranslation } from '@/i18n';
 
 interface CreateRoomDialogProps {
   scopes: BusinessScope[];
@@ -26,6 +27,7 @@ export function CreateRoomDialog({ scopes, agents, onCreateFromScope, onCreateMa
   const [roomTitle, setRoomTitle] = useState('');
   const [routingStrategy, setRoutingStrategy] = useState<string>('auto');
   const [isCreating, setIsCreating] = useState(false);
+  const { t } = useTranslation();
 
   const handleCreate = async () => {
     setIsCreating(true);
@@ -56,7 +58,7 @@ export function CreateRoomDialog({ scopes, agents, onCreateFromScope, onCreateMa
     <div className="dialog-overlay" onClick={onClose}>
       <div className="dialog-content" onClick={e => e.stopPropagation()}>
         <div className="dialog-header">
-          <h3>Create Group Chat Room</h3>
+          <h3>{t('room.createTitle')}</h3>
           <button onClick={onClose} className="close-btn"><X size={18} /></button>
         </div>
 
@@ -64,20 +66,20 @@ export function CreateRoomDialog({ scopes, agents, onCreateFromScope, onCreateMa
           <div className="dialog-mode-select">
             <button className="mode-card" onClick={() => setMode('scope')}>
               <Layers size={24} />
-              <div className="mode-title">From Business Scope</div>
-              <div className="mode-desc">Import all agents from a scope</div>
+              <div className="mode-title">{t('room.fromScope')}</div>
+              <div className="mode-desc">{t('room.fromScopeDesc')}</div>
             </button>
             <button className="mode-card" onClick={() => setMode('manual')}>
               <Users size={24} />
-              <div className="mode-title">Manual Selection</div>
-              <div className="mode-desc">Pick agents from your roster</div>
+              <div className="mode-title">{t('room.manual')}</div>
+              <div className="mode-desc">{t('room.manualDesc')}</div>
             </button>
           </div>
         ) : mode === 'scope' ? (
           <div className="dialog-scope-select">
-            <label>Select Business Scope</label>
+            <label>{t('room.selectScope')}</label>
             <select value={selectedScopeId} onChange={e => setSelectedScopeId(e.target.value)}>
-              <option value="">Choose a scope...</option>
+              <option value="">{t('room.chooseScope')}</option>
               {scopes.map(s => (
                 <option key={s.id} value={s.id}>{s.name}</option>
               ))}
@@ -86,18 +88,18 @@ export function CreateRoomDialog({ scopes, agents, onCreateFromScope, onCreateMa
         ) : (
           <div className="dialog-manual-select">
             <div className="form-group">
-              <label>Room Title (optional)</label>
+              <label>{t('room.titleLabel')}</label>
               <input value={roomTitle} onChange={e => setRoomTitle(e.target.value)} placeholder="e.g. Project Alpha Discussion" />
             </div>
             <div className="form-group">
-              <label>Routing Strategy</label>
+              <label>{t('room.routingStrategy')}</label>
               <select value={routingStrategy} onChange={e => setRoutingStrategy(e.target.value)}>
-                <option value="auto">Auto (AI decides who responds)</option>
-                <option value="mention">Mention only (@agent to trigger)</option>
+                <option value="auto">{t('room.routingAuto')}</option>
+                <option value="mention">{t('room.routingMention')}</option>
               </select>
             </div>
             <div className="form-group">
-              <label>Select Agents ({selectedAgentIds.length} selected)</label>
+              <label>{t('room.selectAgents').replace('{n}', String(selectedAgentIds.length))}</label>
               <div className="agent-select-list">
                 {agents.map(a => (
                   <button
@@ -116,13 +118,13 @@ export function CreateRoomDialog({ scopes, agents, onCreateFromScope, onCreateMa
         )}
 
         <div className="dialog-footer">
-          {mode && <button onClick={() => setMode(null)} className="back-btn">Back</button>}
+          {mode && <button onClick={() => setMode(null)} className="back-btn">{t('room.back')}</button>}
           <button
             onClick={handleCreate}
             disabled={isCreating || (mode === 'scope' && !selectedScopeId) || (mode === 'manual' && selectedAgentIds.length === 0)}
             className="create-btn"
           >
-            {isCreating ? 'Creating...' : 'Create Room'}
+            {isCreating ? t('room.creating') : t('room.createRoom')}
           </button>
         </div>
       </div>

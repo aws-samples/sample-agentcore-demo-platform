@@ -1,0 +1,262 @@
+{
+  "title": "逾期资产治理全生命周期工作流",
+  "description": "管理从贷款首次逾期到最终处置（回收/核销/转让）的全生命周期催收工作流，按M1/M2/M3+分级体系执行差异化催收策略，在合规框架内最大化回收率。",
+  "tasks": [
+    {
+      "id": "task-1",
+      "title": "逾期案件接收与数据整合",
+      "type": "agent",
+      "prompt": "从核心银行系统拉取当日新增逾期案件清单，包含贷款编号、客户ID、逾期天数、逾期金额、产品类型。关联客户画像数据（年龄、职业、收入、历史逾期记录）、催收历史记录（上次催收时间、渠道、结果）、外部风险信号（征信变化、多头借贷、司法信息）。对数据完整性进行校验，缺失字段标记待补充。输出结构化的案件数据包，包含所有维度信息。",
+      "agentRef": "case-allocator",
+      "dependentTasks": [],
+      "requiredIntegrations": ["核心银行系统", "征信系统", "催收管理系统"]
+    },
+    {
+      "id": "task-2",
+      "title": "逾期阶段判定与风险分层",
+      "type": "agent",
+      "prompt": "对接收到的逾期案件执行阶段判定：M1（1-30天）、M2（31-60天）、M3+（60天以上）。对特殊案件执行标记：欺诈案件标记直接转法务、投诉中案件标记暂停催收、已故/破产案件标记特殊流程。在每个阶段内执行风险分层评估：M1按失联概率和还款意愿评分分为高/中/低风险，M2按金额、剩余期数和配合度匹配催收员经验等级，M3+按可执行财产和诉讼成本收益比评估处置路径。输出每个案件的阶段判定、风险等级和推荐策略。",
+      "agentRef": "case-allocator",
+      "dependentTasks": ["task-1"],
+      "requiredIntegrations": []
+    },
+    {
+      "id": "task-3",
+      "title": "逾期阶段分流决策",
+      "type": "condition",
+      "prompt": "根据案件的逾期阶段判定结果进行分流：M1阶段案件进入自动化催收通道，M2阶段案件进入人工催收通道，M3+阶段案件进入法务处置通道，特殊标记案件（投诉中/欺诈/已故/破产）进入对应的异常处理通道。",
+      "agentRef": "case-allocator",
+      "dependentTasks": ["task-2"],
+      "requiredIntegrations": []
+    },
+    {
+      "id": "task-4",
+      "title": "M1自动化催收策略匹配与资源分配",
+      "type": "agent",
+      "prompt": "对M1阶段案件执行策略匹配：低风险案件分配短信+APP推送组合，中风险案件分配短信+AI外呼组合，高风险案件分配短信+AI外呼+人工软催组合。考虑催收系统当日产能上限（AI外呼并发数、短信通道容量）进行资源分配。生成有序的催收任务队列，明确每个案件的触达时间节点（T+1短信、T+3外呼、T+5推送、T+7人工）。将催收任务清单下发至催收执行Agent。记录所有分案决策依据。",
+      "agentRef": "case-allocator",
+      "dependentTasks": ["task-3"],
+      "requiredIntegrations": ["催收管理系统"]
+    },
+    {
+      "id": "task-5",
+      "title": "M1多渠道催收执行",
+      "type": "agent",
+      "prompt": "按照催收任务队列执行M1阶段多渠道催收动作。T+1发送短信提醒：使用审核通过的柔性提醒模板，包含客户姓名、逾期金额、还款截止日期、还款渠道，发送时间09:00-20:00。T+3启动AI智能外呼：对T+1短信后仍未还款的客户，在09:00-20:30时间窗口内执行AI外呼，支持多轮对话、情绪识别和还款引导。T+5发送APP推送通知。T+7对高风险案件启动人工软催收电话，为催收员生成案件摘要卡片和推荐话术。全程执行合规监控：校验催收时间窗口、联系频次（日≤3次）、话术合规性。记录每次触达的时间、渠道、结果和客户反馈。",
+      "agentRef": "collection-executor",
+      "dependentTasks": ["task-4"],
+      "requiredIntegrations": ["短信网关", "AI外呼系统", "APP推送服务"]
+    },
+    {
+      "id": "task-6",
+      "title": "M1客户响应判定",
+      "type": "condition",
+      "prompt": "评估M1催收后的客户响应情况。判定类别：1）客户已还款→结案处理；2）客户承诺还款并给出日期→进入承诺跟踪流程；3）客户无响应且已到T+15→标记失联，准备升级M2；4）客户明确拒绝还款→标记拒绝，准备升级策略；5）客户提出争议或投诉→暂停催收，转客户沟通Agent处理。",
+      "agentRef": "collection-executor",
+      "dependentTasks": ["task-5"],
+      "requiredIntegrations": []
+    },
+    {
+      "id": "task-7",
+      "title": "承诺还款跟踪与履约监控",
+      "type": "agent",
+      "prompt": "对已承诺还款的客户执行履约跟踪：在承诺还款日期前24小时自动发送提醒短信，到期日自动检查还款状态。如客户按期还款，更新案件状态为回收成功并结案。如客户未按期还款，标记承诺违约，升级催收力度（增加联系频次或渠道），对连续两次承诺违约的客户，反馈给智能分案Agent触发策略升级。记录承诺履约率数据。",
+      "agentRef": "collection-executor",
+      "dependentTasks": ["task-6"],
+      "requiredIntegrations": ["核心银行系统", "短信网关"]
+    },
+    {
+      "id": "task-8",
+      "title": "M1→M2策略升级处理",
+      "type": "agent",
+      "prompt": "对T+15仍未回款且无有效响应的M1案件执行策略升级。汇总前期催收动作（各渠道触达记录、客户响应情况、失联/拒绝标记），生成升级说明报告。将案件状态从M1调整为M2，重新执行风险评估和策略匹配：按金额、剩余期数、客户配合度等维度匹配至经验对口的催收员，生成详细的案件摘要和沟通策略建议。更新分案决策记录。",
+      "agentRef": "case-allocator",
+      "dependentTasks": ["task-6"],
+      "requiredIntegrations": ["催收管理系统"]
+    },
+    {
+      "id": "task-9",
+      "title": "M2人工催收执行",
+      "type": "agent",
+      "prompt": "执行M2阶段人工催收任务。催收员接收案件后24小时内完成首次跟进电话。为催收员提供：详细案件摘要（客户信息、逾期详情、M1催收全记录、客户画像）、沟通策略建议、推荐话术要点。催收员在合规时间窗口内拨打电话，了解逾期原因、评估还款意愿和能力。对有还款意愿但暂时困难的客户，引导进入还款方案协商。对拒绝沟通的客户记录情况并安排后续跟进。实时记录通话要点、客户态度评估、承诺内容。执行合规监控：话术合规检测、频次监控、时间窗口校验。",
+      "agentRef": "collection-executor",
+      "dependentTasks": ["task-3", "task-8"],
+      "requiredIntegrations": ["催收管理系统", "通话录音系统"]
+    },
+    {
+      "id": "task-10",
+      "title": "M2客户配合度判定",
+      "type": "condition",
+      "prompt": "评估M2人工催收后的客户配合度。判定类别：1）客户配合且有还款意愿→转入还款方案协商流程；2）客户不配合但逾期未满60天→继续人工催收跟进；3）客户不配合且逾期已满60天→准备升级M3+；4）客户提出争议或投诉→暂停催收，转客户沟通Agent；5）客户表示有不可抗力困难→转客户沟通Agent启动困难援助。",
+      "agentRef": "collection-executor",
+      "dependentTasks": ["task-9"],
+      "requiredIntegrations": []
+    },
+    {
+      "id": "task-11",
+      "title": "还款方案协商与审批",
+      "type": "agent",
+      "prompt": "对有还款意愿的M2客户进行个性化还款方案设计和协商。根据客户逾期原因、还款历史、当前经济状况和逾期金额，设计方案选项：分期还款（最长6期）、延期还款（最长30天）、部分息费减免。计算每个方案的NPV影响（机构损失vs预期回收）。在授权矩阵范围内的方案（减免≤5000元且≤50%）自动审批，超限方案生成审批申请上报人工审批（4小时SLA）。方案达成后录入催收系统，设置跟踪提醒节点，通知催收执行Agent执行后续跟踪。",
+      "agentRef": "customer-negotiator",
+      "dependentTasks": ["task-10"],
+      "requiredIntegrations": ["核心银行系统", "审批系统"]
+    },
+    {
+      "id": "task-12",
+      "title": "客户投诉与争议处理",
+      "type": "agent",
+      "prompt": "处理催收过程中产生的客户投诉和争议。接收投诉后30分钟内完成分类和优先级判定：A类（监管转办）最高优先级，B类（催收行为投诉）高优先级，C类（息费减免）正常，D类（困难援助）正常，E类（账单异议）正常。A/B类投诉立即暂停该案件催收动作。2小时内向客户发送受理确认。调取催收全过程记录（通话录音、短信、系统日志），还原催收行为时间线，逐项核对合规性。48小时内出具正式调查回复。监管转办投诉需同步向监管部门提交回复。记录全过程归档备查。",
+      "agentRef": "customer-negotiator",
+      "dependentTasks": ["task-6", "task-10"],
+      "requiredIntegrations": ["催收管理系统", "通话录音系统", "投诉管理系统"]
+    },
+    {
+      "id": "task-13",
+      "title": "M2→M3+策略升级处理",
+      "type": "agent",
+      "prompt": "对逾期满60天仍未达成有效还款方案的M2案件执行策略升级至M3+。综合评估客户配合度、还款能力和可执行资产状况，生成升级建议报告。将案件状态调整为M3+，执行初步法务处置可行性评估，并将案件下发至法务处置Agent。同步更新分案决策记录和案件迁移数据，通知催收数据分析Agent记录迁徙数据。",
+      "agentRef": "case-allocator",
+      "dependentTasks": ["task-10"],
+      "requiredIntegrations": ["催收管理系统"]
+    },
+    {
+      "id": "task-14",
+      "title": "M3+法务处置可行性评估",
+      "type": "agent",
+      "prompt": "对M3+案件执行系统化的法务处置可行性评估。查询被执行人财产线索：不动产（房产登记）、动产（车辆登记）、金融资产（银行存款、证券）、其他资产（股权、知识产权）。计算诉讼成本收益比：成本项包括律师费（回收金额5-15%）、诉讼费（按标的额阶梯计算）、执行费、送达成本；收益项为可执行资产价值×执行成功率。评估胜诉概率（证据链、合同有效性、诉讼时效）和执行概率（可执行财产充分性）。输出处置建议：适合诉讼（成本收益比≥1:2）、适合委外催收、适合资产包转让、建议核销。",
+      "agentRef": "legal-disposition",
+      "dependentTasks": ["task-3", "task-13"],
+      "requiredIntegrations": ["司法查询系统", "财产登记系统", "催收管理系统"]
+    },
+    {
+      "id": "task-15",
+      "title": "法务处置路径决策",
+      "type": "condition",
+      "prompt": "根据法务处置可行性评估结果决定处置路径：1）诉讼成本收益比≥1:2且胜诉概率高→进入诉讼路径；2）不适合诉讼但金额较大有一定回收可能→进入委外催收；3）小额且无可执行财产的案件适合批量处置→进入资产包转让；4）确认无法回收→进入核销申报流程。",
+      "agentRef": "legal-disposition",
+      "dependentTasks": ["task-14"],
+      "requiredIntegrations": []
+    },
+    {
+      "id": "task-16",
+      "title": "诉讼材料准备与立案",
+      "type": "agent",
+      "prompt": "对适合诉讼的案件准备标准化的起诉材料，在5个工作日内完成。生成文件包括：起诉状（含诉讼请求、事实与理由、法律依据）、证据清单（借款合同、放款凭证、还款记录、催收记录、逾期通知送达凭证）、送达地址确认书。校验法律文书的格式合规性和内容准确性。提交法院立案申请。记录立案受理信息（案号、受理法院、立案日期）。",
+      "agentRef": "legal-disposition",
+      "dependentTasks": ["task-15"],
+      "requiredIntegrations": ["法院电子诉讼平台", "合同管理系统"]
+    },
+    {
+      "id": "task-17",
+      "title": "诉讼进度跟踪与执行",
+      "type": "agent",
+      "prompt": "跟踪诉讼案件的全生命周期进度：立案→送达→开庭→判决→执行申请→强制执行。月度更新每个诉讼案件的当前阶段、下次关键节点和预计时间。标记执行困难的案件（如被执行人下落不明、无可供执行财产）。对判决生效的案件及时申请强制执行。执行回款到账后通知催收执行Agent处理入账。如诉讼中客户主动还款，评估是否撤诉。生成诉讼进度汇总报告。",
+      "agentRef": "legal-disposition",
+      "dependentTasks": ["task-16"],
+      "requiredIntegrations": ["法院电子诉讼平台", "核心银行系统"]
+    },
+    {
+      "id": "task-18",
+      "title": "委外催收案件移交与管理",
+      "type": "agent",
+      "prompt": "对不适合诉讼但有回收可能的案件执行委外催收。根据案件特征选择合适的委外催收机构（佣金率15-25%）。办理案件移交手续：数据加密传输、催收授权书签署、合规要求告知。设定回收目标和考核指标。月度跟踪委外催收进度和回收金额。季度执行委外催收机构合规审计（检查催收行为合规性、数据安全性、客户投诉情况）。对违规机构立即暂停合作。",
+      "agentRef": "legal-disposition",
+      "dependentTasks": ["task-15"],
+      "requiredIntegrations": ["委外催收管理平台"]
+    },
+    {
+      "id": "task-19",
+      "title": "资产包转让与核销处理",
+      "type": "agent",
+      "prompt": "对适合批量处置的案件执行资产包转让或核销。资产包转让流程：筛选适合打包的案件（小额、无可执行财产），请求催收数据分析Agent提供历史回收率数据支撑定价，基于历史数据和市场可比案例确定底价（通常为本金2-8折），对接AMC进行定价谈判和交割。核销流程：收集核销申报材料（催收全记录、法务评估报告、无财产证明），执行核销材料100%合规审查，提交内部审批，审批通过后执行账务核销。核销后保留追索权利，持续关注被执行人财产变化。",
+      "agentRef": "legal-disposition",
+      "dependentTasks": ["task-15"],
+      "requiredIntegrations": ["AMC对接平台", "核心银行系统", "审批系统"]
+    },
+    {
+      "id": "task-20",
+      "title": "催收数据采集与指标计算",
+      "type": "agent",
+      "prompt": "每日从各Agent采集全链条催收数据：智能分案Agent的分案数据（新增案件量、各阶段分布、策略分配）、催收执行Agent的执行数据（触达量、接通率、承诺量、回款量）、客户沟通Agent的沟通数据（投诉量、处理量、减免金额）、法务处置Agent的处置数据（诉讼量、回款量、核销量）。执行数据清洗和校验（准确率≥99.5%）。计算核心指标：各阶段回收率、迁徙率（Roll Rate）、催收成本收入比、投诉率、不良贷款率。生成日度监控简报，标记异常指标。",
+      "agentRef": "collection-analytics",
+      "dependentTasks": ["task-5", "task-9", "task-12", "task-17", "task-18", "task-19"],
+      "requiredIntegrations": ["催收管理系统", "核心银行系统", "数据仓库"]
+    },
+    {
+      "id": "task-21",
+      "title": "迁徙率异常预警与策略反馈",
+      "type": "agent",
+      "prompt": "持续监控逾期迁徙率（Roll Rate）变化。计算月度迁徙率：M0→M1、M1→M2、M2→M3、M3→核销。当任一迁徙率月度环比上升超过2个百分点时，立即触发预警。预警后执行：1）按产品/客群/地区维度下钻分析恶化原因；2）向智能分案Agent发送策略调整建议（如调整某客群的分案策略或催收优先级）；3）向信贷审批域的合规审批Agent发送资产质量预警信号（驱动贷前策略收紧）；4）通知管理层关注。跟踪策略调整后的效果。",
+      "agentRef": "collection-analytics",
+      "dependentTasks": ["task-20"],
+      "requiredIntegrations": ["数据仓库", "预警系统"]
+    },
+    {
+      "id": "task-22",
+      "title": "月度综合报告与策略优化建议",
+      "type": "document",
+      "prompt": "在每月T+3个工作日内生成逾期资产治理月度综合报告。报告内容：1）逾期资产总览（各阶段在管规模和趋势）；2）新增逾期归因分析（哪些产品/客群/审批策略贡献了逾期增长）；3）催收效能分析：各渠道回收率对比、各策略组合ROI评估、催收员绩效排名、A/B测试效果评估（统计显著性P<0.05）；4）回收预测（未来3个月回收金额预测+置信区间，偏差控制±10%）；5）拨备充足性评估（当前拨备覆盖率vs监管红线150%）；6）具体可执行的策略优化建议。数据输出同步至监管报送通道和管理层仪表盘。",
+      "agentRef": "collection-analytics",
+      "dependentTasks": ["task-20", "task-21"],
+      "requiredIntegrations": ["数据仓库", "报表系统", "监管报送系统"]
+    }
+  ],
+  "variables": [
+    {
+      "variableId": "var-1",
+      "name": "overdueAccountList",
+      "variableType": "object",
+      "description": "当日新增逾期案件清单，包含贷款编号、客户ID、逾期天数、逾期金额、产品类型等核心字段",
+      "required": true
+    },
+    {
+      "variableId": "var-2",
+      "name": "customerProfileData",
+      "variableType": "object",
+      "description": "客户画像数据，包含年龄、职业、收入、历史逾期记录、催收响应率等维度信息",
+      "required": true
+    },
+    {
+      "variableId": "var-3",
+      "name": "collectionComplianceRules",
+      "variableType": "object",
+      "description": "催收合规规则配置：允许催收时间窗口（08:00-21:00）、单日最大联系次数（3次）、审核通过的话术模板列表",
+      "required": true
+    },
+    {
+      "variableId": "var-4",
+      "name": "authorizationMatrix",
+      "variableType": "object",
+      "description": "减免授权矩阵配置：各阶段减免上限、分期期数限制、金额阈值（5000元）、比例阈值（50%）",
+      "required": true
+    },
+    {
+      "variableId": "var-5",
+      "name": "litigationCostParameters",
+      "variableType": "object",
+      "description": "诉讼成本参数：律师费率（5-15%）、诉讼费阶梯标准、执行费率、最低成本收益比阈值（1:2）",
+      "required": true
+    },
+    {
+      "variableId": "var-6",
+      "name": "rollRateAlertThreshold",
+      "variableType": "number",
+      "description": "迁徙率预警阈值：月度环比上升百分点数，默认为2（即上升超过2个百分点触发预警）",
+      "required": true
+    },
+    {
+      "variableId": "var-7",
+      "name": "provisionCoverageFloor",
+      "variableType": "number",
+      "description": "拨备覆盖率监管红线，默认为150%",
+      "required": true
+    },
+    {
+      "variableId": "var-8",
+      "name": "recoveryRateTargets",
+      "variableType": "object",
+      "description": "各阶段回收率目标值：M1（70-85%）、M2（40-60%）、M3+（15-30%）",
+      "required": true
+    }
+  ]
+}

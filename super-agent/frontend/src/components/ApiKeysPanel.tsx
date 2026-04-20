@@ -19,6 +19,7 @@ import {
 } from 'lucide-react';
 import { useApiKeys } from '@/services/useApiKeys';
 import type { ApiKey } from '@/services/useApiKeys';
+import { useTranslation } from '@/i18n';
 
 interface ApiKeysPanelProps {
   onClose: () => void;
@@ -34,6 +35,7 @@ export function ApiKeysPanel({ onClose }: ApiKeysPanelProps) {
     deleteApiKey,
     clearError,
   } = useApiKeys();
+  const { t } = useTranslation();
 
   const [showCreateForm, setShowCreateForm] = useState(false);
   const [isCreating, setIsCreating] = useState(false);
@@ -85,13 +87,13 @@ export function ApiKeysPanel({ onClose }: ApiKeysPanelProps) {
   };
 
   const handleRevoke = async (apiKey: ApiKey) => {
-    if (confirm(`Are you sure you want to revoke "${apiKey.name}"? This will immediately disable the key.`)) {
+    if (confirm(t('apiKeys.confirmRevoke').replace('{name}', apiKey.name))) {
       await revokeApiKey(apiKey.id);
     }
   };
 
   const handleDelete = async (apiKey: ApiKey) => {
-    if (confirm(`Are you sure you want to permanently delete "${apiKey.name}"?`)) {
+    if (confirm(t('apiKeys.confirmDelete').replace('{name}', apiKey.name))) {
       await deleteApiKey(apiKey.id);
     }
   };
@@ -105,21 +107,21 @@ export function ApiKeysPanel({ onClose }: ApiKeysPanelProps) {
   };
 
   const formatLastUsed = (lastUsedAt: string | null) => {
-    if (!lastUsedAt) return 'Never used';
+    if (!lastUsedAt) return t('apiKeys.neverUsed');
     const date = new Date(lastUsedAt);
     const now = new Date();
     const diff = now.getTime() - date.getTime();
     
-    if (diff < 60000) return 'Just now';
-    if (diff < 3600000) return `${Math.round(diff / 60000)} minutes ago`;
-    if (diff < 86400000) return `${Math.round(diff / 3600000)} hours ago`;
+    if (diff < 60000) return t('apiKeys.justNow');
+    if (diff < 3600000) return t('apiKeys.minutesAgo').replace('{n}', String(Math.round(diff / 60000)));
+    if (diff < 86400000) return t('apiKeys.hoursAgo').replace('{n}', String(Math.round(diff / 3600000)));
     return date.toLocaleDateString();
   };
 
   const AVAILABLE_SCOPES = [
-    { id: 'workflow:execute', label: 'Execute Workflows', description: 'Run workflows via API' },
-    { id: 'workflow:read', label: 'Read Workflows', description: 'View workflow definitions' },
-    { id: 'workflow:write', label: 'Write Workflows', description: 'Create and modify workflows' },
+    { id: 'workflow:execute', label: t('apiKeys.scopeWorkflowExecute'), description: t('apiKeys.scopeExecuteDesc') },
+    { id: 'workflow:read', label: t('apiKeys.scopeWorkflowRead'), description: t('apiKeys.scopeReadDesc') },
+    { id: 'workflow:write', label: t('apiKeys.scopeWorkflowWrite'), description: t('apiKeys.scopeWriteDesc') },
   ];
 
   return (
@@ -128,7 +130,7 @@ export function ApiKeysPanel({ onClose }: ApiKeysPanelProps) {
       <div className="p-4 border-b border-gray-800 flex items-center justify-between">
         <div className="flex items-center gap-2">
           <Key className="w-5 h-5 text-blue-400" />
-          <h3 className="text-sm font-medium text-white">API Keys</h3>
+          <h3 className="text-sm font-medium text-white">{t('settings.tab.apiKeys')}</h3>
         </div>
         <button onClick={onClose} className="p-1 hover:bg-gray-800 rounded">
           <X className="w-4 h-4 text-gray-400" />
@@ -150,10 +152,10 @@ export function ApiKeysPanel({ onClose }: ApiKeysPanelProps) {
       {newKeySecret && (
         <div className="mx-4 mt-4 p-4 bg-green-500/10 border border-green-500/30 rounded-lg">
           <p className="text-sm text-green-400 mb-2 font-medium">
-            ✓ API Key Created Successfully
+            {t('apiKeys.createdSuccess')}
           </p>
           <p className="text-xs text-gray-400 mb-2">
-            Copy this key now - it won't be shown again!
+            {t('apiKeys.copyNow')}
           </p>
           <div className="flex items-center gap-2">
             <code className="flex-1 p-2 bg-gray-800 rounded text-xs text-gray-300 break-all font-mono">
@@ -174,7 +176,7 @@ export function ApiKeysPanel({ onClose }: ApiKeysPanelProps) {
             onClick={() => setNewKeySecret(null)}
             className="mt-3 text-xs text-green-400 hover:text-green-300"
           >
-            I've copied the key
+            {t('apiKeys.copiedKey')}
           </button>
         </div>
       )}
@@ -182,22 +184,22 @@ export function ApiKeysPanel({ onClose }: ApiKeysPanelProps) {
       {/* Create Form */}
       {showCreateForm && (
         <div className="mx-4 mt-4 p-4 bg-gray-800/50 border border-gray-700 rounded-lg">
-          <h4 className="text-sm font-medium text-white mb-3">Create API Key</h4>
+          <h4 className="text-sm font-medium text-white mb-3">{t('apiKeys.createApiKey')}</h4>
           
           <div className="space-y-4">
             <div>
-              <label className="block text-xs text-gray-400 mb-1">Name</label>
+              <label className="block text-xs text-gray-400 mb-1">{t('apiKeys.keyName')}</label>
               <input
                 type="text"
                 value={newName}
                 onChange={(e) => setNewName(e.target.value)}
-                placeholder="Production API Key"
+                placeholder={t('apiKeys.keyNamePlaceholder')}
                 className="w-full px-3 py-2 bg-gray-900 border border-gray-700 rounded text-sm text-white focus:border-blue-500 outline-none"
               />
             </div>
 
             <div>
-              <label className="block text-xs text-gray-400 mb-2">Scopes</label>
+              <label className="block text-xs text-gray-400 mb-2">{t('apiKeys.scopes')}</label>
               <div className="space-y-2">
                 {AVAILABLE_SCOPES.map((scope) => (
                   <label
@@ -221,7 +223,7 @@ export function ApiKeysPanel({ onClose }: ApiKeysPanelProps) {
 
             <div className="grid grid-cols-2 gap-3">
               <div>
-                <label className="block text-xs text-gray-400 mb-1">Rate Limit (per minute)</label>
+                <label className="block text-xs text-gray-400 mb-1">{t('apiKeys.rateLimitPerMin')}</label>
                 <input
                   type="number"
                   value={newRateLimit}
@@ -232,17 +234,17 @@ export function ApiKeysPanel({ onClose }: ApiKeysPanelProps) {
                 />
               </div>
               <div>
-                <label className="block text-xs text-gray-400 mb-1">Expires In</label>
+                <label className="block text-xs text-gray-400 mb-1">{t('apiKeys.expiresIn')}</label>
                 <select
                   value={newExpiresIn}
                   onChange={(e) => setNewExpiresIn(e.target.value)}
                   className="w-full px-3 py-2 bg-gray-900 border border-gray-700 rounded text-sm text-white focus:border-blue-500 outline-none"
                 >
-                  <option value="never">Never</option>
-                  <option value="30">30 days</option>
-                  <option value="90">90 days</option>
-                  <option value="180">180 days</option>
-                  <option value="365">1 year</option>
+                  <option value="never">{t('apiKeys.expiresNever')}</option>
+                  <option value="30">{t('apiKeys.expires30')}</option>
+                  <option value="90">{t('apiKeys.expires90')}</option>
+                  <option value="180">{t('apiKeys.expires180')}</option>
+                  <option value="365">{t('apiKeys.expires1y')}</option>
                 </select>
               </div>
             </div>
@@ -252,7 +254,7 @@ export function ApiKeysPanel({ onClose }: ApiKeysPanelProps) {
                 onClick={() => setShowCreateForm(false)}
                 className="flex-1 px-3 py-2 bg-gray-700 hover:bg-gray-600 text-white rounded text-sm"
               >
-                Cancel
+                {t('common.cancel')}
               </button>
               <button
                 onClick={handleCreate}
@@ -260,7 +262,7 @@ export function ApiKeysPanel({ onClose }: ApiKeysPanelProps) {
                 className="flex-1 px-3 py-2 bg-blue-600 hover:bg-blue-500 disabled:opacity-50 text-white rounded text-sm flex items-center justify-center gap-2"
               >
                 {isCreating && <Loader2 className="w-4 h-4 animate-spin" />}
-                Create Key
+                {t('apiKeys.createKey')}
               </button>
             </div>
           </div>
@@ -276,16 +278,16 @@ export function ApiKeysPanel({ onClose }: ApiKeysPanelProps) {
         ) : apiKeys.length === 0 && !showCreateForm ? (
           <div className="text-center py-8">
             <Key className="w-12 h-12 text-gray-600 mx-auto mb-3" />
-            <p className="text-sm text-gray-500 mb-2">No API keys yet</p>
+            <p className="text-sm text-gray-500 mb-2">{t('apiKeys.noKeys')}</p>
             <p className="text-xs text-gray-600 mb-4">
-              Create an API key to access workflows programmatically
+              {t('apiKeys.emptyHint')}
             </p>
             <button
               onClick={() => setShowCreateForm(true)}
               className="px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-lg text-sm flex items-center gap-2 mx-auto"
             >
               <Plus className="w-4 h-4" />
-              Create API Key
+              {t('apiKeys.createApiKey')}
             </button>
           </div>
         ) : (
@@ -333,7 +335,7 @@ export function ApiKeysPanel({ onClose }: ApiKeysPanelProps) {
                       ? 'bg-green-500/20 text-green-400' 
                       : 'bg-red-500/20 text-red-400'
                   }`}>
-                    {apiKey.isActive ? 'Active' : 'Revoked'}
+                    {apiKey.isActive ? t('apiKeys.statusActive') : t('apiKeys.statusRevoked')}
                   </span>
                 </div>
 
@@ -362,7 +364,7 @@ export function ApiKeysPanel({ onClose }: ApiKeysPanelProps) {
                         ? 'text-red-400' 
                         : ''
                     }>
-                      Expires: {new Date(apiKey.expiresAt).toLocaleDateString()}
+                      {t('apiKeys.expires')} {new Date(apiKey.expiresAt).toLocaleDateString()}
                     </span>
                   )}
                 </div>
@@ -375,7 +377,7 @@ export function ApiKeysPanel({ onClose }: ApiKeysPanelProps) {
                 className="w-full px-4 py-2 border border-dashed border-gray-700 hover:border-gray-600 text-gray-400 hover:text-gray-300 rounded-lg text-sm flex items-center justify-center gap-2"
               >
                 <Plus className="w-4 h-4" />
-                Create API Key
+                {t('apiKeys.createApiKey')}
               </button>
             )}
           </>
@@ -384,7 +386,7 @@ export function ApiKeysPanel({ onClose }: ApiKeysPanelProps) {
 
       {/* Usage Info */}
       <div className="p-4 border-t border-gray-800 bg-gray-800/30">
-        <h4 className="text-xs font-medium text-gray-400 mb-2">API Usage</h4>
+        <h4 className="text-xs font-medium text-gray-400 mb-2">{t('apiKeys.apiUsage')}</h4>
         <code className="block text-xs text-gray-500 bg-gray-900 p-2 rounded">
           curl -X POST \<br />
           &nbsp;&nbsp;-H "X-API-Key: your_key" \<br />

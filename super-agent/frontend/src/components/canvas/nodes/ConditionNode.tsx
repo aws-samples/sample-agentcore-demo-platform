@@ -8,6 +8,7 @@ import { GitBranch, CheckCircle, XCircle } from 'lucide-react';
 import type { CanvasNodeData, ActionStatus } from '@/types/canvas';
 import type { ConditionNodeMeta } from '@/types/canvas/metadata';
 import { NodeStatusIndicator } from '../NodeStatusIndicator';
+import { useTranslation } from '@/i18n';
 
 type ConditionNodeData = CanvasNodeData<ConditionNodeMeta>;
 
@@ -18,6 +19,7 @@ export const ConditionNode = memo(function ConditionNode(props: NodeProps) {
   const rules = metadata?.rules ?? [];
   const logic = metadata?.logic ?? 'and';
   const result = metadata?.result;
+  const { t } = useTranslation();
   
   // Get execution status from hook (passed via Canvas)
   // executionStatus is injected by Canvas component from nodeExecutionStates
@@ -94,7 +96,7 @@ export const ConditionNode = memo(function ConditionNode(props: NodeProps) {
         {rules.length > 0 && (
           <div className="mt-3 space-y-1.5">
             <div className="flex items-center gap-2 text-xs text-gray-400">
-              <span>Conditions</span>
+              <span>{t('node.conditions')}</span>
               <span className="px-1.5 py-0.5 bg-yellow-500/20 rounded text-yellow-300 text-[10px] uppercase">
                 {logic}
               </span>
@@ -120,7 +122,7 @@ export const ConditionNode = memo(function ConditionNode(props: NodeProps) {
               ))}
               {rules.length > 3 && (
                 <div className="text-[10px] text-gray-500 px-2">
-                  +{rules.length - 3} more
+                  {t('node.nMore').replace('{n}', String(rules.length - 3))}
                 </div>
               )}
             </div>
@@ -145,8 +147,8 @@ export const ConditionNode = memo(function ConditionNode(props: NodeProps) {
       />
       {/* Branch labels */}
       <div className="flex justify-around px-8 pb-0.5 pointer-events-none">
-        <span className="text-[10px] text-green-400">Yes</span>
-        <span className="text-[10px] text-red-400">No</span>
+        <span className="text-[10px] text-green-400">{t('node.branchYes')}</span>
+        <span className="text-[10px] text-red-400">{t('node.branchNo')}</span>
       </div>
     </div>
   );

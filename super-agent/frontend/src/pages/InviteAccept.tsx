@@ -11,6 +11,7 @@
 import { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { setLocalToken } from '@/services/auth';
+import { useTranslation } from '@/i18n';
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? '';
 
@@ -23,6 +24,7 @@ interface InviteInfo {
 export function InviteAccept() {
   const { token } = useParams<{ token: string }>();
   const navigate = useNavigate();
+  const { t } = useTranslation();
   const [info, setInfo] = useState<InviteInfo | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -37,7 +39,7 @@ export function InviteAccept() {
       .then(async (res) => {
         if (!res.ok) {
           const data = await res.json().catch(() => ({}));
-          throw new Error(data.error || 'Invalid invite link');
+          throw new Error(data.error || t('invite.invalidLink'));
         }
         return res.json();
       })
@@ -49,7 +51,7 @@ export function InviteAccept() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (password !== confirmPassword) {
-      setError('Passwords do not match');
+      setError(t('invite.passwordMismatch'));
       return;
     }
     setError(null);
@@ -62,7 +64,7 @@ export function InviteAccept() {
       });
       if (!res.ok) {
         const data = await res.json().catch(() => ({}));
-        throw new Error(data.error || 'Failed to accept invitation');
+        throw new Error(data.error || t('invite.acceptFailed'));
       }
       const data = await res.json();
       setLocalToken(data.token);
@@ -77,7 +79,7 @@ export function InviteAccept() {
   if (loading) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 flex items-center justify-center">
-        <p className="text-slate-400">Validating invite...</p>
+        <p className="text-slate-400">{t('invite.validating')}</p>
       </div>
     );
   }
@@ -88,9 +90,9 @@ export function InviteAccept() {
         <div className="w-full max-w-md text-center">
           <div className="bg-slate-800/50 border border-slate-700 rounded-2xl p-8">
             <div className="text-red-400 text-4xl mb-4">✗</div>
-            <h2 className="text-xl font-bold text-white mb-2">Invalid Invitation</h2>
-            <p className="text-slate-400 text-sm mb-6">{error || 'This invite link is invalid or has expired.'}</p>
-            <a href="/login" className="text-blue-400 hover:text-blue-300 text-sm">Go to login</a>
+            <h2 className="text-xl font-bold text-white mb-2">{t('invite.invalidTitle')}</h2>
+            <p className="text-slate-400 text-sm mb-6">{error || t('invite.invalidDesc')}</p>
+            <a href="/login" className="text-blue-400 hover:text-blue-300 text-sm">{t('invite.goToLogin')}</a>
           </div>
         </div>
       </div>
@@ -106,9 +108,9 @@ export function InviteAccept() {
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z" />
             </svg>
           </div>
-          <h1 className="text-2xl font-bold text-white">Join {info.organizationName}</h1>
+          <h1 className="text-2xl font-bold text-white">{t('invite.joinOrg').replace('{name}', info.organizationName)}</h1>
           <p className="text-slate-400 mt-2">
-            You've been invited as <span className="text-cyan-400 font-medium">{info.role}</span>
+            {t('invite.invitedAs')} <span className="text-cyan-400 font-medium">{info.role}</span>
           </p>
         </div>
 
@@ -121,7 +123,7 @@ export function InviteAccept() {
 
           <form onSubmit={handleSubmit} className="space-y-4">
             <div>
-              <label className="block text-sm font-medium text-slate-300 mb-1">Email</label>
+              <label className="block text-sm font-medium text-slate-300 mb-1">{t('invite.email')}</label>
               <input
                 type="text"
                 value={info.email}
@@ -130,18 +132,18 @@ export function InviteAccept() {
               />
             </div>
             <div>
-              <label htmlFor="fullName" className="block text-sm font-medium text-slate-300 mb-1">Full Name</label>
+              <label htmlFor="fullName" className="block text-sm font-medium text-slate-300 mb-1">{t('invite.fullName')}</label>
               <input
                 id="fullName"
                 type="text"
                 value={fullName}
                 onChange={(e) => setFullName(e.target.value)}
                 className="w-full px-4 py-2.5 bg-slate-700/50 border border-slate-600 rounded-lg text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                placeholder="Your name"
+                placeholder={t('invite.fullNamePlaceholder')}
               />
             </div>
             <div>
-              <label htmlFor="password" className="block text-sm font-medium text-slate-300 mb-1">Password</label>
+              <label htmlFor="password" className="block text-sm font-medium text-slate-300 mb-1">{t('invite.password')}</label>
               <input
                 id="password"
                 type="password"
@@ -150,11 +152,11 @@ export function InviteAccept() {
                 required
                 minLength={8}
                 className="w-full px-4 py-2.5 bg-slate-700/50 border border-slate-600 rounded-lg text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                placeholder="At least 8 characters"
+                placeholder={t('invite.passwordPlaceholder')}
               />
             </div>
             <div>
-              <label htmlFor="confirmPassword" className="block text-sm font-medium text-slate-300 mb-1">Confirm Password</label>
+              <label htmlFor="confirmPassword" className="block text-sm font-medium text-slate-300 mb-1">{t('invite.confirmPassword')}</label>
               <input
                 id="confirmPassword"
                 type="password"
@@ -162,7 +164,7 @@ export function InviteAccept() {
                 onChange={(e) => setConfirmPassword(e.target.value)}
                 required
                 className="w-full px-4 py-2.5 bg-slate-700/50 border border-slate-600 rounded-lg text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                placeholder="Confirm your password"
+                placeholder={t('invite.confirmPlaceholder')}
               />
             </div>
             <button
@@ -170,7 +172,7 @@ export function InviteAccept() {
               disabled={submitting || !password}
               className="w-full py-3 px-4 bg-gradient-to-r from-blue-500 to-purple-600 text-white font-medium rounded-lg hover:from-blue-600 hover:to-purple-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 focus:ring-offset-slate-800 transition-all disabled:opacity-50"
             >
-              {submitting ? 'Creating account...' : 'Accept & Create Account'}
+              {submitting ? t('invite.submitting') : t('invite.accept')}
             </button>
           </form>
         </div>

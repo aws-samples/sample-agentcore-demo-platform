@@ -1,0 +1,29 @@
+{
+  "id": "salesforce",
+  "version": "1.0.0",
+  "name": "Salesforce",
+  "icon": "☁️",
+  "category": "saas",
+  "description": {
+    "en": "CRM data query and management",
+    "cn": "CRM 数据查询与管理"
+  },
+  "auth": {
+    "type": "oauth2",
+    "oauth": {
+      "provider": "salesforce",
+      "scopes": ["api", "refresh_token"],
+      "authorize_url": "https://login.salesforce.com/services/oauth2/authorize",
+      "token_url": "https://login.salesforce.com/services/oauth2/token",
+      "extra_params": {}
+    },
+    "credential_fields": []
+  },
+  "config_fields": [
+    { "key": "instance_url", "label": { "en": "Instance URL", "cn": "实例 URL" }, "type": "text", "placeholder": "https://myorg.salesforce.com", "required": true },
+    { "key": "api_version", "label": { "en": "API Version", "cn": "API 版本" }, "type": "text", "placeholder": "v59.0", "required": false }
+  ],
+  "setup_guide": "setup-guide.md",
+  "tools_definition": "tools.json",
+  "lambda_handler": "handler.ts"
+}

@@ -110,6 +110,8 @@ export class ProjectService {
         ...(input.description !== undefined && { description: input.description?.trim() ?? null }),
         ...(input.repo_url !== undefined && { repo_url: input.repo_url?.trim() ?? null }),
         ...(input.default_branch !== undefined && { default_branch: input.default_branch }),
+        ...(input.business_scope_id !== undefined && { business_scope_id: input.business_scope_id || null }),
+        ...(input.agent_id !== undefined && { agent_id: input.agent_id || null }),
         ...(input.settings !== undefined && { settings: input.settings as Prisma.InputJsonValue }),
       },
     });
@@ -166,7 +168,7 @@ export class ProjectService {
     });
     const sortOrder = (maxOrder?.sort_order ?? 0) + 1;
 
-    return prisma.project_issues.create({
+    const issue = await prisma.project_issues.create({
       data: {
         project_id: projectId,
         organization_id: orgId,
@@ -182,6 +184,15 @@ export class ProjectService {
         created_by: userId,
       },
     });
+
+    // Async: trigger AI enrichment (does not block issue creation)
+    import('./project-governance.service.js').then(({ governanceService }) => {
+      governanceService.enrichIssue(orgId, projectId, issue.id, userId).catch(err => {
+        console.error(`[ProjectService] Auto-enrichment failed for issue ${issue.id}:`, err instanceof Error ? err.message : err);
+      });
+    }).catch(() => {});
+
+    return issue;
   }
 
   async listIssues(projectId: string, filters?: { status?: string; priority?: string }) {
@@ -221,7 +232,10 @@ export class ProjectService {
     const issue = await prisma.project_issues.findFirst({ where: { id: issueId, project_id: projectId } });
     if (!issue) throw AppError.notFound('Issue not found');
 
-    return prisma.project_issues.update({
+    // Mark analysis as stale if description changed significantly
+    const descriptionChanged = input.description !== undefined && input.description !== issue.description;
+
+    const updated = await prisma.project_issues.update({
       where: { id: issueId },
       data: {
         ...(input.title !== undefined && { title: input.title.trim() }),
@@ -229,8 +243,11 @@ export class ProjectService {
         ...(input.priority !== undefined && VALID_PRIORITIES.includes(input.priority!) && { priority: input.priority }),
         ...(input.labels !== undefined && { labels: input.labels as string[] }),
         ...(input.estimated_effort !== undefined && { estimated_effort: input.estimated_effort ?? null }),
+        ...(descriptionChanged && { ai_analysis_status: 'stale' }),
       },
     });
+
+    return updated;
   }
 
   async changeIssueStatus(projectId: string, issueId: string, newStatus: string) {
@@ -284,7 +301,19 @@ export class ProjectService {
 
   // --- Agent Execution ---
 
+  /**
+   * Track which issues are currently being executed to prevent double-execution.
+   */
+  private executingIssues = new Set<string>();
+
   async executeIssue(orgId: string, projectId: string, issueId: string, userId: string) {
+    // Prevent double-execution of the same issue
+    if (this.executingIssues.has(issueId)) {
+      console.log(`[ProjectService] Issue ${issueId} is already being executed, skipping`);
+      const issue = await prisma.project_issues.findFirst({ where: { id: issueId, project_id: projectId } });
+      return { issue, session_id: issue?.workspace_session_id, branch_name: issue?.branch_name };
+    }
+
     console.log(`[ProjectService] executeIssue called: projectId=${projectId}, issueId=${issueId}, userId=${userId}`);
     const issue = await prisma.project_issues.findFirst({ where: { id: issueId, project_id: projectId } });
     if (!issue) throw AppError.notFound('Issue not found');
@@ -293,6 +322,12 @@ export class ProjectService {
     if (!project) throw AppError.notFound('Project not found');
 
     console.log(`[ProjectService] Project agent_id=${project.agent_id}, business_scope_id=${project.business_scope_id}`);
+
+    // Early check: business_scope_id is required for agent execution
+    if (!project.business_scope_id) {
+      console.log(`[ProjectService] No business scope configured for project ${projectId}. Cannot execute.`);
+      throw AppError.validation('No business scope configured for this project. Go to Project Settings to assign a scope before executing tasks.');
+    }
 
     // Ensure project workspace exists
     const sessionId = await this.ensureWorkspaceSession(orgId, projectId, userId);
@@ -322,14 +357,35 @@ export class ProjectService {
     });
 
     // Actually send the task to the agent via the workspace session
-    const taskMessage = `Please work on the following task:
+    const taskMessage = [
+      `You are a software developer working on a project.`,
+      `Your workspace is ready for coding. You have full access to create files, run commands, and build software.`,
+      ``,
+      `## Task`,
+      `**Issue #${issue.issue_number}: ${issue.title}**`,
+      issue.description ? `\n### Description\n${issue.description}` : '',
+      ``,
+      `## Instructions`,
+      `1. All source code MUST be created inside the \`app/\` directory. Create it if it doesn't exist.`,
+      `2. Do NOT place source files in the workspace root — the root is reserved for system files (.claude/, documents/, memories/).`,
+      `3. Inside \`app/\`, organize files with a clear structure (e.g., \`app/src/\`, \`app/public/\`, \`app/package.json\`).`,
+      `4. Make sure the code is functional and well-structured.`,
+      `5. After writing the code, briefly summarize what you created.`,
+      project.repo_url ? `\nRepository: ${project.repo_url}` : '',
+      `\nBranch: \`${branchName}\``,
+    ].filter(Boolean).join('\n');
 
-**Issue #${issue.issue_number}: ${issue.title}**
-Branch: \`${branchName}\`
-${issue.description ? `\nDescription:\n${issue.description}` : ''}
-${project.repo_url ? `\nRepository: ${project.repo_url}` : ''}
-
-Please implement this task. Create the branch if needed, write the code, and let me know when done.`;
+    // System prompt override: tell the agent it's a software developer, not a business consultant
+    const devSystemPrompt = [
+      `You are a senior software developer. Your job is to implement coding tasks by writing real, functional code.`,
+      `You are working in a project workspace. Use your tools to create files, write code, and run commands.`,
+      `IMPORTANT: All source code files MUST go inside the \`app/\` directory. Never create source files in the workspace root.`,
+      `The workspace root contains system directories (.claude/, documents/, memories/) — do not mix application code with them.`,
+      `Do NOT refuse to write code. Do NOT say the workspace is misconfigured. Just implement the task.`,
+      `Focus on writing clean, working code. Create all necessary files inside \`app/\`.`,
+      project.repo_url ? `The project repository is: ${project.repo_url}` : '',
+      project.default_branch ? `Default branch: ${project.default_branch}` : '',
+    ].filter(Boolean).join('\n');
 
     // Persist the task message to the workspace session so the console shows it
     const { chatMessageRepository } = await import('../repositories/chat.repository.js');
@@ -343,20 +399,20 @@ Please implement this task. Create the branch if needed, write the code, and let
     }, orgId);
 
     console.log(`[ProjectService] Task message persisted to session. Checking agent config...`);
-    // This requires either a business_scope_id or an agent_id on the session
-    if (project.business_scope_id || project.agent_id) {
-      console.log(`[ProjectService] Sending task to agent via chatService.processMessage. scopeId=${project.business_scope_id}, agentId=${project.agent_id}`);
-      const { chatService } = await import('./chat.service.js');
-      chatService.processMessage({
-        sessionId,
-        businessScopeId: project.business_scope_id ?? '',
-        message: taskMessage,
-        organizationId: orgId,
-        userId,
-      }).then(result => {
+    console.log(`[ProjectService] Sending task to agent via chatService.processMessage. scopeId=${project.business_scope_id}, agentId=${project.agent_id}`);
+    this.executingIssues.add(issueId);
+    const { chatService } = await import('./chat.service.js');
+    chatService.processMessage({
+      sessionId,
+      businessScopeId: project.business_scope_id,
+      message: taskMessage,
+      organizationId: orgId,
+      userId,
+      systemPromptOverride: devSystemPrompt,
+    }).then(async (result) => {
         console.log(`[ProjectService] Agent responded for issue ${issueId}. Response length: ${result.text.length}`);
         // Persist agent response
-        chatMessageRepository.create({
+        await chatMessageRepository.create({
           session_id: sessionId,
           type: 'ai',
           content: result.text,
@@ -364,10 +420,12 @@ Please implement this task. Create the branch if needed, write the code, and let
           mention_agent_id: null,
           metadata: { source: 'project_agent_response', issue_id: issueId },
         }, orgId).catch(() => {});
-      }).catch(err => {
+
+        // Auto-transition: move issue to in_review when agent completes
+        await this.completeIssueExecution(orgId, projectId, issueId, 'in_review', userId);
+      }).catch(async (err) => {
         console.error(`[ProjectService] Agent execution FAILED for issue ${issueId}:`, err.message || err);
-        // Log the error as a message so the console shows it
-        chatMessageRepository.create({
+        await chatMessageRepository.create({
           session_id: sessionId,
           type: 'ai',
           content: `Agent execution failed: ${err instanceof Error ? err.message : 'Unknown error'}`,
@@ -375,28 +433,110 @@ Please implement this task. Create the branch if needed, write the code, and let
           mention_agent_id: null,
           metadata: { source: 'project_agent_error', issue_id: issueId },
         }, orgId).catch(() => {});
+
+        // On failure, move back to todo so auto-process can retry or user can intervene
+        await this.completeIssueExecution(orgId, projectId, issueId, 'todo', userId);
+      }).finally(() => {
+        this.executingIssues.delete(issueId);
       });
-    } else {
-      console.log(`[ProjectService] No agent or scope configured for project ${projectId}. Skipping agent invocation.`);
-      // No scope or agent configured — log this to the console
-      await chatMessageRepository.create({
-        session_id: sessionId,
-        type: 'ai',
-        content: 'No agent or business scope configured for this project. Assign an agent in project creation to enable automatic execution.',
-        agent_id: null,
-        mention_agent_id: null,
-        metadata: { source: 'project_no_agent' },
-      }, orgId);
-    }
 
     return { issue: updated, session_id: sessionId, branch_name: branchName };
   }
 
+  /**
+   * Complete an issue execution: update status, add comment, and trigger next auto-process.
+   */
+  private async completeIssueExecution(
+    orgId: string, projectId: string, issueId: string,
+    newStatus: 'in_review' | 'done' | 'todo', userId: string,
+  ) {
+    try {
+      await prisma.project_issues.update({
+        where: { id: issueId },
+        data: { status: newStatus },
+      });
+
+      // Sync workspace files from S3 after agent completes
+      try {
+        await this.syncWorkspaceFromS3(orgId, projectId, userId);
+      } catch (err) {
+        console.warn(`[ProjectService] Post-execution workspace sync failed:`, err instanceof Error ? err.message : err);
+      }
+
+      // Fetch and store diff from S3 (uploaded by AgentCore's Stop hook)
+      try {
+        await this.fetchAndStoreDiff(orgId, projectId, issueId);
+      } catch (err) {
+        console.warn(`[ProjectService] Diff fetch failed:`, err instanceof Error ? err.message : err);
+      }
+
+      const statusLabel = newStatus === 'in_review' ? 'In Review' : newStatus === 'done' ? 'Done' : 'Todo';
+      await prisma.project_issue_comments.create({
+        data: {
+          issue_id: issueId,
+          organization_id: orgId,
+          author_user_id: userId,
+          content: `Agent execution completed. Issue moved to **${statusLabel}**.`,
+          comment_type: 'status_change',
+          metadata: { new_status: newStatus } as Prisma.InputJsonValue,
+        },
+      });
+
+      console.log(`[ProjectService] Issue ${issueId} moved to ${newStatus}`);
+
+      // Check if auto-process is enabled and trigger next task
+      const project = await prisma.projects.findFirst({ where: { id: projectId } });
+      if (project) {
+        const settings = (project.settings as Record<string, unknown>) ?? {};
+        if (settings.auto_process) {
+          console.log(`[ProjectService] Auto-process enabled, checking for next todo...`);
+          // Small delay to avoid race conditions
+          setTimeout(() => {
+            this.autoProcessNext(orgId, projectId, userId).catch(err => {
+              console.error(`[ProjectService] Auto-process next failed:`, err.message || err);
+            });
+          }, 2000);
+        }
+      }
+    } catch (err) {
+      console.error(`[ProjectService] Failed to complete issue execution:`, err);
+    }
+  }
+
   async autoProcessNext(orgId: string, projectId: string, userId: string) {
+    // Check if any issue is currently being executed (in-memory guard)
     const inProgress = await prisma.project_issues.findFirst({
       where: { project_id: projectId, status: 'in_progress' },
     });
-    if (inProgress) return null;
+
+    // If there's an in_progress issue but it's not actively being executed,
+    // it might be stuck. Check if it's been in_progress for too long (> 10 min).
+    if (inProgress) {
+      const isActivelyExecuting = this.executingIssues.has(inProgress.id);
+      const stuckThresholdMs = 10 * 60 * 1000; // 10 minutes
+      const elapsed = Date.now() - new Date(inProgress.updated_at).getTime();
+
+      if (!isActivelyExecuting && elapsed > stuckThresholdMs) {
+        console.log(`[ProjectService] Issue ${inProgress.id} appears stuck (in_progress for ${Math.round(elapsed / 60000)}min, not actively executing). Moving back to todo.`);
+        await prisma.project_issues.update({
+          where: { id: inProgress.id },
+          data: { status: 'todo' },
+        });
+        await prisma.project_issue_comments.create({
+          data: {
+            issue_id: inProgress.id,
+            organization_id: orgId,
+            author_user_id: userId,
+            content: `Issue was stuck in "In Progress" for ${Math.round(elapsed / 60000)} minutes without active execution. Moved back to Todo for retry.`,
+            comment_type: 'status_change',
+            metadata: { reason: 'stuck_recovery' } as Prisma.InputJsonValue,
+          },
+        });
+        // Fall through to pick up the next todo
+      } else {
+        return null; // Still actively executing, wait
+      }
+    }
 
     const nextTodo = await prisma.project_issues.findFirst({
       where: { project_id: projectId, status: 'todo' },
@@ -428,14 +568,33 @@ Please implement this task. Create the branch if needed, write the code, and let
     const project = await prisma.projects.findFirst({ where: { id: projectId } });
     if (!project) throw AppError.notFound('Project not found');
 
-    if (project.workspace_session_id) return project.workspace_session_id;
+    if (project.workspace_session_id) {
+      // Validate the existing session still exists
+      const existingSession = await prisma.chat_sessions.findFirst({
+        where: { id: project.workspace_session_id },
+      });
+
+      if (existingSession) {
+        // Ensure the session has the correct business_scope_id
+        if (project.business_scope_id && existingSession.business_scope_id !== project.business_scope_id) {
+          await prisma.chat_sessions.update({
+            where: { id: project.workspace_session_id },
+            data: { business_scope_id: project.business_scope_id },
+          }).catch(() => {});
+        }
+        return project.workspace_session_id;
+      }
+
+      // Session was deleted — fall through to create a new one
+      console.log(`[ProjectService] Workspace session ${project.workspace_session_id} no longer exists, creating new one`);
+    }
 
     // Create a persistent workspace session for this project
     const session = await prisma.chat_sessions.create({
       data: {
         organization_id: orgId,
         user_id: userId,
-        business_scope_id: null,
+        business_scope_id: project.business_scope_id ?? null,
         agent_id: project.agent_id,
         title: `Project: ${project.name}`,
         status: 'idle',
@@ -474,21 +633,39 @@ Please implement this task. Create the branch if needed, write the code, and let
     // Use the chat service to send a message through the workspace agent
     const { chatService } = await import('./chat.service.js');
 
-    const message = `Please improve the following task description. Make it clear, well-structured, and actionable for a developer. Include acceptance criteria if appropriate. Return ONLY the improved description in Markdown, no preamble or explanation.
+    const hasDescription = !!issue.description?.trim();
+
+    const message = hasDescription
+      ? `Improve the following task description. Make it clear, well-structured, and actionable for a developer. Include acceptance criteria if appropriate. Return ONLY the improved description in Markdown, no preamble or explanation.
 
 Title: ${issue.title}
-${issue.description ? `Current description:\n${issue.description}` : 'No description provided yet. Generate a good description based on the title.'}
+Current description:
+${issue.description}
+${project.repo_url ? `Repository: ${project.repo_url}` : ''}`
+      : `Generate a clear, well-structured task description for a developer based on the following title. Include a brief overview, key requirements, and acceptance criteria. Return ONLY the description in Markdown, no preamble or explanation.
+
+Title: ${issue.title}
 ${project.repo_url ? `Repository: ${project.repo_url}` : ''}`;
+
+    if (!project.business_scope_id) {
+      throw AppError.validation('No business scope configured for this project. Assign a scope in project settings to enable AI features.');
+    }
 
     const result = await chatService.processMessage({
       sessionId,
-      businessScopeId: project.business_scope_id ?? '',
+      businessScopeId: project.business_scope_id,
       message,
       organizationId: orgId,
       userId,
+      systemPromptOverride: 'You are a technical project manager. Your job is to write clear, actionable task descriptions for software developers. Return only the improved description in Markdown. Do NOT use any tools — just respond with text.',
     });
 
     const improved = result.text;
+
+    // Guard against empty/placeholder responses
+    if (!improved || improved === '(No response)' || improved.trim().length < 10) {
+      throw AppError.internal('AI did not return a valid description. Please try again.');
+    }
 
     // Save the improved description
     await prisma.project_issues.update({
@@ -497,6 +674,149 @@ ${project.repo_url ? `Repository: ${project.repo_url}` : ''}`;
     });
 
     return improved;
+  }
+
+  /**
+   * Sync workspace files from S3 back to local filesystem.
+   * Useful after AgentCore container has written files that need to be visible locally.
+   */
+  async syncWorkspaceFromS3(orgId: string, projectId: string, userId: string): Promise<{ synced: number; path: string }> {
+    const project = await prisma.projects.findFirst({ where: { id: projectId } });
+    if (!project) throw AppError.notFound('Project not found');
+    if (!project.workspace_session_id) throw AppError.validation('No workspace session exists for this project');
+    if (!project.business_scope_id) throw AppError.validation('No business scope configured');
+
+    const { workspaceManager } = await import('./workspace-manager.js');
+    const { config: appConfig } = await import('../config/index.js');
+
+    const localPath = workspaceManager.getSessionWorkspacePath(orgId, project.business_scope_id, project.workspace_session_id);
+    const s3Bucket = appConfig.agentcore.workspaceS3Bucket;
+    const s3Prefix = `${orgId}/${project.business_scope_id}/${project.workspace_session_id}/`;
+
+    // Use the S3 client from workspace manager to download files
+    const { S3Client, ListObjectsV2Command, GetObjectCommand } = await import('@aws-sdk/client-s3');
+    const { mkdir, writeFile: fsWriteFile } = await import('fs/promises');
+    const { join, dirname } = await import('path');
+    const { pipeline } = await import('stream/promises');
+    const { createWriteStream } = await import('fs');
+
+    const s3Client = new S3Client({ region: appConfig.agentcore.region || 'us-east-1' });
+    let downloaded = 0;
+    let continuationToken: string | undefined;
+
+    do {
+      const result = await s3Client.send(new ListObjectsV2Command({
+        Bucket: s3Bucket,
+        Prefix: s3Prefix,
+        ContinuationToken: continuationToken,
+      }));
+
+      for (const obj of result.Contents ?? []) {
+        if (!obj.Key) continue;
+        const relativePath = obj.Key.slice(s3Prefix.length);
+        if (!relativePath || relativePath.endsWith('/')) continue;
+        // Skip node_modules and .git
+        if (relativePath.includes('node_modules/') || relativePath.includes('.git/')) continue;
+
+        const localFilePath = join(localPath, relativePath);
+        try {
+          await mkdir(dirname(localFilePath), { recursive: true });
+          const response = await s3Client.send(new GetObjectCommand({
+            Bucket: s3Bucket,
+            Key: obj.Key,
+          }));
+          if (response.Body) {
+            await pipeline(response.Body as NodeJS.ReadableStream, createWriteStream(localFilePath));
+            downloaded++;
+          }
+        } catch (err) {
+          console.warn(`[ProjectService] syncBack failed for ${relativePath}:`, err instanceof Error ? err.message : err);
+        }
+      }
+
+      continuationToken = result.NextContinuationToken;
+    } while (continuationToken);
+
+    console.log(`[ProjectService] Synced ${downloaded} files from S3 to ${localPath}`);
+    return { synced: downloaded, path: localPath };
+  }
+
+  /**
+   * Fetch __diff__.json from S3 (uploaded by AgentCore after execution)
+   * and store the diff data on the issue record.
+   */
+  private async fetchAndStoreDiff(orgId: string, projectId: string, issueId: string): Promise<void> {
+    const project = await prisma.projects.findFirst({ where: { id: projectId } });
+    if (!project?.workspace_session_id || !project.business_scope_id) return;
+
+    const { config: appConfig } = await import('../config/index.js');
+    const { S3Client, GetObjectCommand, DeleteObjectCommand } = await import('@aws-sdk/client-s3');
+
+    const s3Client = new S3Client({ region: appConfig.agentcore.region || 'us-east-1' });
+    const s3Bucket = appConfig.agentcore.workspaceS3Bucket;
+    const s3Prefix = `${orgId}/${project.business_scope_id}/${project.workspace_session_id}/`;
+    const diffKey = `${s3Prefix}__diff__.json`;
+
+    try {
+      const response = await s3Client.send(new GetObjectCommand({
+        Bucket: s3Bucket,
+        Key: diffKey,
+      }));
+
+      if (!response.Body) return;
+
+      const bodyStr = await response.Body.transformToString('utf-8');
+      const diffData = JSON.parse(bodyStr) as {
+        diff_stat: Record<string, unknown>;
+        diff_patch: string;
+        created_at: string;
+      };
+
+      // Store on the issue
+      await prisma.project_issues.update({
+        where: { id: issueId },
+        data: {
+          diff_stat: diffData.diff_stat as Prisma.InputJsonValue,
+          diff_patch: diffData.diff_patch,
+          diff_created_at: new Date(diffData.created_at),
+        },
+      });
+
+      console.log(`[ProjectService] Stored diff for issue ${issueId}: ${(diffData.diff_stat as Record<string, unknown>).files_changed} files changed`);
+
+      // Clean up the diff file from S3
+      await s3Client.send(new DeleteObjectCommand({
+        Bucket: s3Bucket,
+        Key: diffKey,
+      })).catch(() => {});
+
+    } catch (err) {
+      // NoSuchKey is expected if agent didn't produce any changes
+      const errMsg = err instanceof Error ? err.message : String(err);
+      if (!errMsg.includes('NoSuchKey') && !errMsg.includes('AccessDenied')) {
+        console.warn(`[ProjectService] Failed to fetch diff from S3:`, errMsg);
+      }
+    }
+  }
+
+  /**
+   * Get the diff data for an issue (for frontend display).
+   */
+  async getIssueDiff(projectId: string, issueId: string): Promise<{
+    diff_stat: Record<string, unknown> | null;
+    diff_patch: string | null;
+    diff_created_at: Date | null;
+  }> {
+    const issue = await prisma.project_issues.findFirst({
+      where: { id: issueId, project_id: projectId },
+      select: { diff_stat: true, diff_patch: true, diff_created_at: true },
+    });
+    if (!issue) throw AppError.notFound('Issue not found');
+    return {
+      diff_stat: issue.diff_stat as Record<string, unknown> | null,
+      diff_patch: issue.diff_patch,
+      diff_created_at: issue.diff_created_at,
+    };
   }
 }
 

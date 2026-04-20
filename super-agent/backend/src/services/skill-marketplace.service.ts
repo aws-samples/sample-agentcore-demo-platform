@@ -313,7 +313,7 @@ export class SkillMarketplaceService {
     try {
       const searchUrl = `https://api.github.com/search/repositories?q=${encodeURIComponent(query + ' claude skill SKILL.md')}&sort=stars&per_page=10`;
       const res = await fetch(searchUrl, {
-        headers: { 'Accept': 'application/vnd.github.v3+json', 'User-Agent': 'super-agent-platform' },
+        headers: { 'Accept': 'application/vnd.github.v3+json', 'User-Agent': 'frontend' },
       });
       if (!res.ok) return [];
       const data = await res.json() as { items: Array<{ full_name: string; description: string | null; html_url: string }> };
@@ -516,6 +516,22 @@ export class SkillMarketplaceService {
       }
     }
 
+    // Auto-publish to enterprise catalog so it appears in the Internal tab
+    try {
+      const { enterpriseSkillRepository } = await import('../repositories/enterprise-skill.repository.js');
+      const existingEntry = await enterpriseSkillRepository.findBySkillId(skill.id, organizationId);
+      if (!existingEntry) {
+        await enterpriseSkillRepository.publish(organizationId, {
+          skillId: skill.id,
+          publishedBy: userId || 'system',
+          source: 'skills.sh',
+          sourceRef: installRef,
+        });
+      }
+    } catch (err) {
+      console.warn(`Failed to auto-publish skill to enterprise catalog:`, err);
+    }
+
     return {
       skillId: skill.id,
       name: skillName,
@@ -525,6 +541,395 @@ export class SkillMarketplaceService {
     };
   }
 
+  /**
+   * Parse an arbitrary GitHub URL into repo path and sub-directory.
+   * Supports formats like:
+   *   https://github.com/owner/repo
+   *   https://github.com/owner/repo/tree/main/some/path
+   *   https://github.com/owner/repo/blob/main/some/file.md
+   */
+  parseGitHubUrl(url: string): { repoPath: string; subPath: string | null; branch: string | null } | null {
+    try {
+      const parsed = new URL(url);
+      if (parsed.hostname !== 'github.com') return null;
+
+      // pathname: /owner/repo[/tree|blob/branch/...path]
+      const parts = parsed.pathname.replace(/^\//, '').replace(/\/$/, '').split('/');
+      if (parts.length < 2) return null;
+
+      const repoPath = `${parts[0]}/${parts[1]}`;
+
+      if (parts.length === 2) {
+        return { repoPath, subPath: null, branch: null };
+      }
+
+      // /tree/main/some/path or /blob/main/some/file
+      if ((parts[2] === 'tree' || parts[2] === 'blob') && parts.length >= 4) {
+        const branch = parts[3]!;
+        const subPath = parts.length > 4 ? parts.slice(4).join('/') : null;
+        return { repoPath, subPath, branch };
+      }
+
+      return { repoPath, subPath: null, branch: null };
+    } catch {
+      return null;
+    }
+  }
+
+  /**
+   * Probe a GitHub URL for SKILL.md files.
+   * Returns a list of discovered skills with their install refs.
+   */
+  async probeGitHubUrl(url: string): Promise<{
+    found: boolean;
+    repoPath: string;
+    skills: Array<{ name: string; installRef: string; skillMdUrl: string; description: string | null }>;
+    error?: string;
+  }> {
+    const parsed = this.parseGitHubUrl(url);
+    if (!parsed) {
+      return { found: false, repoPath: '', skills: [], error: 'Invalid GitHub URL' };
+    }
+
+    const { repoPath, subPath, branch: urlBranch } = parsed;
+    const branches = urlBranch ? [urlBranch] : ['main', 'master'];
+    const skills: Array<{ name: string; installRef: string; skillMdUrl: string; description: string | null }> = [];
+
+    // Strategy 1: Check if SKILL.md exists directly at the given path
+    if (subPath) {
+      for (const branch of branches) {
+        // Check SKILL.md in the directory itself
+        const directUrl = `https://raw.githubusercontent.com/${repoPath}/${branch}/${subPath}/SKILL.md`;
+        try {
+          const res = await fetch(directUrl);
+          if (res.ok) {
+            const content = await res.text();
+            const descMatch = content.match(/^description:\s*(.+)$/m);
+            const skillName = subPath.split('/').pop() || repoPath.split('/')[1] || 'skill';
+            skills.push({
+              name: skillName,
+              installRef: `${repoPath}@${skillName}`,
+              skillMdUrl: `https://github.com/${repoPath}/blob/${branch}/${subPath}/SKILL.md`,
+              description: descMatch?.[1]?.trim() || null,
+            });
+            return { found: true, repoPath, skills };
+          }
+        } catch { /* try next */ }
+
+        // Check if the path itself IS a SKILL.md file
+        if (subPath.endsWith('SKILL.md') || subPath.endsWith('skill.md')) {
+          const fileUrl = `https://raw.githubusercontent.com/${repoPath}/${branch}/${subPath}`;
+          try {
+            const res = await fetch(fileUrl);
+            if (res.ok) {
+              const content = await res.text();
+              const descMatch = content.match(/^description:\s*(.+)$/m);
+              const parentDir = subPath.split('/').slice(0, -1).pop() || repoPath.split('/')[1] || 'skill';
+              skills.push({
+                name: parentDir,
+                installRef: `${repoPath}@${parentDir}`,
+                skillMdUrl: `https://github.com/${repoPath}/blob/${branch}/${subPath}`,
+                description: descMatch?.[1]?.trim() || null,
+              });
+              return { found: true, repoPath, skills };
+            }
+          } catch { /* try next */ }
+        }
+      }
+    }
+
+    // Strategy 2: Use GitHub API to list directory contents and find SKILL.md files
+    for (const branch of branches) {
+      const apiPath = subPath || '';
+      const apiUrl = `https://api.github.com/repos/${repoPath}/contents/${apiPath}?ref=${branch}`;
+      try {
+        const res = await fetch(apiUrl, {
+          headers: { 'Accept': 'application/vnd.github.v3+json', 'User-Agent': 'super-agent' },
+        });
+        if (!res.ok) continue;
+
+        const entries = await res.json() as Array<{ name: string; type: string; path: string }>;
+        if (!Array.isArray(entries)) continue;
+
+        // Check for SKILL.md directly in this directory
+        const skillMd = entries.find(e => e.name.toUpperCase() === 'SKILL.MD');
+        if (skillMd) {
+          const rawUrl = `https://raw.githubusercontent.com/${repoPath}/${branch}/${skillMd.path}`;
+          let description: string | null = null;
+          try {
+            const contentRes = await fetch(rawUrl);
+            if (contentRes.ok) {
+              const content = await contentRes.text();
+              const descMatch = content.match(/^description:\s*(.+)$/m);
+              description = descMatch?.[1]?.trim() || null;
+            }
+          } catch { /* ignore */ }
+
+          const dirName = apiPath ? apiPath.split('/').pop()! : repoPath.split('/')[1] || 'skill';
+          skills.push({
+            name: dirName,
+            installRef: `${repoPath}@${dirName}`,
+            skillMdUrl: `https://github.com/${repoPath}/blob/${branch}/${skillMd.path}`,
+            description,
+          });
+        }
+
+        // Check subdirectories for SKILL.md (one level deep)
+        const dirs = entries.filter(e => e.type === 'dir');
+        const subChecks = dirs.map(async (dir) => {
+          const subApiUrl = `https://api.github.com/repos/${repoPath}/contents/${dir.path}?ref=${branch}`;
+          try {
+            const subRes = await fetch(subApiUrl, {
+              headers: { 'Accept': 'application/vnd.github.v3+json', 'User-Agent': 'super-agent' },
+            });
+            if (!subRes.ok) return null;
+            const subEntries = await subRes.json() as Array<{ name: string; path: string }>;
+            if (!Array.isArray(subEntries)) return null;
+
+            const subSkillMd = subEntries.find(e => e.name.toUpperCase() === 'SKILL.MD');
+            if (!subSkillMd) return null;
+
+            const rawUrl = `https://raw.githubusercontent.com/${repoPath}/${branch}/${subSkillMd.path}`;
+            let description: string | null = null;
+            try {
+              const contentRes = await fetch(rawUrl);
+              if (contentRes.ok) {
+                const content = await contentRes.text();
+                const descMatch = content.match(/^description:\s*(.+)$/m);
+                description = descMatch?.[1]?.trim() || null;
+              }
+            } catch { /* ignore */ }
+
+            return {
+              name: dir.name,
+              installRef: `${repoPath}@${dir.name}`,
+              skillMdUrl: `https://github.com/${repoPath}/blob/${branch}/${subSkillMd.path}`,
+              description,
+            };
+          } catch { return null; }
+        });
+
+        const subResults = await Promise.all(subChecks);
+        for (const r of subResults) {
+          if (r) skills.push(r);
+        }
+
+        if (skills.length > 0) {
+          return { found: true, repoPath, skills };
+        }
+      } catch { /* try next branch */ }
+    }
+
+    // Strategy 3: Check common skill directory patterns at repo root
+    if (!subPath) {
+      const commonPaths = ['.claude/skills', 'skills', '.agents/skills'];
+      for (const branch of branches) {
+        for (const basePath of commonPaths) {
+          const apiUrl = `https://api.github.com/repos/${repoPath}/contents/${basePath}?ref=${branch}`;
+          try {
+            const res = await fetch(apiUrl, {
+              headers: { 'Accept': 'application/vnd.github.v3+json', 'User-Agent': 'super-agent' },
+            });
+            if (!res.ok) continue;
+
+            const entries = await res.json() as Array<{ name: string; type: string; path: string }>;
+            if (!Array.isArray(entries)) continue;
+
+            for (const dir of entries.filter(e => e.type === 'dir')) {
+              const skillMdUrl = `https://raw.githubusercontent.com/${repoPath}/${branch}/${dir.path}/SKILL.md`;
+              try {
+                const mdRes = await fetch(skillMdUrl);
+                if (!mdRes.ok) continue;
+                const content = await mdRes.text();
+                const descMatch = content.match(/^description:\s*(.+)$/m);
+                skills.push({
+                  name: dir.name,
+                  installRef: `${repoPath}@${dir.name}`,
+                  skillMdUrl: `https://github.com/${repoPath}/blob/${branch}/${dir.path}/SKILL.md`,
+                  description: descMatch?.[1]?.trim() || null,
+                });
+              } catch { /* skip */ }
+            }
+
+            if (skills.length > 0) {
+              return { found: true, repoPath, skills };
+            }
+          } catch { /* try next */ }
+        }
+      }
+    }
+
+    return { found: false, repoPath, skills: [] };
+  }
+
+  /**
+   * Process an uploaded zip file to find and install skills.
+   *
+   * 1. Save the zip to a temp directory
+   * 2. Extract it using the system `unzip` command
+   * 3. Recursively scan for SKILL.md files
+   * 4. For each found skill, copy files and create DB records
+   */
+  async installFromZip(options: {
+    organizationId: string;
+    zipBuffer: Buffer;
+    fileName: string;
+    userId?: string;
+  }): Promise<{
+    skills: Array<{ skillId: string; name: string; displayName: string }>;
+    errors: string[];
+  }> {
+    const { organizationId, zipBuffer, fileName, userId } = options;
+    const tmpId = createHash('sha256').update(`${organizationId}:zip:${Date.now()}`).digest('hex').substring(0, 16);
+    const tmpDir = resolve(process.cwd(), 'data', 'tmp', `zip-${tmpId}`);
+    const extractDir = join(tmpDir, 'extracted');
+
+    const installedSkills: Array<{ skillId: string; name: string; displayName: string }> = [];
+    const errors: string[] = [];
+
+    try {
+      await mkdir(extractDir, { recursive: true });
+
+      // Write zip to temp file
+      const zipPath = join(tmpDir, fileName || 'upload.zip');
+      await writeFile(zipPath, zipBuffer);
+
+      // Extract using system unzip
+      try {
+        await execFileAsync('unzip', ['-o', '-q', zipPath, '-d', extractDir], { timeout: 30_000 });
+      } catch (err) {
+        // Try tar for .tar.gz / .tgz files
+        if (fileName.endsWith('.tar.gz') || fileName.endsWith('.tgz')) {
+          await execFileAsync('tar', ['-xzf', zipPath, '-C', extractDir], { timeout: 30_000 });
+        } else {
+          throw new Error(`Failed to extract archive: ${err instanceof Error ? err.message : 'unknown error'}`);
+        }
+      }
+
+      // Recursively find all SKILL.md files
+      const skillFiles = await this.findSkillMdFiles(extractDir);
+
+      if (skillFiles.length === 0) {
+        return { skills: [], errors: ['No SKILL.md files found in the uploaded archive.'] };
+      }
+
+      // Install each discovered skill
+      for (const skillMdPath of skillFiles) {
+        try {
+          const skillDir = join(skillMdPath, '..');
+          const skillContent = await readFile(skillMdPath, 'utf-8');
+
+          // Derive skill name from parent directory
+          const parentDirName = resolve(skillDir).split('/').pop() || 'skill';
+          // If the parent is the extract root itself, use the zip file name
+          const skillName = (resolve(skillDir) === resolve(extractDir))
+            ? (fileName.replace(/\.(zip|tar\.gz|tgz)$/i, '') || 'skill')
+            : parentDirName;
+
+          const displayName = skillName.replace(/-/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
+
+          // Extract description from frontmatter
+          const descMatch = skillContent.match(/^description:\s*(.+)$/m);
+          const description = descMatch?.[1]?.trim() || `Uploaded from ${fileName}`;
+
+          const hashId = createHash('sha256')
+            .update(`${organizationId}:zip-upload:${skillName}:${Date.now()}`)
+            .digest('hex').substring(0, 16);
+
+          // Copy skill files to permanent location
+          const permDir = resolve(process.cwd(), 'data', 'skills', hashId);
+          await mkdir(permDir, { recursive: true });
+          await cp(skillDir, permDir, { recursive: true });
+
+          // Write metadata
+          await writeFile(join(permDir, 'metadata.json'), JSON.stringify({
+            source: 'zip-upload',
+            fileName,
+            contentFileName: 'SKILL.md',
+            installedAt: new Date().toISOString(),
+          }, null, 2), 'utf-8');
+
+          // Create or update DB record
+          const existing = await skillService.findByName(organizationId, skillName);
+          let skill;
+
+          const metadata = {
+            source: 'zip-upload',
+            fileName,
+            contentFileName: 'SKILL.md',
+            localPath: permDir,
+            installedAt: new Date().toISOString(),
+            hash_id: hashId,
+          };
+
+          if (existing) {
+            skill = await skillService.updateSkill(organizationId, existing.id, {
+              display_name: displayName,
+              description,
+              tags: ['zip-upload'],
+              metadata,
+            });
+            if (!skill) throw new Error(`Failed to update existing skill: ${skillName}`);
+          } else {
+            skill = await skillService.createSkill(organizationId, {
+              name: skillName,
+              display_name: displayName,
+              description,
+              version: '1.0.0',
+              tags: ['zip-upload'],
+              metadata,
+            });
+          }
+
+          // Auto-publish to enterprise catalog
+          try {
+            const { enterpriseSkillRepository } = await import('../repositories/enterprise-skill.repository.js');
+            const existingEntry = await enterpriseSkillRepository.findBySkillId(skill.id, organizationId);
+            if (!existingEntry) {
+              await enterpriseSkillRepository.publish(organizationId, {
+                skillId: skill.id,
+                publishedBy: userId || 'system',
+                source: 'zip-upload',
+                sourceRef: fileName,
+              });
+            }
+          } catch (err) {
+            console.warn(`Failed to auto-publish zip-uploaded skill:`, err);
+          }
+
+          installedSkills.push({ skillId: skill.id, name: skillName, displayName });
+        } catch (err) {
+          errors.push(`Failed to install skill from ${skillMdPath}: ${err instanceof Error ? err.message : 'unknown error'}`);
+        }
+      }
+    } finally {
+      // Cleanup temp directory
+      await rm(tmpDir, { recursive: true, force: true }).catch(() => {});
+    }
+
+    return { skills: installedSkills, errors };
+  }
+
+  /**
+   * Recursively find all SKILL.md files in a directory.
+   */
+  private async findSkillMdFiles(dir: string, maxDepth = 5, currentDepth = 0): Promise<string[]> {
+    if (currentDepth > maxDepth) return [];
+
+    const results: string[] = [];
+    const entries = await readdir(dir, { withFileTypes: true });
+
+    for (const entry of entries) {
+      if (entry.name.toUpperCase() === 'SKILL.MD' && !entry.isDirectory()) {
+        results.push(join(dir, entry.name));
+      } else if (entry.isDirectory() && !entry.name.startsWith('.') && entry.name !== 'node_modules') {
+        const subResults = await this.findSkillMdFiles(join(dir, entry.name), maxDepth, currentDepth + 1);
+        results.push(...subResults);
+      }
+    }
+
+    return results;
+  }
 }
 
 export const skillMarketplaceService = new SkillMarketplaceService();

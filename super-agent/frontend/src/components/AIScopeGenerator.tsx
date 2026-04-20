@@ -18,6 +18,7 @@ import {
   User, Bot,
 } from 'lucide-react';
 import { useToast } from '@/components';
+import { useTranslation } from '@/i18n';
 import { ChatMessage } from '@/components/chat/ChatMessage';
 import type { ContentBlock } from '@/services/chatStreamService';
 import {
@@ -108,13 +109,14 @@ function ScopePreviewCard({
   onChange: (s: GeneratedScope) => void;
 }) {
   const [editing, setEditing] = useState(false);
+  const { t } = useTranslation();
 
   if (editing) {
     return (
       <div className="rounded-xl border border-blue-500/40 bg-gray-800/60 p-5 space-y-3">
         <div className="flex justify-between items-center">
-          <span className="text-sm font-medium text-gray-300">Edit Scope</span>
-          <button onClick={() => setEditing(false)} className="text-xs text-blue-400 hover:text-blue-300">Done</button>
+          <span className="text-sm font-medium text-gray-300">{t('aiScope.editScope')}</span>
+          <button onClick={() => setEditing(false)} className="text-xs text-blue-400 hover:text-blue-300">{t('aiScope.done')}</button>
         </div>
         <div className="grid grid-cols-2 gap-3">
           <div>
@@ -170,6 +172,7 @@ function AgentCard({
 }) {
   const [expanded, setExpanded] = useState(false);
   const [editing, setEditing] = useState(false);
+  const { t } = useTranslation();
 
   return (
     <div className={`rounded-xl border transition-all ${agent._removed ? 'border-gray-700/50 bg-gray-800/30 opacity-50' : 'border-gray-700 bg-gray-800/50 hover:border-gray-600'}`}>
@@ -302,10 +305,12 @@ export function AIScopeGenerator() {
   const navigate = useNavigate();
   const location = useLocation();
   const { success: showSuccess, error: showError } = useToast();
+  const { t } = useTranslation();
 
   // Accept pre-filled description and optional SOP file from navigation state
-  const navState = location.state as { description?: string; hasSopFile?: boolean } | null;
+  const navState = location.state as { description?: string; hasSopFile?: boolean; language?: 'en' | 'cn' } | null;
   const prefilled = navState?.description || '';
+  const language = navState?.language || 'en';
   // Consume the SOP file from the ephemeral store (only available once after navigation)
   const [sopFile] = useState<File | null>(() => navState?.hasSopFile ? consumeSopFile() : null);
 
@@ -395,8 +400,8 @@ export function AIScopeGenerator() {
     try {
       // Use document upload endpoint when a SOP file is provided
       const fullText = sopFile
-        ? await generateScopeWithDocument(sopFile, description.trim(), sseHandler, controller.signal)
-        : await generateScope(description.trim(), sseHandler, controller.signal);
+        ? await generateScopeWithDocument(sopFile, description.trim(), sseHandler, controller.signal, language)
+        : await generateScope(description.trim(), sseHandler, controller.signal, language);
 
       // Parse the result
       const config = parseScopeConfig(fullText);
@@ -419,7 +424,7 @@ export function AIScopeGenerator() {
       ]);
       setStep('error');
     }
-  }, [description, sopFile]);
+  }, [description, sopFile, language]);
 
   // -------------------------------------------------------------------------
   // Auto-trigger generation when arriving with pre-filled description
@@ -492,7 +497,7 @@ export function AIScopeGenerator() {
           </button>
           <div className="flex items-center gap-2">
             <Sparkles className="w-5 h-5 text-purple-400" />
-            <h1 className="text-xl font-semibold">AI Scope Generator</h1>
+            <h1 className="text-xl font-semibold">{t('aiScope.title')}</h1>
           </div>
         </div>
       </header>
@@ -505,24 +510,24 @@ export function AIScopeGenerator() {
           {step === 'input' && !showChat && (
             <div className="space-y-6 pt-4">
               <div>
-                <h2 className="text-lg font-bold mb-2">Describe your business</h2>
-                <p className="text-sm text-gray-400">Tell us about your business, team, or use case. The AI will generate a scope with specialized agents.</p>
+                <h2 className="text-lg font-bold mb-2">{t('aiScope.describeTitle')}</h2>
+                <p className="text-sm text-gray-400">{t('aiScope.describeHint')}</p>
               </div>
               <textarea
                 value={description}
                 onChange={e => setDescription(e.target.value)}
                 rows={6}
-                placeholder="e.g. We're an e-commerce fashion brand with 50 employees. We need agents for customer support, inventory management, marketing campaigns, and order fulfillment..."
+                placeholder={t('aiScope.descPlaceholder')}
                 className="w-full px-4 py-3 bg-gray-800/50 border border-gray-700 rounded-xl text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent resize-none"
                 autoFocus
               />
               <div className="flex justify-end gap-3">
                 <button onClick={() => navigate('/create-business-scope')} className="px-6 py-2.5 text-sm text-gray-300 hover:text-white border border-gray-700 rounded-xl transition-colors">
-                  Cancel
+                  {t('common.cancel')}
                 </button>
                 <button onClick={handleGenerate} disabled={!description.trim()}
                   className={`px-8 py-2.5 text-sm font-semibold rounded-xl flex items-center gap-2 transition-all ${description.trim() ? 'bg-gradient-to-r from-purple-500 to-blue-600 text-white hover:shadow-lg hover:shadow-purple-500/30' : 'bg-gray-700 text-gray-500 cursor-not-allowed'}`}>
-                  <Sparkles className="w-4 h-4" /> Generate
+                  <Sparkles className="w-4 h-4" /> {t('aiScope.generate')}
                 </button>
               </div>
             </div>
@@ -542,7 +547,7 @@ export function AIScopeGenerator() {
                 <div className="flex justify-center">
                   <button onClick={() => { abortRef.current?.abort(); setStep('input'); setUserPrompt(''); }}
                     className="text-sm text-gray-400 hover:text-white border border-gray-700 px-4 py-1.5 rounded-lg transition-colors">
-                    Cancel generation
+                    {t('aiScope.cancelGeneration')}
                   </button>
                 </div>
               )}
@@ -553,16 +558,16 @@ export function AIScopeGenerator() {
           {step === 'preview' && scope && (
             <div className="space-y-6 border-t border-gray-800 pt-6">
               <div>
-                <h2 className="text-lg font-bold mb-1">Review & Customize</h2>
-                <p className="text-sm text-gray-400">Edit the scope and agents before saving. Click any card to edit.</p>
+                <h2 className="text-lg font-bold mb-1">{t('aiScope.reviewTitle')}</h2>
+                <p className="text-sm text-gray-400">{t('aiScope.reviewDesc')}</p>
               </div>
 
               <ScopePreviewCard scope={scope} onChange={setScope} />
 
               <div className="flex items-center justify-between">
-                <h3 className="text-sm font-medium text-gray-300">Agents ({activeAgents.length})</h3>
+                <h3 className="text-sm font-medium text-gray-300">{t('aiScope.agents')} ({activeAgents.length})</h3>
                 <button onClick={addAgent} className="flex items-center gap-1 text-xs text-blue-400 hover:text-blue-300 transition-colors">
-                  <Plus className="w-3.5 h-3.5" /> Add Agent
+                  <Plus className="w-3.5 h-3.5" /> {t('aiScope.addAgent')}
                 </button>
               </div>
               <div className="space-y-3">
@@ -580,11 +585,11 @@ export function AIScopeGenerator() {
               <div className="flex items-center justify-between pt-6 border-t border-gray-800">
                 <button onClick={() => { setStep('input'); setScope(null); setAgents([]); setUserPrompt(''); setContentBlocks([]); }}
                   className="flex items-center gap-2 text-sm text-gray-400 hover:text-white transition-colors">
-                  <RefreshCw className="w-4 h-4" /> Start Over
+                  <RefreshCw className="w-4 h-4" /> {t('aiScope.startOver')}
                 </button>
                 <button onClick={handleConfirm} disabled={activeAgents.length === 0}
                   className="flex items-center gap-2 px-6 py-2.5 bg-gradient-to-r from-green-500 to-emerald-600 text-white rounded-xl font-medium hover:from-green-600 hover:to-emerald-700 transition-all disabled:opacity-50 disabled:cursor-not-allowed">
-                  <Check className="w-4 h-4" /> Create Scope
+                  <Check className="w-4 h-4" /> {t('aiScope.createScope')}
                 </button>
               </div>
             </div>
@@ -594,8 +599,8 @@ export function AIScopeGenerator() {
           {step === 'saving' && (
             <div className="flex flex-col items-center justify-center py-16">
               <Loader2 className="w-10 h-10 text-green-400 animate-spin mb-4" />
-              <p className="text-lg font-medium">Creating scope, agents & generating avatars...</p>
-              <p className="text-sm text-gray-400 mt-2">This may take a moment while AI generates unique avatar images</p>
+              <p className="text-lg font-medium">{t('aiScope.savingTitle')}</p>
+              <p className="text-sm text-gray-400 mt-2">{t('aiScope.savingHint')}</p>
             </div>
           )}
 
@@ -606,12 +611,12 @@ export function AIScopeGenerator() {
                 <div className="w-14 h-14 rounded-full bg-red-500/10 flex items-center justify-center mb-4">
                   <AlertCircle className="w-7 h-7 text-red-400" />
                 </div>
-                <p className="text-lg font-medium mb-1">Generation Failed</p>
+                <p className="text-lg font-medium mb-1">{t('aiScope.errorTitle')}</p>
                 <p className="text-sm text-gray-400 text-center max-w-md mb-6">{errorMsg}</p>
                 <div className="flex gap-3">
                   <button onClick={() => { setStep('input'); setUserPrompt(''); setContentBlocks([]); }}
                     className="flex items-center gap-2 px-4 py-2 text-sm text-gray-300 border border-gray-600 rounded-lg hover:border-gray-500 transition-colors">
-                    <RefreshCw className="w-4 h-4" /> Try Again
+                    <RefreshCw className="w-4 h-4" /> {t('aiScope.tryAgain')}
                   </button>
                 </div>
               </div>

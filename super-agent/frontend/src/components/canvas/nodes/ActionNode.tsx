@@ -8,15 +8,16 @@ import { Zap, Globe, Database, Bell, Wand2, Loader2, CheckCircle, XCircle, Clock
 import type { CanvasNodeData, ActionStatus } from '@/types/canvas';
 import type { ActionNodeMeta, ActionType } from '@/types/canvas/metadata';
 import { BaseNode } from './BaseNode';
+import { useTranslation } from '@/i18n';
 
 type ActionNodeData = CanvasNodeData<ActionNodeMeta>;
 
-const actionTypeConfig: Record<ActionType, { icon: typeof Globe; label: string }> = {
-  api_call: { icon: Globe, label: 'API Call' },
-  database: { icon: Database, label: 'Database' },
-  notification: { icon: Bell, label: 'Notification' },
-  transform: { icon: Wand2, label: 'Transform' },
-  custom: { icon: Zap, label: 'Custom' },
+const actionTypeConfig: Record<ActionType, { icon: typeof Globe; labelKey: string }> = {
+  api_call: { icon: Globe, labelKey: 'node.actionApiCall' },
+  database: { icon: Database, labelKey: 'node.actionDatabase' },
+  notification: { icon: Bell, labelKey: 'node.actionNotification' },
+  transform: { icon: Wand2, labelKey: 'node.actionTransform' },
+  custom: { icon: Zap, labelKey: 'node.actionCustom' },
 };
 
 const statusConfig: Record<ActionStatus, { icon: typeof Loader2; color: string; animate?: boolean }> = {
@@ -39,6 +40,7 @@ export const ActionNode = memo(function ActionNode(props: NodeProps) {
   const statusInfo = statusConfig[status];
   const ActionIcon = actionInfo.icon;
   const StatusIcon = statusInfo.icon;
+  const { t } = useTranslation();
 
   return (
     <BaseNode
@@ -58,7 +60,7 @@ export const ActionNode = memo(function ActionNode(props: NodeProps) {
       <div className="mt-3 space-y-2">
         <div className="inline-flex items-center gap-1.5 px-2 py-1 rounded-full text-xs bg-orange-500/10">
           <ActionIcon className="w-3 h-3 text-orange-400" />
-          <span className="text-orange-300">{actionInfo.label}</span>
+          <span className="text-orange-300">{t(actionInfo.labelKey)}</span>
         </div>
 
         {metadata?.config && Object.keys(metadata.config).length > 0 && (
@@ -74,7 +76,7 @@ export const ActionNode = memo(function ActionNode(props: NodeProps) {
               ))}
               {Object.keys(metadata.config).length > 3 && (
                 <div className="text-[10px] text-gray-500">
-                  +{Object.keys(metadata.config).length - 3} more
+                  {t('node.nMore').replace('{n}', String(Object.keys(metadata.config).length - 3))}
                 </div>
               )}
             </div>

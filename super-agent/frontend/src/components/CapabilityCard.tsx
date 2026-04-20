@@ -1,10 +1,12 @@
 import type { Capability } from '@/types'
+import { useTranslation } from '@/i18n'
 
 interface CapabilityCardProps {
   capability: Capability
 }
 
 export function CapabilityCard({ capability }: CapabilityCardProps) {
+  const { t } = useTranslation()
   return (
     <div className="bg-gray-800/50 hover:bg-gray-800 rounded-lg p-4 border border-gray-700 hover:border-gray-600 transition-all">
       {/* Icon and Category */}
@@ -31,7 +33,7 @@ export function CapabilityCard({ capability }: CapabilityCardProps) {
 
       {/* Tool Identifier */}
       <div className="pt-3 border-t border-gray-700">
-        <p className="text-xs text-gray-500 mb-1">Tool ID</p>
+        <p className="text-xs text-gray-500 mb-1">{t('capability.toolId')}</p>
         <p className="text-xs text-gray-300 font-mono break-all">{capability.toolIdentifier}</p>
       </div>
     </div>

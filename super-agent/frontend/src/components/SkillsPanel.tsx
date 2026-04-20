@@ -15,6 +15,7 @@ import {
 } from 'lucide-react'
 import { restClient } from '@/services/api/restClient'
 import { RestUserGroupService, type UserGroup } from '@/services/api/restUserGroupService'
+import { useTranslation } from '@/i18n'
 
 // ---------------------------------------------------------------------------
 // Types
@@ -86,6 +87,7 @@ function TabButton({ active, onClick, icon, label }: {
 
 export function SkillsPanel({ open, onClose, sessionId }: SkillsPanelProps) {
   const [activeTab, setActiveTab] = useState<Tab>('installed')
+  const { t } = useTranslation()
 
   // Installed (workspace) skills
   const [installedSkills, setInstalledSkills] = useState<WorkspaceSkill[]>([])
@@ -339,7 +341,7 @@ export function SkillsPanel({ open, onClose, sessionId }: SkillsPanelProps) {
         <div className="flex items-center justify-between px-4 py-3 border-b border-gray-800">
           <div className="flex items-center gap-2">
             <Zap className="w-5 h-5 text-yellow-400" />
-            <span className="text-sm font-semibold text-white">Skills</span>
+            <span className="text-sm font-semibold text-white">{t('skills.title')}</span>
           </div>
           <button onClick={onClose} className="p-1.5 rounded-lg hover:bg-gray-700 text-gray-400 hover:text-white transition-colors">
             <X className="w-4 h-4" />
@@ -349,11 +351,11 @@ export function SkillsPanel({ open, onClose, sessionId }: SkillsPanelProps) {
         {/* Tabs */}
         <div className="flex items-center gap-1.5 px-4 py-2 border-b border-gray-800">
           <TabButton active={activeTab === 'installed'} onClick={() => setActiveTab('installed')}
-            icon={<Zap className="w-3 h-3" />} label={`Installed (${installedSkills.length})`} />
+            icon={<Zap className="w-3 h-3" />} label={`${t('skills.tabInstalled')} (${installedSkills.length})`} />
           <TabButton active={activeTab === 'enterprise'} onClick={() => setActiveTab('enterprise')}
-            icon={<Building2 className="w-3 h-3" />} label="Internal" />
+            icon={<Building2 className="w-3 h-3" />} label={t('skills.tabInternal')} />
           <TabButton active={activeTab === 'external'} onClick={() => setActiveTab('external')}
-            icon={<Globe className="w-3 h-3" />} label="External" />
+            icon={<Globe className="w-3 h-3" />} label={t('skills.tabExternal')} />
         </div>
 
         {/* Error */}
@@ -448,11 +450,12 @@ function InstalledTab({ skills, loading, sessionId, publishingSkill, confirmingP
   onDelete: (name: string) => void
   deletingSkill: string | null
 }) {
+  const { t } = useTranslation()
   if (!sessionId) {
     return (
       <div className="text-center py-8">
         <Package className="w-8 h-8 text-gray-700 mx-auto mb-1" />
-        <p className="text-xs text-gray-500">No active session</p>
+        <p className="text-xs text-gray-500">{t('skills.noSession')}</p>
       </div>
     )
   }
@@ -467,7 +470,7 @@ function InstalledTab({ skills, loading, sessionId, publishingSkill, confirmingP
     return (
       <div className="text-center py-8">
         <Package className="w-8 h-8 text-gray-700 mx-auto mb-1" />
-        <p className="text-xs text-gray-500">No skills in this workspace</p>
+        <p className="text-xs text-gray-500">{t('skills.noSkills')}</p>
       </div>
     )
   }
@@ -501,12 +504,12 @@ function InstalledTab({ skills, loading, sessionId, publishingSkill, confirmingP
               <input
                 value={publishCategory}
                 onChange={e => onPublishCategoryChange(e.target.value)}
-                placeholder="Category (optional)"
+                placeholder={t('skills.categoryOptional')}
                 className="w-full px-2 py-1 bg-gray-700 border border-gray-600 rounded text-xs text-white placeholder-gray-500 focus:outline-none focus:border-blue-500"
               />
               {/* User group multi-select */}
               <div>
-                <label className="text-[10px] text-gray-400 block mb-1">Publish to groups:</label>
+                <label className="text-[10px] text-gray-400 block mb-1">{t('skills.publishToGroups')}</label>
                 {userGroups.length > 0 ? (
                   <div className="flex flex-wrap gap-1">
                     {userGroups.map(g => {
@@ -533,10 +536,10 @@ function InstalledTab({ skills, loading, sessionId, publishingSkill, confirmingP
                     })}
                   </div>
                 ) : (
-                  <p className="text-[10px] text-gray-500">No groups yet. Create groups in Settings → Groups.</p>
+                  <p className="text-[10px] text-gray-500">{t('skills.noGroupsHint')}</p>
                 )}
                 {publishGroupIds.length === 0 && (
-                  <p className="text-[10px] text-yellow-400/80 mt-1">⚠ No groups selected — this skill will be visible to everyone.</p>
+                  <p className="text-[10px] text-yellow-400/80 mt-1">{t('skills.noGroupsWarning')}</p>
                 )}
               </div>
               <div className="flex items-center gap-2">
@@ -546,7 +549,7 @@ function InstalledTab({ skills, loading, sessionId, publishingSkill, confirmingP
                   className="px-2 py-1 bg-green-600 hover:bg-green-500 disabled:bg-gray-700 text-white text-xs rounded transition-colors flex items-center gap-1"
                 >
                   {confirmingPublish ? <Loader2 className="w-3 h-3 animate-spin" /> : <Check className="w-3 h-3" />}
-                  {confirmingPublish ? 'Publishing…' : 'Confirm'}
+                  {confirmingPublish ? t('skills.publishing') : t('skills.confirm')}
                 </button>
               </div>
             </div>
@@ -556,7 +559,7 @@ function InstalledTab({ skills, loading, sessionId, publishingSkill, confirmingP
               className="mt-1.5 flex items-center gap-1 text-[10px] text-blue-400 hover:text-blue-300 transition-colors"
             >
               <Upload className="w-3 h-3" />
-              Publish to Internal
+              {t('skills.publishToInternal')}
             </button>
           )}
         </div>
@@ -587,6 +590,7 @@ function EnterpriseTab({ skills, loading, categories, query, category, sort, ins
   onInstall: (id: string) => void
   onVote: (id: string, vote: 1 | -1) => void
 }) {
+  const { t } = useTranslation()
   return (
     <div className="px-4 py-3">
       {/* Search + filters */}
@@ -597,7 +601,7 @@ function EnterpriseTab({ skills, loading, categories, query, category, sort, ins
             value={query}
             onChange={e => onQueryChange(e.target.value)}
             onKeyDown={e => e.key === 'Enter' && onSearch()}
-            placeholder="Search internal skills..."
+            placeholder={t('skills.searchInternal')}
             className="w-full pl-8 pr-3 py-1.5 bg-gray-800 border border-gray-700 rounded-lg text-white text-xs placeholder-gray-500 focus:outline-none focus:border-blue-500"
           />
         </div>
@@ -612,7 +616,7 @@ function EnterpriseTab({ skills, loading, categories, query, category, sort, ins
           onChange={e => { onCategoryChange(e.target.value); setTimeout(onSearch, 0) }}
           className="px-2 py-1 bg-gray-800 border border-gray-700 rounded text-xs text-gray-300 focus:outline-none focus:border-blue-500"
         >
-          <option value="">All categories</option>
+          <option value="">{t('skills.allCategories')}</option>
           {categories.map(c => <option key={c} value={c}>{c}</option>)}
         </select>
         <select
@@ -620,9 +624,9 @@ function EnterpriseTab({ skills, loading, categories, query, category, sort, ins
           onChange={e => { onSortChange(e.target.value as typeof sort); setTimeout(onSearch, 0) }}
           className="px-2 py-1 bg-gray-800 border border-gray-700 rounded text-xs text-gray-300 focus:outline-none focus:border-blue-500"
         >
-          <option value="popular">Popular</option>
-          <option value="top-rated">Top Rated</option>
-          <option value="recent">Recent</option>
+          <option value="popular">{t('skills.popular')}</option>
+          <option value="top-rated">{t('skills.topRated')}</option>
+          <option value="recent">{t('skills.recent')}</option>
         </select>
       </div>
 
@@ -634,8 +638,8 @@ function EnterpriseTab({ skills, loading, categories, query, category, sort, ins
       ) : skills.length === 0 ? (
         <div className="text-center py-8">
           <Building2 className="w-8 h-8 text-gray-700 mx-auto mb-2" />
-          <p className="text-xs text-gray-500">No internal skills yet</p>
-          <p className="text-[10px] text-gray-600 mt-1">Import from External or publish from a workspace</p>
+          <p className="text-xs text-gray-500">{t('skills.noInternal')}</p>
+          <p className="text-[10px] text-gray-600 mt-1">{t('skills.noInternalHint')}</p>
         </div>
       ) : (
         <div className="space-y-1.5">
@@ -652,7 +656,7 @@ function EnterpriseTab({ skills, loading, categories, query, category, sort, ins
                       {skill.category && (
                         <span className="text-[10px] px-1.5 py-0.5 bg-gray-700 rounded text-gray-400">{skill.category}</span>
                       )}
-                      <span className="text-[10px] text-gray-600">{skill.installCount} installs</span>
+                      <span className="text-[10px] text-gray-600">{skill.installCount} {t('skills.installs')}</span>
                       <span className={`text-[10px] ${skill.source === 'skills.sh' ? 'text-purple-400' : 'text-green-400'}`}>
                         {skill.source === 'skills.sh' ? '⬡ skills.sh' : '● internal'}
                       </span>
@@ -676,13 +680,13 @@ function EnterpriseTab({ skills, loading, categories, query, category, sort, ins
                     {/* Install button */}
                     {alreadyInstalled ? (
                       <span className="flex items-center gap-1 text-[10px] text-green-400">
-                        <Check className="w-3 h-3" /> Installed
+                        <Check className="w-3 h-3" /> {t('skills.installed')}
                       </span>
                     ) : sessionId ? (
                       <button onClick={() => onInstall(skill.id)} disabled={installingId === skill.id}
                         className="flex items-center gap-1 px-2 py-0.5 text-[10px] bg-blue-600 hover:bg-blue-500 disabled:bg-gray-700 text-white rounded transition-colors">
                         {installingId === skill.id ? <Loader2 className="w-3 h-3 animate-spin" /> : <Download className="w-3 h-3" />}
-                        Install
+                        {t('skills.install')}
                       </button>
                     ) : null}
                   </div>
@@ -714,6 +718,7 @@ function ExternalTab({ results, searching, query, installedNames, installingRef,
   onInstall: (ref: string) => void
   onImport: (ref: string) => void
 }) {
+  const { t } = useTranslation()
   // Show search results if available, otherwise show featured
   const displaySkills = results.length > 0 ? results : (!query && !searching ? featuredSkills : [])
   const showFeaturedLabel = results.length === 0 && !query && !searching && featuredSkills.length > 0
@@ -727,7 +732,7 @@ function ExternalTab({ results, searching, query, installedNames, installingRef,
             value={query}
             onChange={e => onQueryChange(e.target.value)}
             onKeyDown={e => e.key === 'Enter' && onSearch()}
-            placeholder="Search skills.sh marketplace..."
+            placeholder={t('skills.searchMarketplace')}
             className="w-full pl-8 pr-3 py-1.5 bg-gray-800 border border-gray-700 rounded-lg text-white text-xs placeholder-gray-500 focus:outline-none focus:border-blue-500"
           />
         </div>
@@ -740,14 +745,14 @@ function ExternalTab({ results, searching, query, installedNames, installingRef,
       {searching ? (
         <div className="flex items-center justify-center py-8">
           <Loader2 className="w-5 h-5 text-blue-400 animate-spin" />
-          <span className="ml-2 text-xs text-gray-400">Searching marketplace...</span>
+          <span className="ml-2 text-xs text-gray-400">{t('skills.searchingMarketplace')}</span>
         </div>
       ) : displaySkills.length > 0 ? (
         <div>
           {showFeaturedLabel && (
             <div className="flex items-center gap-1.5 mb-2">
               <Globe className="w-3.5 h-3.5 text-blue-400" />
-              <span className="text-xs text-gray-400">Popular on skills.sh</span>
+              <span className="text-xs text-gray-400">{t('skills.popularOnSkillsSh')}</span>
             </div>
           )}
           <div className="space-y-1.5">
@@ -765,19 +770,19 @@ function ExternalTab({ results, searching, query, installedNames, installingRef,
                     <div className="flex flex-col gap-1 flex-shrink-0 mt-0.5">
                       {alreadyInstalled ? (
                         <span className="flex items-center gap-1 text-xs text-green-400">
-                          <Check className="w-3 h-3" /> Installed
+                          <Check className="w-3 h-3" /> {t('skills.installed')}
                         </span>
                       ) : (
                         <button onClick={() => onInstall(skill.installRef)} disabled={installingRef === skill.installRef}
                           className="flex items-center gap-1 px-2 py-1 text-xs bg-blue-600 hover:bg-blue-500 disabled:bg-gray-700 text-white rounded-md transition-colors">
                           {installingRef === skill.installRef ? <Loader2 className="w-3 h-3 animate-spin" /> : <Download className="w-3 h-3" />}
-                          Install
+                          {t('skills.install')}
                         </button>
                       )}
                       <button onClick={() => onImport(skill.installRef)} disabled={importingRef === skill.installRef}
                         className="flex items-center gap-1 px-2 py-1 text-[10px] text-purple-400 hover:text-purple-300 border border-purple-500/30 hover:border-purple-500/50 rounded-md transition-colors disabled:opacity-50">
                         {importingRef === skill.installRef ? <Loader2 className="w-3 h-3 animate-spin" /> : <Building2 className="w-3 h-3" />}
-                        Import to Internal
+                        {t('skills.importToInternal')}
                       </button>
                     </div>
                   </div>
@@ -789,18 +794,18 @@ function ExternalTab({ results, searching, query, installedNames, installingRef,
       ) : loadingFeatured ? (
         <div className="flex items-center justify-center py-8">
           <Loader2 className="w-5 h-5 text-blue-400 animate-spin" />
-          <span className="ml-2 text-xs text-gray-400">Loading popular skills...</span>
+          <span className="ml-2 text-xs text-gray-400">{t('skills.loadingPopular')}</span>
         </div>
       ) : query && !searching ? (
         <div className="text-center py-8 text-gray-500">
           <Package className="w-8 h-8 mx-auto mb-2 opacity-40" />
-          <p className="text-xs">No results for "{query}"</p>
+          <p className="text-xs">{t('skills.noResults').replace('{q}', query)}</p>
         </div>
       ) : (
         <div className="text-center py-8 text-gray-500">
           <Globe className="w-8 h-8 mx-auto mb-2 opacity-40" />
-          <p className="text-xs">Search the skills.sh marketplace</p>
-          <p className="text-[10px] mt-1 text-gray-600">Find community skills, then install or import to internal</p>
+          <p className="text-xs">{t('skills.searchPrompt')}</p>
+          <p className="text-[10px] mt-1 text-gray-600">{t('skills.searchPromptHint')}</p>
         </div>
       )}
     </div>

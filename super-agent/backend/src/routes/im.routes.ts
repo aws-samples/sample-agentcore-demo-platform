@@ -405,8 +405,11 @@ export async function imWebhookRoutes(fastify: FastifyInstance): Promise<void> {
   );
 
   /**
-   * POST /api/im/dingtalk/callback — DingTalk Robot callback endpoint.
-   * Verified via signing secret in binding config.
+   * POST /api/im/dingtalk/callback — DingTalk Outgoing Webhook callback.
+   *
+   * For Outgoing Webhook mode, the binding's channel_id may be '*' (wildcard)
+   * since conversationId is not known until the first message arrives.
+   * On first message, we auto-update the binding's channel_id.
    */
   fastify.post(
     '/dingtalk/callback',
@@ -418,7 +421,21 @@ export async function imWebhookRoutes(fastify: FastifyInstance): Promise<void> {
 
       const headers = request.headers as Record<string, string>;
       const rawBody = JSON.stringify(request.body);
-      const result = await verifyAndLookupBinding('dingtalk', msg.channelId, dingtalkAdapter, headers, rawBody);
+
+      // Try exact match first, then wildcard '*' binding
+      let result = await verifyAndLookupBinding('dingtalk', msg.channelId, dingtalkAdapter, headers, rawBody);
+      if ('error' in result && result.error.includes('No active binding')) {
+        result = await verifyAndLookupBinding('dingtalk', '*', dingtalkAdapter, headers, rawBody);
+        // Auto-update the wildcard binding with the real conversationId
+        if (!('error' in result)) {
+          try {
+            await imChannelRepository.update(result.binding.id, result.binding.organization_id, {
+              config: { ...(result.binding.config as Record<string, unknown>), channel_id: msg.channelId },
+            });
+          } catch { /* non-critical */ }
+        }
+      }
+
       if ('error' in result) {
         console.warn(`[DINGTALK] ${result.error}`);
         return reply.status(403).send({ error: 'Forbidden' });
@@ -430,6 +447,10 @@ export async function imWebhookRoutes(fastify: FastifyInstance): Promise<void> {
         await imService.handleMessage(msg);
       } catch (error) {
         console.error('[DINGTALK] Failed to handle message:', error instanceof Error ? error.message : error);
+        // Try to send error message back to user
+        try {
+          await dingtalkAdapter.sendReply(result.binding, msg.threadId, '⚠ 消息处理失败，请稍后重试');
+        } catch { /* best effort */ }
       }
     },
   );

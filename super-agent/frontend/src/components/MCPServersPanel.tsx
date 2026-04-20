@@ -13,6 +13,7 @@ import {
 } from 'lucide-react'
 import { restClient } from '@/services/api/restClient'
 import { MCP_SERVER_CATALOG, type McpServerEntry } from '@/data/mcp-servers'
+import { useTranslation } from '@/i18n'
 
 // ---------------------------------------------------------------------------
 // Types
@@ -38,6 +39,7 @@ interface MCPServersPanelProps {
 // ---------------------------------------------------------------------------
 
 export function MCPServersPanel({ open, onClose, sessionId }: MCPServersPanelProps) {
+  const { t } = useTranslation()
   const [servers, setServers] = useState<SessionMcpServer[]>([])
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -174,7 +176,7 @@ export function MCPServersPanel({ open, onClose, sessionId }: MCPServersPanelPro
         <div className="flex items-center justify-between px-4 py-3 border-b border-gray-800">
           <div className="flex items-center gap-2">
             <Server className="w-5 h-5 text-cyan-400" />
-            <span className="text-sm font-semibold text-white">MCP Servers</span>
+            <span className="text-sm font-semibold text-white">{t('mcpPanel.title')}</span>
             <span className="text-xs text-gray-500">({servers.length})</span>
           </div>
           <button onClick={onClose} className="p-1.5 rounded-lg hover:bg-gray-700 text-gray-400 hover:text-white transition-colors">
@@ -196,7 +198,7 @@ export function MCPServersPanel({ open, onClose, sessionId }: MCPServersPanelPro
           {/* Installed servers */}
           <div className="px-4 py-3">
             <div className="flex items-center justify-between mb-3">
-              <span className="text-xs font-medium text-gray-400 uppercase tracking-wider">Installed</span>
+              <span className="text-xs font-medium text-gray-400 uppercase tracking-wider">{t('mcpPanel.installed')}</span>
               <button
                 onClick={() => setShowAdd(true)}
                 className="flex items-center gap-1 px-2 py-1 text-xs text-blue-400 hover:text-blue-300 hover:bg-blue-500/10 rounded transition-colors"
@@ -213,8 +215,8 @@ export function MCPServersPanel({ open, onClose, sessionId }: MCPServersPanelPro
             ) : servers.length === 0 ? (
               <div className="text-center py-6">
                 <Server className="w-8 h-8 text-gray-700 mx-auto mb-2" />
-                <p className="text-sm text-gray-500">No MCP servers in this session</p>
-                <p className="text-xs text-gray-600 mt-1">Add servers to extend agent capabilities</p>
+                <p className="text-sm text-gray-500">{t('mcpPanel.noServers')}</p>
+                <p className="text-xs text-gray-600 mt-1">{t('mcpPanel.noServersHint')}</p>
               </div>
             ) : (
               <div className="space-y-2">
@@ -239,7 +241,7 @@ export function MCPServersPanel({ open, onClose, sessionId }: MCPServersPanelPro
                       onClick={() => handleRemove(s.name)}
                       disabled={removingName === s.name}
                       className="p-1.5 rounded hover:bg-red-500/20 text-gray-500 hover:text-red-400 opacity-0 group-hover:opacity-100 transition-all disabled:opacity-50"
-                      title="Remove from session"
+                      title={t('mcpPanel.removeFromSession')}
                     >
                       {removingName === s.name ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Trash2 className="w-3.5 h-3.5" />}
                     </button>
@@ -252,12 +254,12 @@ export function MCPServersPanel({ open, onClose, sessionId }: MCPServersPanelPro
           {/* Add server form */}
           {showAdd && (
             <div className="mx-4 mb-4 p-3 bg-gray-800 rounded-lg border border-gray-700">
-              <div className="text-xs font-medium text-gray-300 mb-2">Add MCP Server</div>
+              <div className="text-xs font-medium text-gray-300 mb-2">{t('mcpPanel.addServer')}</div>
               <div className="space-y-2">
                 <input
                   value={addName}
                   onChange={e => setAddName(e.target.value)}
-                  placeholder="Server name (e.g. my-server)"
+                  placeholder={t('mcpPanel.serverName')}
                   className="w-full px-3 py-1.5 text-sm bg-gray-900 border border-gray-700 rounded text-white placeholder-gray-500 focus:outline-none focus:border-blue-500"
                 />
                 <div className="flex gap-2">
@@ -289,13 +291,13 @@ export function MCPServersPanel({ open, onClose, sessionId }: MCPServersPanelPro
                     <input
                       value={addCommand}
                       onChange={e => setAddCommand(e.target.value)}
-                      placeholder="Command (e.g. npx)"
+                      placeholder={t('mcpPanel.command')}
                       className="w-full px-3 py-1.5 text-sm bg-gray-900 border border-gray-700 rounded text-white placeholder-gray-500 focus:outline-none focus:border-blue-500"
                     />
                     <input
                       value={addArgs}
                       onChange={e => setAddArgs(e.target.value)}
-                      placeholder="Arguments (space-separated, e.g. -y @org/server)"
+                      placeholder={t('mcpPanel.arguments')}
                       className="w-full px-3 py-1.5 text-sm bg-gray-900 border border-gray-700 rounded text-white placeholder-gray-500 focus:outline-none focus:border-blue-500"
                     />
                   </>
@@ -303,7 +305,7 @@ export function MCPServersPanel({ open, onClose, sessionId }: MCPServersPanelPro
                   <input
                     value={addUrl}
                     onChange={e => setAddUrl(e.target.value)}
-                    placeholder="Server URL (e.g. http://localhost:8080/sse)"
+                    placeholder={t('mcpPanel.serverUrl')}
                     className="w-full px-3 py-1.5 text-sm bg-gray-900 border border-gray-700 rounded text-white placeholder-gray-500 focus:outline-none focus:border-blue-500"
                   />
                 )}
@@ -320,7 +322,7 @@ export function MCPServersPanel({ open, onClose, sessionId }: MCPServersPanelPro
                     onClick={() => { setShowAdd(false); setAddName(''); setAddCommand(''); setAddArgs(''); setAddUrl('') }}
                     className="px-3 py-1.5 text-xs text-gray-400 hover:text-white transition-colors"
                   >
-                    Cancel
+                    {t('common.cancel')}
                   </button>
                 </div>
               </div>
@@ -331,9 +333,9 @@ export function MCPServersPanel({ open, onClose, sessionId }: MCPServersPanelPro
           <div className="px-4 py-3 border-t border-gray-800">
             <div className="flex items-center justify-between mb-3">
               <span className="text-xs font-medium text-gray-400 uppercase tracking-wider">
-                Browse Servers
+                {t('mcpPanel.browseServers')}
               </span>
-              <span className="text-[10px] text-gray-600">{filteredCatalog.length} servers</span>
+              <span className="text-[10px] text-gray-600">{filteredCatalog.length} {t('mcpPanel.servers')}</span>
             </div>
 
             {/* Search input */}
@@ -342,7 +344,7 @@ export function MCPServersPanel({ open, onClose, sessionId }: MCPServersPanelPro
               <input
                 value={searchQuery}
                 onChange={e => setSearchQuery(e.target.value)}
-                placeholder="Search MCP servers..."
+                placeholder={t('mcpPanel.searchPlaceholder')}
                 className="w-full pl-8 pr-3 py-2 text-sm bg-gray-800 border border-gray-700 rounded-lg text-white placeholder-gray-500 focus:outline-none focus:border-cyan-500/50 transition-colors"
               />
               {searchQuery && (
@@ -360,7 +362,7 @@ export function MCPServersPanel({ open, onClose, sessionId }: MCPServersPanelPro
               {filteredCatalog.length === 0 ? (
                 <div className="text-center py-6">
                   <Search className="w-6 h-6 text-gray-700 mx-auto mb-2" />
-                  <p className="text-xs text-gray-500">No servers match "{searchQuery}"</p>
+                  <p className="text-xs text-gray-500">{t('mcpPanel.noMatch').replace('{q}', searchQuery)}</p>
                 </div>
               ) : (
                 filteredCatalog.map(entry => {
@@ -389,12 +391,12 @@ export function MCPServersPanel({ open, onClose, sessionId }: MCPServersPanelPro
                             className="inline-flex items-center gap-1 text-[10px] text-cyan-500 hover:text-cyan-400 mt-1"
                           >
                             <ExternalLink className="w-2.5 h-2.5" />
-                            View docs
+                            {t('mcpPanel.viewDocs')}
                           </a>
                         )}
                       </div>
                       {installed ? (
-                        <span className="text-xs text-green-400 px-2 py-1 bg-green-500/10 rounded flex-shrink-0">Added</span>
+                        <span className="text-xs text-green-400 px-2 py-1 bg-green-500/10 rounded flex-shrink-0">{t('mcpPanel.added')}</span>
                       ) : entry.config ? (
                         <button
                           onClick={() => handleQuickAdd(entry)}
@@ -405,7 +407,7 @@ export function MCPServersPanel({ open, onClose, sessionId }: MCPServersPanelPro
                           Add
                         </button>
                       ) : (
-                        <span className="text-[10px] text-gray-600 px-2 py-1 flex-shrink-0">Managed</span>
+                        <span className="text-[10px] text-gray-600 px-2 py-1 flex-shrink-0">{t('mcpPanel.managed')}</span>
                       )}
                     </div>
                   )
@@ -419,7 +421,7 @@ export function MCPServersPanel({ open, onClose, sessionId }: MCPServersPanelPro
         {/* Footer */}
         <div className="px-4 py-3 border-t border-gray-800">
           <p className="text-xs text-gray-600">
-            MCP servers added here apply to this session only. Changes take effect on the next message.
+            {t('mcpPanel.footer')}
           </p>
         </div>
       </div>

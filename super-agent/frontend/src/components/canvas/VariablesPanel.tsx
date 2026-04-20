@@ -16,6 +16,7 @@ import {
   GripVertical,
 } from 'lucide-react';
 import type { WorkflowVariable, WorkflowVariableValue } from '@/types/workflow-plan';
+import { useTranslation } from '@/i18n';
 
 interface VariablesPanelProps {
   variables: WorkflowVariable[];
@@ -31,6 +32,7 @@ export function VariablesPanel({
   readOnly = false,
 }: VariablesPanelProps) {
   const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set());
+  const { t } = useTranslation();
 
   const toggleExpanded = useCallback((id: string) => {
     setExpandedIds(prev => {
@@ -117,7 +119,7 @@ export function VariablesPanel({
       <div className="p-4 border-b border-gray-800 flex items-center justify-between">
         <div className="flex items-center gap-2">
           <Variable className="w-5 h-5 text-blue-400" />
-          <h3 className="text-sm font-medium text-white">Workflow Variables</h3>
+          <h3 className="text-sm font-medium text-white">{t('variables.title')}</h3>
         </div>
         <button
           onClick={onClose}
@@ -132,8 +134,8 @@ export function VariablesPanel({
         {variables.length === 0 ? (
           <div className="text-center py-8 text-gray-500">
             <Variable className="w-8 h-8 mx-auto mb-2 opacity-50" />
-            <p className="text-sm">No variables defined</p>
-            <p className="text-xs mt-1">Variables allow users to provide input when running the workflow</p>
+            <p className="text-sm">{t('variables.empty')}</p>
+            <p className="text-xs mt-1">{t('variables.emptyHint')}</p>
           </div>
         ) : (
           <div className="space-y-2">
@@ -163,7 +165,7 @@ export function VariablesPanel({
             className="w-full flex items-center justify-center gap-2 px-4 py-2 bg-blue-600/20 hover:bg-blue-600/30 text-blue-400 rounded-lg transition-colors text-sm"
           >
             <Plus className="w-4 h-4" />
-            Add Variable
+            {t('variables.add')}
           </button>
         </div>
       )}
@@ -194,6 +196,7 @@ function VariableItem({
   onDeleteValue,
   readOnly,
 }: VariableItemProps) {
+  const { t } = useTranslation();
   return (
     <div className="bg-gray-800/50 rounded-lg border border-gray-700 overflow-hidden">
       {/* Header */}
@@ -250,7 +253,7 @@ function VariableItem({
         <div className="p-3 pt-0 space-y-3 border-t border-gray-700/50">
           {/* Name */}
           <div>
-            <label className="block text-xs text-gray-400 mb-1">Name</label>
+            <label className="block text-xs text-gray-400 mb-1">{t('variables.name')}</label>
             <input
               type="text"
               value={variable.name}
@@ -263,28 +266,28 @@ function VariableItem({
 
           {/* Type */}
           <div>
-            <label className="block text-xs text-gray-400 mb-1">Type</label>
+            <label className="block text-xs text-gray-400 mb-1">{t('variables.type')}</label>
             <select
               value={variable.variableType}
               onChange={(e) => onUpdate({ variableType: e.target.value as 'string' | 'resource' })}
               disabled={readOnly}
               className="w-full px-3 py-1.5 bg-gray-900 border border-gray-700 rounded text-sm text-white disabled:opacity-50"
             >
-              <option value="string">Text</option>
-              <option value="resource">File/Resource</option>
+              <option value="string">{t('variables.typeText')}</option>
+              <option value="resource">{t('variables.typeFile')}</option>
             </select>
           </div>
 
           {/* Description */}
           <div>
-            <label className="block text-xs text-gray-400 mb-1">Description</label>
+            <label className="block text-xs text-gray-400 mb-1">{t('variables.description')}</label>
             <textarea
               value={variable.description}
               onChange={(e) => onUpdate({ description: e.target.value })}
               disabled={readOnly}
               rows={2}
               className="w-full px-3 py-1.5 bg-gray-900 border border-gray-700 rounded text-sm text-white resize-none disabled:opacity-50"
-              placeholder="Describe what this variable is for..."
+              placeholder={t('variables.descPlaceholder')}
             />
           </div>
 
@@ -302,26 +305,26 @@ function VariableItem({
               htmlFor={`required-${variable.variableId}`}
               className="text-xs text-gray-400"
             >
-              Required
+              {t('variables.required')}
             </label>
           </div>
 
           {/* Default Values */}
           <div>
             <div className="flex items-center justify-between mb-1">
-              <label className="text-xs text-gray-400">Default Value(s)</label>
+              <label className="text-xs text-gray-400">{t('variables.defaultValues')}</label>
               {!readOnly && (
                 <button
                   onClick={onAddValue}
                   className="text-xs text-blue-400 hover:text-blue-300"
                 >
-                  + Add
+                  {t('variables.addDefault')}
                 </button>
               )}
             </div>
             
             {variable.value.length === 0 ? (
-              <p className="text-xs text-gray-600 italic">No default value</p>
+              <p className="text-xs text-gray-600 italic">{t('variables.noDefault')}</p>
             ) : (
               <div className="space-y-1">
                 {variable.value.map((val, index) => (
@@ -332,7 +335,7 @@ function VariableItem({
                       onChange={(e) => onUpdateValue(index, { text: e.target.value })}
                       disabled={readOnly}
                       className="flex-1 px-2 py-1 bg-gray-900 border border-gray-700 rounded text-xs text-white disabled:opacity-50"
-                      placeholder="Default value..."
+                      placeholder={t('variables.defaultPlaceholder')}
                     />
                     {!readOnly && (
                       <button
@@ -351,7 +354,7 @@ function VariableItem({
           {/* Usage Hint */}
           <div className="pt-2 border-t border-gray-700/50">
             <p className="text-xs text-gray-500">
-              Reference in prompts: <code className="text-blue-400">@{'{'}var:{variable.name}{'}'}</code>
+              {t('variables.referenceHint')} <code className="text-blue-400">@{'{'}var:{variable.name}{'}'}</code>
             </p>
           </div>
         </div>

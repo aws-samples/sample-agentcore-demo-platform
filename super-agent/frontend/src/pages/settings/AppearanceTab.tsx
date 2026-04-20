@@ -1,20 +1,22 @@
 import { Sun, Moon, Monitor } from 'lucide-react'
 import { useTheme, type Theme } from '@/services/ThemeContext'
+import { useTranslation } from '@/i18n'
 
-const OPTIONS: { id: Theme; icon: React.ReactNode; label: string; desc: string }[] = [
-  { id: 'light', icon: <Sun className="w-5 h-5" />, label: 'Light', desc: 'Always use light theme' },
-  { id: 'dark', icon: <Moon className="w-5 h-5" />, label: 'Dark', desc: 'Always use dark theme' },
-  { id: 'system', icon: <Monitor className="w-5 h-5" />, label: 'System', desc: 'Follow your OS setting' },
+const OPTIONS: { id: Theme; icon: React.ReactNode; labelKey: string; descKey: string }[] = [
+  { id: 'light', icon: <Sun className="w-5 h-5" />, labelKey: 'appearance.light', descKey: 'appearance.lightDesc' },
+  { id: 'dark', icon: <Moon className="w-5 h-5" />, labelKey: 'appearance.dark', descKey: 'appearance.darkDesc' },
+  { id: 'system', icon: <Monitor className="w-5 h-5" />, labelKey: 'appearance.system', descKey: 'appearance.systemDesc' },
 ]
 
 export function AppearanceTab() {
   const { theme, setTheme } = useTheme()
+  const { t } = useTranslation()
 
   return (
     <div>
-      <h2 className="text-lg font-semibold text-white mb-1">Appearance</h2>
+      <h2 className="text-lg font-semibold text-white mb-1">{t('appearance.title')}</h2>
       <p className="text-sm text-gray-400 mb-6">
-        Choose how the platform looks to you.
+        {t('appearance.subtitle')}
       </p>
 
       <div className="grid grid-cols-3 gap-4 max-w-lg">
@@ -32,10 +34,10 @@ export function AppearanceTab() {
               {opt.icon}
             </div>
             <span className={`text-sm font-medium ${theme === opt.id ? 'text-blue-400' : 'text-gray-300'}`}>
-              {opt.label}
+              {t(opt.labelKey)}
             </span>
             <span className="text-xs text-gray-500 text-center">
-              {opt.desc}
+              {t(opt.descKey)}
             </span>
           </button>
         ))}

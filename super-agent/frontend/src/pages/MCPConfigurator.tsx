@@ -68,16 +68,16 @@ export function MCPConfigurator() {
     let isValid = true
 
     isValid = validation.validateField('name', form.name, [
-      ValidationRules.required('Server name is required')
+      ValidationRules.required(t('mcpConfig.validationNameRequired'))
     ]) && isValid
 
     if (form.serverType === 'stdio') {
       isValid = validation.validateField('command', form.command, [
-        ValidationRules.required('Command is required')
+        ValidationRules.required(t('mcpConfig.validationCommandRequired'))
       ]) && isValid
     } else {
       isValid = validation.validateField('url', form.url, [
-        ValidationRules.required('URL is required'),
+        ValidationRules.required(t('mcpConfig.validationUrlRequired')),
         ValidationRules.url('Please enter a valid URL')
       ]) && isValid
     }
@@ -224,7 +224,7 @@ export function MCPConfigurator() {
   }
 
   const handleSave = async () => {
-    if (!validateForm()) { showError('Please fix validation errors'); return }
+    if (!validateForm()) { showError(t('mcpConfig.fixValidation')); return }
     setIsSaving(true)
     try {
       const headersObj = form.headers.trim() ? JSON.parse(form.headers) : {}
@@ -247,10 +247,10 @@ export function MCPConfigurator() {
 
       if (selectedServerId) {
         await updateServer(selectedServerId, serverData)
-        success('Server updated successfully')
+        success(t('mcpConfig.serverUpdated'))
       } else {
         await createServer(serverData)
-        success('Server created successfully')
+        success(t('mcpConfig.serverCreated'))
       }
       setIsFormOpen(false)
       resetForm()
@@ -261,10 +261,10 @@ export function MCPConfigurator() {
   }
 
   const handleDelete = async (id: string) => {
-    if (!confirm('Are you sure you want to delete this server?')) return
+    if (!confirm(t('mcpConfig.confirmDeleteServer'))) return
     try {
       await deleteServer(id)
-      success('Server deleted successfully')
+      success(t('mcpConfig.serverDeleted'))
       if (selectedServerId === id) { setIsFormOpen(false); resetForm() }
     } catch (err) {
       showError(err instanceof Error ? err.message : 'Failed to delete server')
@@ -421,11 +421,11 @@ export function MCPConfigurator() {
 
                   {/* Server Type Selector */}
                   <div>
-                    <label className="block text-sm font-medium text-gray-300 mb-2">Server Type</label>
+                    <label className="block text-sm font-medium text-gray-300 mb-2">{t('mcpConfig.serverType')}</label>
                     <div className="flex gap-2">
                       {([
-                        { type: 'stdio' as ServerType, icon: Terminal, label: 'stdio (command)' },
-                        { type: 'sse' as ServerType, icon: Globe, label: 'SSE / HTTP (URL)' },
+                        { type: 'stdio' as ServerType, icon: Terminal, label: t('mcpConfig.stdioCommand') },
+                        { type: 'sse' as ServerType, icon: Globe, label: t('mcpConfig.sseHttp') },
                       ]).map(({ type, icon: Icon, label }) => (
                         <button
                           key={type}

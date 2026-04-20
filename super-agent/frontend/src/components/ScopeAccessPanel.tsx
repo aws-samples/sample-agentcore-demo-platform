@@ -10,6 +10,7 @@ import { X, UserPlus, Trash2, ChevronDown, Loader2, AlertCircle, Shield, Globe, 
 import { useScopeMembers } from '@/services/useScopeMembers';
 import { useMembers } from '@/services/useMembers';
 import type { ScopeRole, ScopeVisibility } from '@/services/api/restScopeMembershipService';
+import { useTranslation } from '@/i18n';
 
 const SCOPE_ROLES: ScopeRole[] = ['admin', 'member', 'viewer'];
 
@@ -31,6 +32,7 @@ interface Props {
 export function ScopeAccessPanel({ scopeId, scopeName, visibility, isAdmin, onClose, onVisibilityChange }: Props) {
   const { members: scopeMembers, isLoading, error, clearError, addMember, updateRole, removeMember, updateVisibility } = useScopeMembers(scopeId);
   const { members: orgMembers } = useMembers();
+  const { t } = useTranslation();
 
   const [showAdd, setShowAdd] = useState(false);
   const [selectedUserId, setSelectedUserId] = useState('');
@@ -69,7 +71,7 @@ export function ScopeAccessPanel({ scopeId, scopeName, visibility, isAdmin, onCl
         <div className="flex items-center justify-between px-5 py-4 border-b border-gray-800">
           <div className="flex items-center gap-2">
             <Shield className="w-5 h-5 text-blue-400" />
-            <h2 className="text-white font-semibold">{scopeName} — Access Control</h2>
+            <h2 className="text-white font-semibold">{scopeName} — {t('scopeAccess.title')}</h2>
           </div>
           <button onClick={onClose} className="p-1 text-gray-400 hover:text-white">
             <X className="w-5 h-5" />
@@ -96,12 +98,12 @@ export function ScopeAccessPanel({ scopeId, scopeName, visibility, isAdmin, onCl
               )}
               <div>
                 <div className="text-sm text-white font-medium">
-                  {currentVisibility === 'open' ? 'Open Scope' : 'Restricted Scope'}
+                  {currentVisibility === 'open' ? t('scopeAccess.openScope') : t('scopeAccess.restrictedScope')}
                 </div>
                 <div className="text-xs text-gray-400">
                   {currentVisibility === 'open'
-                    ? 'All organization members can access this scope'
-                    : 'Only explicitly added members can access this scope'}
+                    ? t('scopeAccess.openDesc')
+                    : t('scopeAccess.restrictedDesc')}
                 </div>
               </div>
             </div>
@@ -110,7 +112,7 @@ export function ScopeAccessPanel({ scopeId, scopeName, visibility, isAdmin, onCl
                 onClick={handleVisibilityToggle}
                 className="px-3 py-1.5 text-xs font-medium rounded-lg border border-gray-600 text-gray-300 hover:bg-gray-700 transition-colors"
               >
-                {currentVisibility === 'open' ? 'Restrict' : 'Open'}
+                {currentVisibility === 'open' ? t('scopeAccess.restrict') : t('scopeAccess.open')}
               </button>
             )}
           </div>
@@ -122,7 +124,7 @@ export function ScopeAccessPanel({ scopeId, scopeName, visibility, isAdmin, onCl
               className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-lg text-sm"
             >
               <UserPlus className="w-4 h-4" />
-              Add Member
+              {t('scopeAccess.addMember')}
             </button>
           )}
 
@@ -134,7 +136,7 @@ export function ScopeAccessPanel({ scopeId, scopeName, visibility, isAdmin, onCl
                   onChange={(e) => setSelectedUserId(e.target.value)}
                   className="flex-1 px-3 py-2 bg-gray-900 border border-gray-700 rounded-lg text-sm text-white focus:border-blue-500 outline-none"
                 >
-                  <option value="">Select a member...</option>
+                  <option value="">{t('scopeAccess.selectMember')}</option>
                   {availableMembers.map((m) => (
                     <option key={m.user_id} value={m.user_id}>
                       {m.name || m.email || m.invited_email || 'Unknown'}
@@ -152,14 +154,14 @@ export function ScopeAccessPanel({ scopeId, scopeName, visibility, isAdmin, onCl
                 </select>
               </div>
               <div className="flex gap-2 justify-end">
-                <button onClick={() => setShowAdd(false)} className="px-3 py-1.5 text-sm text-gray-400 hover:text-white">Cancel</button>
+                <button onClick={() => setShowAdd(false)} className="px-3 py-1.5 text-sm text-gray-400 hover:text-white">{t('common.cancel')}</button>
                 <button
                   onClick={handleAdd}
                   disabled={isAdding || !selectedUserId}
                   className="flex items-center gap-2 px-4 py-1.5 bg-blue-600 hover:bg-blue-500 disabled:opacity-50 text-white rounded-lg text-sm"
                 >
                   {isAdding && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
-                  Add
+                  {t('groups.add')}
                 </button>
               </div>
             </div>
@@ -173,16 +175,16 @@ export function ScopeAccessPanel({ scopeId, scopeName, visibility, isAdmin, onCl
           ) : scopeMembers.length === 0 ? (
             <div className="text-center py-8 text-gray-500 text-sm">
               {currentVisibility === 'open'
-                ? 'No explicit members. All org members have access.'
-                : 'No members added yet. Add members to grant access.'}
+                ? t('scopeAccess.emptyOpen')
+                : t('scopeAccess.emptyRestricted')}
             </div>
           ) : (
             <div className="rounded-xl border border-gray-800 overflow-hidden">
               <table className="w-full text-sm">
                 <thead>
                   <tr className="border-b border-gray-800 bg-gray-800/40">
-                    <th className="text-left px-4 py-2.5 text-xs font-medium text-gray-400 uppercase">Member</th>
-                    <th className="text-left px-4 py-2.5 text-xs font-medium text-gray-400 uppercase">Scope Role</th>
+                    <th className="text-left px-4 py-2.5 text-xs font-medium text-gray-400 uppercase">{t('scopeAccess.colMember')}</th>
+                    <th className="text-left px-4 py-2.5 text-xs font-medium text-gray-400 uppercase">{t('scopeAccess.colScopeRole')}</th>
                     {isAdmin && <th className="px-4 py-2.5" />}
                   </tr>
                 </thead>
@@ -227,7 +229,7 @@ export function ScopeAccessPanel({ scopeId, scopeName, visibility, isAdmin, onCl
                           <button
                             onClick={() => removeMember(member.id)}
                             className="p-1.5 text-gray-500 hover:text-red-400 hover:bg-red-400/10 rounded transition-colors"
-                            title="Remove from scope"
+                            title={t('scopeAccess.removeFromScope')}
                           >
                             <Trash2 className="w-4 h-4" />
                           </button>

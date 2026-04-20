@@ -9,37 +9,38 @@ import type { CanvasNodeData, ActionStatus } from '@/types/canvas';
 import type { HumanApprovalNodeMeta, ApprovalStatus } from '@/types/canvas/metadata';
 import { BaseNode } from './BaseNode';
 import { NodeStatusIndicator } from '../NodeStatusIndicator';
+import { useTranslation } from '@/i18n';
 
 type HumanApprovalNodeData = CanvasNodeData<HumanApprovalNodeMeta>;
 
 const statusConfig: Record<ApprovalStatus, { 
   icon: typeof Clock; 
   color: string;
-  label: string;
+  labelKey: string;
   bgColor: string;
 }> = {
   pending: { 
     icon: Clock, 
     color: 'text-yellow-400',
-    label: 'Pending',
+    labelKey: 'node.approvalPending',
     bgColor: 'bg-yellow-500/10',
   },
   approved: { 
     icon: CheckCircle, 
     color: 'text-green-400',
-    label: 'Approved',
+    labelKey: 'node.approvalApproved',
     bgColor: 'bg-green-500/10',
   },
   rejected: { 
     icon: XCircle, 
     color: 'text-red-400',
-    label: 'Rejected',
+    labelKey: 'node.approvalRejected',
     bgColor: 'bg-red-500/10',
   },
   timeout: { 
     icon: AlertCircle, 
     color: 'text-orange-400',
-    label: 'Timeout',
+    labelKey: 'node.approvalTimeout',
     bgColor: 'bg-orange-500/10',
   },
 };
@@ -51,6 +52,7 @@ export const HumanApprovalNode = memo(function HumanApprovalNode(props: NodeProp
   const approvalStatus = metadata?.status ?? 'pending';
   const statusInfo = statusConfig[approvalStatus];
   const StatusIcon = statusInfo.icon;
+  const { t } = useTranslation();
   
   // Get execution status from hook (passed via Canvas)
   // executionStatus is injected by Canvas component from nodeExecutionStates
@@ -84,7 +86,7 @@ export const HumanApprovalNode = memo(function HumanApprovalNode(props: NodeProp
         {/* Status Badge */}
         <div className={`inline-flex items-center gap-1.5 px-2 py-1 rounded-full text-xs ${statusInfo.bgColor}`}>
           <StatusIcon className={`w-3 h-3 ${statusInfo.color}`} />
-          <span className={statusInfo.color}>{statusInfo.label}</span>
+          <span className={statusInfo.color}>{t(statusInfo.labelKey)}</span>
         </div>
 
         {/* Instructions */}
@@ -99,7 +101,7 @@ export const HumanApprovalNode = memo(function HumanApprovalNode(props: NodeProp
         {/* Approver Info */}
         {metadata?.approverName && (
           <div className="flex items-center gap-2 text-xs text-gray-400">
-            <span>Approver:</span>
+            <span>{t('node.approver')}</span>
             <span className="text-purple-300">{metadata.approverName}</span>
           </div>
         )}
@@ -123,7 +125,7 @@ export const HumanApprovalNode = memo(function HumanApprovalNode(props: NodeProp
         {/* Timeout Info */}
         {metadata?.timeoutSeconds && approvalStatus === 'pending' && (
           <div className="text-[10px] text-gray-500">
-            Timeout: {metadata.timeoutSeconds}s
+            {t('node.timeout').replace('{n}', String(metadata.timeoutSeconds))}
           </div>
         )}
       </div>

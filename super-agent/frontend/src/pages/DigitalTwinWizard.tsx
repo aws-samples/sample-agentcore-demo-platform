@@ -5,21 +5,23 @@
 
 import { useState, useCallback, useRef, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { ArrowLeft, ArrowRight, User, BookOpen, Zap, Share2, Upload, Check, Loader2, Sparkles, FileText, Bot } from 'lucide-react'
+import { ArrowLeft, ArrowRight, User, BookOpen, Zap, Share2, Upload, Check, Loader2, Sparkles, FileText, Bot, Globe, X } from 'lucide-react'
 import { restClient } from '@/services/api/restClient'
 import { getValidToken } from '@/services/auth'
+import { useTranslation } from '@/i18n'
 import { ChatMessage } from '@/components/chat/ChatMessage'
 import type { ContentBlock } from '@/services/chatStreamService'
 import {
   generateScope, generateScopeWithDocument, parseScopeConfig,
   type SSEEvent,
 } from '@/services/scopeGeneratorService'
+import type { Language } from '@/types'
 
 const STEPS = [
-  { id: 'identity', label: 'Identity', icon: User, desc: 'Who are you?' },
-  { id: 'knowledge', label: 'Knowledge', icon: BookOpen, desc: 'What do you know?' },
-  { id: 'skills', label: 'Skills', icon: Zap, desc: 'What can you do?' },
-  { id: 'publish', label: 'Publish', icon: Share2, desc: 'Where do you live?' },
+  { id: 'identity', labelKey: 'twin.stepIdentity', icon: User, descKey: 'twin.stepIdentityDesc' },
+  { id: 'knowledge', labelKey: 'twin.stepKnowledge', icon: BookOpen, descKey: 'twin.stepKnowledgeDesc' },
+  { id: 'skills', labelKey: 'twin.stepSkills', icon: Zap, descKey: 'twin.stepSkillsDesc' },
+  { id: 'publish', labelKey: 'twin.stepPublish', icon: Share2, descKey: 'twin.stepPublishDesc' },
 ] as const
 
 type StepId = typeof STEPS[number]['id']
@@ -38,8 +40,9 @@ interface WizardState {
   documentGroupId: string | null
   documentGroupName: string
   uploadedFiles: Array<{ name: string; size: number }>
-  // Step 3: Skills (simplified for now)
+  // Step 3: Skills
   selectedSkillIds: string[]
+  skipSkills: boolean
   // Step 4: Publish
   publishPlatform: boolean
   publishIM: boolean
@@ -51,6 +54,7 @@ interface WizardState {
 
 export function DigitalTwinWizard() {
   const navigate = useNavigate()
+  const { t, currentLanguage } = useTranslation()
   const [currentStep, setCurrentStep] = useState<StepId>('identity')
   const [isGeneratingPrompt, setIsGeneratingPrompt] = useState(false)
   const [isGeneratingTwin, setIsGeneratingTwin] = useState(false)
@@ -58,14 +62,21 @@ export function DigitalTwinWizard() {
   const [generatedConfig, setGeneratedConfig] = useState<{ config: any; avatarKey: string | null } | null>(null)
   const [isConfirming, setIsConfirming] = useState(false)
   const chatEndRef = useRef<HTMLDivElement>(null)
+  const abortRef = useRef<AbortController | null>(null)
   const [error, setError] = useState<string | null>(null)
+
+  // Language selection dialog state
+  const [showLangDialog, setShowLangDialog] = useState(false)
+  const [selectedLang, setSelectedLang] = useState<Language>(currentLanguage)
+  // The language chosen for the current generation (persisted after dialog confirm)
+  const [generationLang, setGenerationLang] = useState<Language>('en')
 
   const [state, setState] = useState<WizardState>({
     displayName: '', name: '', role: '', description: '',
     avatarFile: null, avatarPreview: null, avatarKey: null,
     systemPrompt: '',
     documentGroupId: null, documentGroupName: '', uploadedFiles: [],
-    selectedSkillIds: [],
+    selectedSkillIds: [], skipSkills: false,
     publishPlatform: true, publishIM: false, imChannelType: 'slack', imChannelId: '',
     createdAgentId: null,
   })
@@ -187,11 +198,25 @@ export function DigitalTwinWizard() {
     }
   }
 
+  // Cancel generation and go back to the publish step
+  const handleCancelGeneration = () => {
+    abortRef.current?.abort()
+    abortRef.current = null
+    setIsGeneratingTwin(false)
+    setGeneratedConfig(null)
+    setContentBlocks([])
+    setError(null)
+  }
+
   // Final save: create the agent using agentic twin generation
-  const handleFinish = async () => {
+  const handleFinish = async (language: Language) => {
       setIsGeneratingTwin(true)
       setContentBlocks([])
       setError(null)
+      setGenerationLang(language)
+      const controller = new AbortController()
+      abortRef.current = controller
+      const isCn = language === 'cn'
       try {
         // 1. Upload photo
         let avatarKey: string | null = null
@@ -200,32 +225,62 @@ export function DigitalTwinWizard() {
         }
 
         // 2. Build the description prompt for the scope generator
-        const twinDescription = [
-          `Create a DIGITAL TWIN configuration (not a business team) for a single person:`,
-          `Name: ${state.displayName}`,
-          `Role: ${state.role || 'General professional'}`,
-          `Description: ${state.description || 'A professional in their field.'}`,
-          '',
-          `IMPORTANT: This is a digital twin of ONE person, not a team.`,
-          `- Generate a scope with scope.name = "${state.displayName}"`,
-          `- Generate 1 agent that represents this person (not multiple agents)`,
-          `- The agent's systemPrompt must capture this person's specific expertise in ${state.role}`,
-          `- Generate 3-6 skills specific to ${state.role} domain (NOT generic skills)`,
-          `- If a document is provided, extract domain knowledge from it for the skills`,
-        ].join('\n')
+        const skillInstruction = state.skipSkills
+          ? (isCn
+            ? `- 不要生成任何技能。返回空的 skills 数组。`
+            : `- Do NOT generate any skills. Return an empty skills array.`)
+          : (isCn
+            ? [
+                `- 生成 3-6 个针对 ${state.role} 领域的专业技能（不要通用技能）`,
+                `- 如果提供了文档，请从中提取领域知识用于技能生成`,
+              ].join('\n')
+            : [
+                `- Generate 3-6 skills specific to ${state.role} domain (NOT generic skills)`,
+                `- If a document is provided, extract domain knowledge from it for the skills`,
+              ].join('\n'))
+
+        const twinDescription = isCn
+          ? [
+              `为以下人员创建一个数字分身配置（不是业务团队）：`,
+              `姓名：${state.displayName}`,
+              `角色：${state.role || '通用专业人士'}`,
+              `描述：${state.description || '一位专业人士。'}`,
+              '',
+              `重要：这是一个人的数字分身，不是团队。`,
+              `- 生成一个 scope，scope.name = "${state.displayName}"`,
+              `- 只生成 1 个代表此人的 agent（不要多个 agent）`,
+              `- agent 的 systemPrompt 必须体现此人在 ${state.role} 方面的专业能力`,
+              skillInstruction,
+            ].join('\n')
+          : [
+              `Create a DIGITAL TWIN configuration (not a business team) for a single person:`,
+              `Name: ${state.displayName}`,
+              `Role: ${state.role || 'General professional'}`,
+              `Description: ${state.description || 'A professional in their field.'}`,
+              '',
+              `IMPORTANT: This is a digital twin of ONE person, not a team.`,
+              `- Generate a scope with scope.name = "${state.displayName}"`,
+              `- Generate 1 agent that represents this person (not multiple agents)`,
+              `- The agent's systemPrompt must capture this person's specific expertise in ${state.role}`,
+              skillInstruction,
+            ].join('\n')
 
         setContentBlocks([{
           type: 'text',
           text: state.uploadedFiles.length > 0
-            ? `📄 Uploading document and analyzing to build ${state.displayName}'s digital twin...\n\n`
-            : `🤖 Generating ${state.displayName}'s digital twin configuration...\n\n`,
+            ? (isCn
+              ? `📄 正在上传文档并分析，构建 ${state.displayName} 的数字分身${state.skipSkills ? '（不含技能）' : ''}...\n\n`
+              : `📄 Uploading document and analyzing to build ${state.displayName}'s digital twin${state.skipSkills ? ' (without skills)' : ''}...\n\n`)
+            : (isCn
+              ? `🤖 正在生成 ${state.displayName} 的数字分身配置${state.skipSkills ? '（不含技能）' : ''}...\n\n`
+              : `🤖 Generating ${state.displayName}'s digital twin configuration${state.skipSkills ? ' (without skills)' : ''}...\n\n`),
         }])
 
         // 3. Reuse the scope generator SSE flow (same as Business Scope creation)
         // This puts the file in the workspace and lets AI read it with tools
         const sseHandler = (event: SSEEvent) => {
           if (event.type === 'session_start') {
-            setContentBlocks(prev => [...prev, { type: 'text', text: 'Session started. Analyzing...\n\n' }])
+            setContentBlocks(prev => [...prev, { type: 'text', text: isCn ? '会话已启动，正在分析...\n\n' : 'Session started. Analyzing...\n\n' }])
           } else if (event.type === 'assistant' && event.content) {
             setContentBlocks(prev => {
               const next = [...prev]
@@ -246,7 +301,7 @@ export function DigitalTwinWizard() {
               return next
             })
           } else if (event.type === 'result') {
-            setContentBlocks(prev => [...prev, { type: 'text', text: '\n\n✅ Generation complete.' }])
+            setContentBlocks(prev => [...prev, { type: 'text', text: isCn ? '\n\n✅ 生成完成。' : '\n\n✅ Generation complete.' }])
           } else if (event.type === 'error') {
             setContentBlocks(prev => [...prev, { type: 'text', text: `\n\n❌ Error: ${event.message}` }])
           }
@@ -276,8 +331,8 @@ export function DigitalTwinWizard() {
 
         // Call the same generate endpoint as Business Scope creation
         const fullText = sopFile
-          ? await generateScopeWithDocument(sopFile, twinDescription, sseHandler)
-          : await generateScope(twinDescription, sseHandler)
+          ? await generateScopeWithDocument(sopFile, twinDescription, sseHandler, controller.signal, language)
+          : await generateScope(twinDescription, sseHandler, controller.signal, language)
 
         // 4. Parse the generated config
         try {
@@ -293,7 +348,7 @@ export function DigitalTwinWizard() {
               color: scopeConfig.scope.color || '#6366f1',
             },
             systemPrompt: firstAgent?.systemPrompt || scopeConfig.scope.description,
-            skills: (firstAgent?.skills || []).map(s => ({
+            skills: state.skipSkills ? [] : (firstAgent?.skills || []).map(s => ({
               name: s.name,
               description: s.description,
               body: s.body,
@@ -303,12 +358,18 @@ export function DigitalTwinWizard() {
           const skillCount = twinConfig.skills.length
           setContentBlocks(prev => [...prev, {
             type: 'text',
-            text: `\n\n✅ Generated system prompt and **${skillCount} skills** for ${state.displayName}. Review above and click "Confirm & Create" to save.`,
+            text: state.skipSkills
+              ? (isCn
+                ? `\n\n✅ 已为 ${state.displayName} 生成系统提示词（已跳过技能）。请查看上方内容，点击"确认并创建"保存。`
+                : `\n\n✅ Generated system prompt for ${state.displayName} (skills skipped). Review above and click "Confirm & Create" to save.`)
+              : (isCn
+                ? `\n\n✅ 已为 ${state.displayName} 生成系统提示词和 **${skillCount} 个技能**。请查看上方内容，点击"确认并创建"保存。`
+                : `\n\n✅ Generated system prompt and **${skillCount} skills** for ${state.displayName}. Review above and click "Confirm & Create" to save.`),
           }])
           setGeneratedConfig({ config: twinConfig, avatarKey })
         } catch {
           // Fallback: basic config
-          setContentBlocks(prev => [...prev, { type: 'text', text: '\n\n⚠️ Could not parse AI output. A basic configuration has been prepared.' }])
+          setContentBlocks(prev => [...prev, { type: 'text', text: isCn ? '\n\n⚠️ 无法解析 AI 输出，已准备基础配置。' : '\n\n⚠️ Could not parse AI output. A basic configuration has been prepared.' }])
           setGeneratedConfig({
             config: {
               scope: { name: state.displayName, description: `Digital twin of ${state.displayName}`, icon: '🤖', color: '#6366f1' },
@@ -321,7 +382,11 @@ export function DigitalTwinWizard() {
 
         setIsGeneratingTwin(false)
       } catch (err) {
-        setError(err instanceof Error ? err.message : 'Failed to create digital twin')
+        if (err instanceof DOMException && err.name === 'AbortError') {
+          // User cancelled — no error to show
+        } else {
+          setError(err instanceof Error ? err.message : 'Failed to create digital twin')
+        }
         setIsGeneratingTwin(false)
       }
     }
@@ -333,7 +398,7 @@ export function DigitalTwinWizard() {
     try {
       const { config, avatarKey } = generatedConfig
 
-      setContentBlocks(prev => [...prev, { type: 'text', text: `\n\n💾 Saving digital twin with ${config.skills?.length ?? 0} skills...` }])
+      setContentBlocks(prev => [...prev, { type: 'text', text: generationLang === 'cn' ? `\n\n💾 正在保存数字分身，包含 ${config.skills?.length ?? 0} 个技能...` : `\n\n💾 Saving digital twin with ${config.skills?.length ?? 0} skills...` }])
 
       const confirmRes = await restClient.post<{ data: { scope: { id: string } } }>(
         '/api/scope-generator/generate-twin/confirm',
@@ -350,7 +415,7 @@ export function DigitalTwinWizard() {
         } catch { /* non-fatal */ }
       }
 
-      setContentBlocks(prev => [...prev, { type: 'text', text: '\n\n🎉 Digital twin created successfully! Redirecting...' }])
+      setContentBlocks(prev => [...prev, { type: 'text', text: generationLang === 'cn' ? '\n\n🎉 数字分身创建成功！正在跳转...' : '\n\n🎉 Digital twin created successfully! Redirecting...' }])
       setTimeout(() => navigate(`/agents?scope=${scopeId}`), 1500)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to save digital twin')
@@ -366,8 +431,8 @@ export function DigitalTwinWizard() {
           <ArrowLeft size={18} className="text-gray-400" />
         </button>
         <div>
-          <h1 className="text-lg font-semibold">Create Digital Twin</h1>
-          <p className="text-xs text-gray-500">Build an AI version of yourself</p>
+          <h1 className="text-lg font-semibold">{t('twin.title')}</h1>
+          <p className="text-xs text-gray-500">{t('twin.subtitle')}</p>
         </div>
       </div>
 
@@ -389,7 +454,7 @@ export function DigitalTwinWizard() {
                 }`}
               >
                 {isDone ? <Check size={14} /> : <Icon size={14} />}
-                <span className="hidden sm:inline">{step.label}</span>
+                <span className="hidden sm:inline">{t(step.labelKey)}</span>
               </button>
             </div>
           )
@@ -402,8 +467,14 @@ export function DigitalTwinWizard() {
           /* ── Generating view: Claude Code chat interface ── */
           <div className="space-y-4">
             <div className="text-center mb-6">
-              <h2 className="text-xl font-semibold mb-1">Creating {state.displayName}'s Digital Twin</h2>
-              <p className="text-sm text-gray-400">AI is analyzing your documents and building skills...</p>
+              <h2 className="text-xl font-semibold mb-1">
+                {generationLang === 'cn' ? `正在创建 ${state.displayName} 的数字分身` : t('twin.creatingTitle').replace('{name}', state.displayName)}
+              </h2>
+              <p className="text-sm text-gray-400">
+                {state.skipSkills
+                  ? (generationLang === 'cn' ? '正在生成数字分身配置...' : t('twin.generatingConfig'))
+                  : (generationLang === 'cn' ? '正在分析文档并构建技能...' : t('twin.analyzingDocs'))}
+              </p>
             </div>
 
             {/* User prompt bubble */}
@@ -413,25 +484,31 @@ export function DigitalTwinWizard() {
               </div>
               <div className="flex flex-col max-w-[70%] items-end">
                 <div className="px-4 py-2 rounded-2xl bg-blue-600 text-white rounded-br-md">
-                  <p className="text-sm">Create a digital twin for {state.displayName} ({state.role})</p>
+                  <p className="text-sm">
+                    {generationLang === 'cn'
+                      ? `为 ${state.displayName}（${state.role}）创建数字分身`
+                      : t('twin.userPrompt').replace('{name}', state.displayName).replace('{role}', state.role)}
+                  </p>
                 </div>
               </div>
             </div>
 
             {/* AI streaming response */}
-            <div className="flex gap-3">
-              <div className="w-8 h-8 rounded-full bg-purple-600 flex items-center justify-center flex-shrink-0">
-                <Bot className="w-4 h-4 text-white" />
-              </div>
-              <div className="flex-1 max-w-[85%]">
+            <div>
+              <div className="flex-1">
                 {contentBlocks.length > 0 ? (
-                  <ChatMessage content={contentBlocks} isStreaming={true} />
+                  <ChatMessage content={contentBlocks} isStreaming={isGeneratingTwin} />
                 ) : (
-                  <div className="bg-gray-800 px-4 py-3 rounded-2xl rounded-bl-md">
-                    <div className="flex gap-1">
-                      <span className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
-                      <span className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
-                      <span className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
+                  <div className="flex gap-3">
+                    <div className="w-8 h-8 rounded-full bg-purple-600 flex items-center justify-center flex-shrink-0">
+                      <Bot className="w-4 h-4 text-white" />
+                    </div>
+                    <div className="bg-gray-800 px-4 py-3 rounded-2xl rounded-bl-md">
+                      <div className="flex gap-1">
+                        <span className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
+                        <span className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
+                        <span className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
+                      </div>
                     </div>
                   </div>
                 )}
@@ -444,24 +521,24 @@ export function DigitalTwinWizard() {
               </div>
             )}
 
-            {/* Confirm button — shown after generation completes */}
-            {generatedConfig && !isConfirming && (
-              <div className="flex justify-center pt-4">
-                <button
-                  onClick={handleConfirmCreate}
-                  className="flex items-center gap-2 px-6 py-3 bg-green-600 hover:bg-green-500 text-white rounded-lg text-sm font-medium transition-colors"
-                >
-                  <Check size={16} />
-                  Confirm & Create Digital Twin
-                </button>
-              </div>
-            )}
             {isConfirming && (
               <div className="flex justify-center pt-4">
                 <div className="flex items-center gap-2 px-6 py-3 bg-gray-700 text-gray-300 rounded-lg text-sm">
                   <Loader2 size={16} className="animate-spin" />
-                  Saving...
+                  {t('twin.savingTwin')}
                 </div>
+              </div>
+            )}
+            {/* Cancel button — shown during generation (before config is ready) */}
+            {isGeneratingTwin && !generatedConfig && (
+              <div className="flex justify-center pt-4">
+                <button
+                  onClick={handleCancelGeneration}
+                  className="flex items-center gap-2 px-4 py-2 text-sm text-gray-400 hover:text-white transition-colors"
+                >
+                  <ArrowLeft size={16} />
+                  {t('twin.cancelGoBack')}
+                </button>
               </div>
             )}
 
@@ -470,8 +547,8 @@ export function DigitalTwinWizard() {
         ) : currentStep === 'identity' && (
           <div className="space-y-6">
             <div className="text-center mb-8">
-              <h2 className="text-xl font-semibold mb-1">Who are you?</h2>
-              <p className="text-sm text-gray-400">Upload your photo and describe yourself</p>
+              <h2 className="text-xl font-semibold mb-1">{t('twin.identityTitle')}</h2>
+              <p className="text-sm text-gray-400">{t('twin.identitySubtitle')}</p>
             </div>
 
             {/* Photo upload */}
@@ -485,32 +562,32 @@ export function DigitalTwinWizard() {
                   ) : (
                     <div className="text-center">
                       <Upload size={20} className="mx-auto text-gray-500" />
-                      <span className="text-[10px] text-gray-500 mt-1">Photo</span>
+                      <span className="text-[10px] text-gray-500 mt-1">{t('twin.photoLabel')}</span>
                     </div>
                   )}
                 </div>
                 <input type="file" accept="image/*" onChange={handlePhotoSelect} className="hidden" />
               </label>
-              <span className="text-xs text-gray-500">Click to upload your photo</span>
+              <span className="text-xs text-gray-500">{t('twin.clickUploadPhoto')}</span>
             </div>
 
             {/* Name fields */}
             <div className="grid grid-cols-2 gap-4">
               <div>
-                <label className="block text-xs text-gray-400 mb-1">Display Name</label>
+                <label className="block text-xs text-gray-400 mb-1">{t('twin.displayNameLabel')}</label>
                 <input
                   value={state.displayName}
                   onChange={e => handleNameChange(e.target.value)}
-                  placeholder="e.g. Yaohua"
+                  placeholder={t('twin.displayNamePlaceholder')}
                   className="w-full px-3 py-2 bg-gray-800 border border-gray-700 rounded-lg text-sm text-white placeholder-gray-500 outline-none focus:border-blue-500"
                 />
               </div>
               <div>
-                <label className="block text-xs text-gray-400 mb-1">Role / Title</label>
+                <label className="block text-xs text-gray-400 mb-1">{t('twin.roleTitleLabel')}</label>
                 <input
                   value={state.role}
                   onChange={e => update({ role: e.target.value })}
-                  placeholder="e.g. AWS AgentCore Specialist"
+                  placeholder={t('twin.rolePlaceholder')}
                   className="w-full px-3 py-2 bg-gray-800 border border-gray-700 rounded-lg text-sm text-white placeholder-gray-500 outline-none focus:border-blue-500"
                 />
               </div>
@@ -518,11 +595,11 @@ export function DigitalTwinWizard() {
 
             {/* Description */}
             <div>
-              <label className="block text-xs text-gray-400 mb-1">About You</label>
+              <label className="block text-xs text-gray-400 mb-1">{t('twin.aboutYouLabel')}</label>
               <textarea
                 value={state.description}
                 onChange={e => update({ description: e.target.value })}
-                placeholder="Describe your expertise, personality, communication style... This will be used to generate your digital twin's behavior."
+                placeholder={t('twin.aboutYouPlaceholder')}
                 rows={4}
                 className="w-full px-3 py-2 bg-gray-800 border border-gray-700 rounded-lg text-sm text-white placeholder-gray-500 outline-none focus:border-blue-500 resize-none"
               />
@@ -531,20 +608,20 @@ export function DigitalTwinWizard() {
             {/* System prompt (AI-generated) */}
             <div>
               <div className="flex items-center justify-between mb-1">
-                <label className="text-xs text-gray-400">System Prompt</label>
+                <label className="text-xs text-gray-400">{t('twin.systemPromptLabel')}</label>
                 <button
                   onClick={generateSystemPrompt}
                   disabled={isGeneratingPrompt || !state.description.trim()}
                   className="flex items-center gap-1 px-2 py-1 text-xs text-purple-400 hover:text-purple-300 disabled:text-gray-600 transition-colors"
                 >
                   {isGeneratingPrompt ? <Loader2 size={12} className="animate-spin" /> : <Sparkles size={12} />}
-                  {isGeneratingPrompt ? 'Generating...' : 'AI Generate'}
+                  {isGeneratingPrompt ? t('twin.aiGenerating') : t('twin.aiGenerateBtn')}
                 </button>
               </div>
               <textarea
                 value={state.systemPrompt}
                 onChange={e => update({ systemPrompt: e.target.value })}
-                placeholder="AI will generate this based on your description, or write your own..."
+                placeholder={t('twin.systemPromptPlaceholder')}
                 rows={6}
                 className="w-full px-3 py-2 bg-gray-800 border border-gray-700 rounded-lg text-sm text-white placeholder-gray-500 outline-none focus:border-blue-500 resize-none font-mono text-xs"
               />
@@ -552,18 +629,18 @@ export function DigitalTwinWizard() {
           </div>
         )}
 
-        {currentStep === 'knowledge' && (
+        {currentStep === 'knowledge' && !(isGeneratingTwin || generatedConfig) && (
           <div className="space-y-6">
             <div className="text-center mb-8">
-              <h2 className="text-xl font-semibold mb-1">What do you know?</h2>
-              <p className="text-sm text-gray-400">Upload documents that represent your expertise</p>
+              <h2 className="text-xl font-semibold mb-1">{t('twin.knowledgeTitle')}</h2>
+              <p className="text-sm text-gray-400">{t('twin.knowledgeSubtitle')}</p>
             </div>
 
             {/* File upload area */}
             <label className="block border-2 border-dashed border-gray-700 hover:border-gray-500 rounded-xl p-8 text-center cursor-pointer transition-colors">
               <Upload size={32} className="mx-auto text-gray-500 mb-3" />
-              <p className="text-sm text-gray-300 mb-1">Drop files here or click to upload</p>
-              <p className="text-xs text-gray-500">PDF, DOC, TXT, MD — up to 50MB each</p>
+              <p className="text-sm text-gray-300 mb-1">{t('twin.dropFilesUpload')}</p>
+              <p className="text-xs text-gray-500">{t('twin.fileFormats')}</p>
               <input
                 type="file"
                 multiple
@@ -576,7 +653,7 @@ export function DigitalTwinWizard() {
             {/* Uploaded files list */}
             {state.uploadedFiles.length > 0 && (
               <div className="space-y-2">
-                <p className="text-xs text-gray-400">{state.uploadedFiles.length} file(s) uploaded</p>
+                <p className="text-xs text-gray-400">{t('twin.filesUploaded').replace('{n}', String(state.uploadedFiles.length))}</p>
                 {state.uploadedFiles.map((f, i) => (
                   <div key={i} className="flex items-center gap-2 px-3 py-2 bg-gray-800 rounded-lg">
                     <FileText size={14} className="text-blue-400" />
@@ -589,98 +666,55 @@ export function DigitalTwinWizard() {
 
             <div className="bg-gray-800/50 border border-gray-700 rounded-lg p-4">
               <p className="text-xs text-gray-400">
-                Tip: Upload documents that contain your domain expertise — internal docs, guides, FAQs, meeting notes.
-                Your digital twin will use these as reference when answering questions.
+                {t('twin.knowledgeTip')}
               </p>
             </div>
           </div>
         )}
 
-        {currentStep === 'skills' && (
+        {currentStep === 'skills' && !(isGeneratingTwin || generatedConfig) && (
           <div className="space-y-6">
             <div className="text-center mb-8">
-              <h2 className="text-xl font-semibold mb-1">What can you do?</h2>
-              <p className="text-sm text-gray-400">Skills and tools can be configured later from the agent profile</p>
+              <h2 className="text-xl font-semibold mb-1">{t('twin.skillsTitle')}</h2>
+              <p className="text-sm text-gray-400">{t('twin.skillsSubtitle')}</p>
             </div>
 
-            <div className="bg-gray-800/50 border border-gray-700 rounded-xl p-8 text-center">
+            {/* Skip skills toggle */}
+            <label className="flex items-center gap-3 px-4 py-3 bg-gray-800 border border-gray-700 rounded-lg cursor-pointer hover:border-gray-600 transition-colors">
+              <input
+                type="checkbox"
+                checked={state.skipSkills}
+                onChange={e => update({ skipSkills: e.target.checked })}
+                className="w-4 h-4 rounded border-gray-600 bg-gray-700 text-blue-600 focus:ring-blue-500"
+              />
+              <div className="flex-1">
+                <div className="text-sm text-white">{t('twin.skipSkillsLabel')}</div>
+                <div className="text-xs text-gray-400">{t('twin.skipSkillsDesc')}</div>
+              </div>
+            </label>
+
+            <div className={`bg-gray-800/50 border border-gray-700 rounded-xl p-8 text-center transition-opacity ${state.skipSkills ? 'opacity-40' : ''}`}>
               <Zap size={32} className="mx-auto text-yellow-500 mb-3" />
-              <p className="text-sm text-gray-300 mb-2">Skills can be equipped after creation</p>
+              <p className="text-sm text-gray-300 mb-2">
+                {state.skipSkills ? t('twin.noSkillsGenerated') : t('twin.skillsWillGenerate')}
+              </p>
               <p className="text-xs text-gray-500 max-w-md mx-auto">
-                Once your digital twin is created, you can open the Skill Workshop to browse and equip skills,
-                connect MCP servers (like Quip, Confluence), and fine-tune capabilities.
+                {state.skipSkills ? t('twin.skipSkillsHint') : t('twin.generateSkillsHint')}
               </p>
             </div>
           </div>
         )}
 
-        {currentStep === 'publish' && (
+        {currentStep === 'publish' && !(isGeneratingTwin || generatedConfig) && (
           <div className="space-y-6">
+            {/* Summary */}
             <div className="text-center mb-8">
-              <h2 className="text-xl font-semibold mb-1">Where do you live?</h2>
-              <p className="text-sm text-gray-400">Choose where your digital twin will be available</p>
+              <h2 className="text-xl font-semibold mb-1">{t('twin.readyToCreate')}</h2>
+              <p className="text-sm text-gray-400">{t('twin.reviewSubtitle')}</p>
             </div>
 
-            {/* Platform toggle */}
-            <label className="flex items-center gap-3 px-4 py-3 bg-gray-800 border border-gray-700 rounded-lg cursor-pointer hover:border-gray-600 transition-colors">
-              <input
-                type="checkbox"
-                checked={state.publishPlatform}
-                onChange={e => update({ publishPlatform: e.target.checked })}
-                className="w-4 h-4 rounded border-gray-600 bg-gray-700 text-blue-600 focus:ring-blue-500"
-              />
-              <div className="flex-1">
-                <div className="text-sm text-white">Super Agent Platform</div>
-                <div className="text-xs text-gray-400">Available in the chat interface as an independent agent</div>
-              </div>
-              <Check size={16} className={state.publishPlatform ? 'text-green-400' : 'text-gray-600'} />
-            </label>
-
-            {/* IM toggle */}
-            <label className="flex items-center gap-3 px-4 py-3 bg-gray-800 border border-gray-700 rounded-lg cursor-pointer hover:border-gray-600 transition-colors">
-              <input
-                type="checkbox"
-                checked={state.publishIM}
-                onChange={e => update({ publishIM: e.target.checked })}
-                className="w-4 h-4 rounded border-gray-600 bg-gray-700 text-blue-600 focus:ring-blue-500"
-              />
-              <div className="flex-1">
-                <div className="text-sm text-white">IM Channel (Feishu / Slack / DingTalk)</div>
-                <div className="text-xs text-gray-400">Bind to a group chat so people can @mention your twin</div>
-              </div>
-            </label>
-
-            {state.publishIM && (
-              <div className="ml-7 space-y-3 pl-4 border-l-2 border-gray-700">
-                <div>
-                  <label className="block text-xs text-gray-400 mb-1">Channel Type</label>
-                  <select
-                    value={state.imChannelType}
-                    onChange={e => update({ imChannelType: e.target.value })}
-                    className="w-full px-3 py-2 bg-gray-800 border border-gray-700 rounded-lg text-sm text-white outline-none focus:border-blue-500"
-                  >
-                    <option value="slack">Slack</option>
-                    <option value="feishu">Feishu / Lark</option>
-                    <option value="dingtalk">DingTalk</option>
-                    <option value="discord">Discord</option>
-                    <option value="teams">Microsoft Teams</option>
-                  </select>
-                </div>
-                <div>
-                  <label className="block text-xs text-gray-400 mb-1">Channel ID</label>
-                  <input
-                    value={state.imChannelId}
-                    onChange={e => update({ imChannelId: e.target.value })}
-                    placeholder="e.g. C01234ABCDE"
-                    className="w-full px-3 py-2 bg-gray-800 border border-gray-700 rounded-lg text-sm text-white placeholder-gray-500 outline-none focus:border-blue-500"
-                  />
-                </div>
-              </div>
-            )}
-
-            {/* Summary */}
             <div className="bg-gray-800/50 border border-gray-700 rounded-lg p-4 space-y-2">
-              <p className="text-xs text-gray-400 font-medium uppercase tracking-wider">Summary</p>
+              <p className="text-xs text-gray-400 font-medium uppercase tracking-wider">{t('twin.summaryLabel')}</p>
               <div className="flex items-center gap-3">
                 {state.avatarPreview ? (
                   <img src={state.avatarPreview} alt="" className="w-10 h-10 rounded-full object-cover" />
@@ -690,12 +724,12 @@ export function DigitalTwinWizard() {
                   </div>
                 )}
                 <div>
-                  <div className="text-sm text-white font-medium">{state.displayName || 'Unnamed'}</div>
-                  <div className="text-xs text-gray-400">{state.role || 'No role set'}</div>
+                  <div className="text-sm text-white font-medium">{state.displayName || t('twin.unnamed')}</div>
+                  <div className="text-xs text-gray-400">{state.role || t('twin.noRole')}</div>
                 </div>
               </div>
               <div className="text-xs text-gray-500">
-                {state.uploadedFiles.length} document(s) • {state.publishPlatform ? 'Platform' : ''}{state.publishIM ? ' + IM' : ''}
+                {t('twin.summaryLine').replace('{docs}', String(state.uploadedFiles.length)).replace('{skills}', state.skipSkills ? t('twin.noSkills') : t('twin.aiGeneratedSkills'))}
               </div>
             </div>
 
@@ -708,36 +742,108 @@ export function DigitalTwinWizard() {
         )}
       </div>
 
-      {/* Bottom navigation — hidden during generation */}
-      {!isGeneratingTwin && !generatedConfig && (
+      {/* Bottom navigation */}
+      {!isConfirming && (
       <div className="fixed bottom-0 left-0 right-0 flex items-center justify-between px-6 py-4 border-t border-gray-800 bg-gray-950">
         <button
-          onClick={canGoBack ? goBack : () => navigate('/agents')}
+          onClick={(isGeneratingTwin || generatedConfig) ? handleCancelGeneration : (canGoBack ? goBack : () => navigate('/agents'))}
           className="flex items-center gap-2 px-4 py-2 text-sm text-gray-400 hover:text-white transition-colors"
         >
           <ArrowLeft size={16} />
-          {canGoBack ? 'Back' : 'Cancel'}
+          {(isGeneratingTwin || generatedConfig) ? t('twin.back') : (canGoBack ? t('twin.back') : t('common.cancel'))}
         </button>
 
-        {isLastStep ? (
+        {(isGeneratingTwin || generatedConfig) ? (
+          /* During / after generation */
+          generatedConfig ? (
+            <button
+              onClick={handleConfirmCreate}
+              className="flex items-center gap-2 px-6 py-2 bg-green-600 hover:bg-green-500 text-white rounded-lg text-sm font-medium transition-colors"
+            >
+              <Check size={16} />
+              {t('twin.confirmCreate')}
+            </button>
+          ) : (
+            <div className="flex items-center gap-2 px-4 py-2 text-sm text-gray-500">
+              <Loader2 size={16} className="animate-spin" />
+              {t('twin.generating')}
+            </div>
+          )
+        ) : isLastStep ? (
           <button
-            onClick={handleFinish}
+            onClick={() => { setSelectedLang(currentLanguage); setShowLangDialog(true) }}
             disabled={isGeneratingTwin || !state.displayName.trim()}
             className="flex items-center gap-2 px-6 py-2 bg-blue-600 hover:bg-blue-500 disabled:bg-gray-700 disabled:text-gray-500 text-white rounded-lg text-sm font-medium transition-colors"
           >
             {isGeneratingTwin ? <Loader2 size={16} className="animate-spin" /> : <Sparkles size={16} />}
-            {isGeneratingTwin ? 'Creating...' : 'Create Digital Twin'}
+            {isGeneratingTwin ? t('twin.creating') : t('twin.createButton')}
           </button>
         ) : (
           <button
             onClick={goNext}
             className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-lg text-sm transition-colors"
           >
-            Next
+            {t('twin.next')}
             <ArrowRight size={16} />
           </button>
         )}
       </div>
+      )}
+
+      {/* Language Selection Dialog */}
+      {showLangDialog && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm">
+          <div className="bg-gray-800 border border-gray-700 rounded-2xl shadow-2xl w-full max-w-md mx-4 overflow-hidden">
+            <div className="flex items-center justify-between px-6 py-4 border-b border-gray-700">
+              <div className="flex items-center gap-2">
+                <Globe className="w-5 h-5 text-purple-400" />
+                <h3 className="text-lg font-semibold text-white">{t('twin.langDialogTitle')}</h3>
+              </div>
+              <button onClick={() => setShowLangDialog(false)} className="p-1.5 rounded-lg text-gray-400 hover:text-white hover:bg-gray-700 transition-colors">
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+            <div className="px-6 py-5 space-y-4">
+              <p className="text-sm text-gray-400">
+                {t('twin.langDialogDesc')}
+              </p>
+              <div className="grid grid-cols-2 gap-3">
+                <button
+                  onClick={() => setSelectedLang('en')}
+                  className={`flex flex-col items-center gap-2 p-4 rounded-xl border-2 transition-all ${
+                    selectedLang === 'en'
+                      ? 'border-purple-500 bg-purple-500/10 shadow-lg shadow-purple-500/10'
+                      : 'border-gray-700 bg-gray-800/50 hover:border-gray-600'
+                  }`}
+                >
+                  <span className="text-2xl">🇺🇸</span>
+                  <span className={`text-sm font-medium ${selectedLang === 'en' ? 'text-purple-300' : 'text-gray-300'}`}>{t('twin.langEnglish')}</span>
+                </button>
+                <button
+                  onClick={() => setSelectedLang('cn')}
+                  className={`flex flex-col items-center gap-2 p-4 rounded-xl border-2 transition-all ${
+                    selectedLang === 'cn'
+                      ? 'border-purple-500 bg-purple-500/10 shadow-lg shadow-purple-500/10'
+                      : 'border-gray-700 bg-gray-800/50 hover:border-gray-600'
+                  }`}
+                >
+                  <span className="text-2xl">🇨🇳</span>
+                  <span className={`text-sm font-medium ${selectedLang === 'cn' ? 'text-purple-300' : 'text-gray-300'}`}>中文</span>
+                </button>
+              </div>
+            </div>
+            <div className="flex justify-end gap-3 px-6 py-4 border-t border-gray-700">
+              <button onClick={() => setShowLangDialog(false)} className="px-5 py-2 text-sm text-gray-300 hover:text-white border border-gray-600 rounded-xl transition-colors">
+                {t('common.cancel')}
+              </button>
+              <button onClick={() => { setShowLangDialog(false); handleFinish(selectedLang) }}
+                className="px-6 py-2 text-sm font-semibold rounded-xl bg-gradient-to-r from-purple-500 to-blue-600 text-white hover:shadow-lg hover:shadow-purple-500/30 transition-all flex items-center gap-2">
+                <Sparkles className="w-4 h-4" />
+                {t('twin.langCreateBtn')}
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   )

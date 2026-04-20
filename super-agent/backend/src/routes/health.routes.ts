@@ -64,7 +64,7 @@ export async function healthRoutes(fastify: FastifyInstance): Promise<void> {
       const response: HealthResponse = {
         status: 'ok',
         timestamp: new Date().toISOString(),
-        service: 'super-agent-backend',
+        service: 'backend',
         version: process.env.npm_package_version || '1.0.0',
       };
 
@@ -146,7 +146,7 @@ export async function healthRoutes(fastify: FastifyInstance): Promise<void> {
       const response: ReadinessResponse = {
         status: dbHealthy ? 'ok' : 'unhealthy',
         timestamp: new Date().toISOString(),
-        service: 'super-agent-backend',
+        service: 'backend',
         version: process.env.npm_package_version || '1.0.0',
         checks: {
           database: dbHealthy

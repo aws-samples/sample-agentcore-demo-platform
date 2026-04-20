@@ -83,7 +83,7 @@ export function ContextPanel({ context, isLoading = false }: ContextPanelProps) 
   if (!context) {
     return (
       <div className="w-72 bg-gray-900 border-l border-gray-800 p-4 flex items-center justify-center">
-        <p className="text-gray-500 text-sm text-center">No context available</p>
+        <p className="text-gray-500 text-sm text-center">{t('chat.noContext')}</p>
       </div>
     )
   }

@@ -1,0 +1,27 @@
+{
+  "id": "redshift",
+  "version": "1.0.0",
+  "name": "Redshift",
+  "icon": "🏢",
+  "category": "database",
+  "description": {
+    "en": "Data warehouse queries",
+    "cn": "数据仓库查询"
+  },
+  "auth": {
+    "type": "connection_string",
+    "credential_fields": [
+      { "key": "host", "label": { "en": "Host", "cn": "Host" }, "type": "text", "placeholder": "my-cluster.xxx.us-east-1.redshift.amazonaws.com", "required": true },
+      { "key": "port", "label": { "en": "Port", "cn": "Port" }, "type": "number", "placeholder": "5439", "required": false },
+      { "key": "database", "label": { "en": "Database", "cn": "Database" }, "type": "text", "placeholder": "dev", "required": true },
+      { "key": "username", "label": { "en": "Username", "cn": "Username" }, "type": "text", "required": true },
+      { "key": "password", "label": { "en": "Password", "cn": "Password" }, "type": "password", "required": true }
+    ]
+  },
+  "config_fields": [
+    { "key": "schema", "label": { "en": "Schema", "cn": "Schema" }, "type": "text", "placeholder": "public", "required": false }
+  ],
+  "setup_guide": "setup-guide.md",
+  "tools_definition": "tools.json",
+  "lambda_handler": "handler.ts"
+}

@@ -23,3 +23,8 @@ export {
   startScheduleProcessor,
   stopScheduleProcessor,
 } from './schedule-processor.js';
+
+export {
+  startProjectAutoProcessor,
+  stopProjectAutoProcessor,
+} from './project-auto-processor.js';

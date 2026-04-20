@@ -26,9 +26,9 @@ interface ToastState {
 }
 
 // Simplified status options: Active & Disabled
-const SIMPLE_STATUSES: Array<{ value: AgentStatus; label: string }> = [
-  { value: 'active', label: 'Active' },
-  { value: 'offline', label: 'Disabled' },
+const SIMPLE_STATUSES: Array<{ value: AgentStatus; labelKey: string }> = [
+  { value: 'active', labelKey: 'agentConfig.statusActive' },
+  { value: 'offline', labelKey: 'agentConfig.statusDisabled' },
 ]
 
 export function AgentConfigurator() {
@@ -173,7 +173,7 @@ export function AgentConfigurator() {
             : tool
         )
         handleInputChange('tools', updatedTools)
-        showToast('success', 'Skill updated successfully')
+        showToast('success', t('agentConfig.skillUpdated'))
       } catch (err) {
         showToast('error', 'Failed to update skill')
         console.error('Failed to update skill:', err)
@@ -199,7 +199,7 @@ export function AgentConfigurator() {
 
   const handleSave = async () => {
     if (!form.internalName.trim() || !form.displayName.trim()) {
-      showToast('error', 'Name and display name are required')
+      showToast('error', t('agentConfig.nameRequired'))
       return
     }
 
@@ -220,7 +220,7 @@ export function AgentConfigurator() {
           origin: 'manual',
         })
         setIsSaving(false)
-        showToast('success', 'Agent created successfully')
+        showToast('success', t('agentConfig.agentCreated'))
         // Navigate to the new agent's page
         setTimeout(() => navigate(`/agents?id=${created.id}`), 500)
       } catch (err) {
@@ -335,7 +335,7 @@ export function AgentConfigurator() {
                 className="flex items-center gap-2 px-4 py-2 bg-yellow-600/20 hover:bg-yellow-600/30 border border-yellow-600/40 rounded-lg text-yellow-400 transition-colors"
               >
                 <Zap className="w-4 h-4" />
-                <span>Skill Workshop</span>
+                <span>{t('agentConfig.skillWorkshop')}</span>
               </button>
             )}
             <button
@@ -438,7 +438,7 @@ export function AgentConfigurator() {
                 />
                 <label className="flex items-center gap-1.5 px-3 py-2 bg-blue-600/20 hover:bg-blue-600/30 text-blue-400 rounded-lg cursor-pointer transition-colors text-sm">
                   <Upload size={14} />
-                  <span>Upload</span>
+                  <span>{t('agentConfig.upload')}</span>
                   <input
                     type="file"
                     accept="image/png,image/jpeg,image/webp,image/gif"
@@ -475,7 +475,7 @@ export function AgentConfigurator() {
           {/* Status */}
           <FormField label={t('agentConfig.status')}>
             <div className="grid grid-cols-2 gap-3">
-              {SIMPLE_STATUSES.map(({ value, label }) => (
+              {SIMPLE_STATUSES.map(({ value, labelKey }) => (
                 <button
                   key={value}
                   type="button"
@@ -486,7 +486,7 @@ export function AgentConfigurator() {
                       : 'bg-gray-800 border-gray-700 text-gray-300 hover:border-gray-600'
                   }`}
                 >
-                  {label}
+                  {t(labelKey)}
                 </button>
               ))}
             </div>
@@ -574,7 +574,7 @@ export function AgentConfigurator() {
                           type="button"
                           onClick={() => handleEditTool(tool)}
                           className="p-1 hover:bg-gray-700 rounded text-gray-400 hover:text-blue-400"
-                          title="Edit skill"
+                          title={t('agentConfig.editSkill')}
                         >
                           <Pencil className="w-4 h-4" />
                         </button>
@@ -582,7 +582,7 @@ export function AgentConfigurator() {
                           type="button"
                           onClick={() => handleRemoveTool(tool.id)}
                           className="p-1 hover:bg-gray-700 rounded text-gray-400 hover:text-red-400"
-                          title="Remove skill"
+                          title={t('agentConfig.removeSkill')}
                         >
                           <X className="w-4 h-4" />
                         </button>

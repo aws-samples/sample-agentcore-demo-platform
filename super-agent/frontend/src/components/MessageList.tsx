@@ -3,6 +3,7 @@ import { User } from 'lucide-react'
 import type { Message } from '@/types'
 import type { ContentBlock } from '@/services/chatStreamService'
 import { ChatMessage } from './chat/ChatMessage'
+import { useTranslation } from '@/i18n'
 
 interface MessageListProps {
   messages: Message[]
@@ -119,6 +120,7 @@ function TypingIndicator() {
 
 export function MessageList({ messages, isTyping = false }: MessageListProps) {
   const messagesEndRef = useRef<HTMLDivElement>(null)
+  const { t } = useTranslation()
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
@@ -127,7 +129,7 @@ export function MessageList({ messages, isTyping = false }: MessageListProps) {
   if (messages.length === 0 && !isTyping) {
     return (
       <div className="flex-1 flex items-center justify-center text-gray-500">
-        <p>Start a conversation by sending a message</p>
+        <p>{t('chat.emptyState')}</p>
       </div>
     )
   }

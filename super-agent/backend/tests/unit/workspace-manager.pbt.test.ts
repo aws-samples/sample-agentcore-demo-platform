@@ -39,7 +39,7 @@ const agentIdArb = fc
  * Uses realistic path prefixes to simulate different deployment environments.
  */
 const baseDirArb = fc.constantFrom(
-  '/tmp/super-agent-workspaces',
+  '/tmp/workspaces',
   '/var/lib/agent-workspaces',
   '/home/user/workspaces',
   '/opt/agents/work',

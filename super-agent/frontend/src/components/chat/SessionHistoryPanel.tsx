@@ -3,6 +3,7 @@ import { Plus, MessageSquare, Trash2, PanelLeftClose, PanelLeftOpen, Clock, Load
 import { RestChatService } from '@/services/api/restChatService'
 import { restClient } from '@/services/api/restClient'
 import { sessionStreamManager } from '@/services/SessionStreamManager'
+import { PublishToShowcaseModal } from './PublishToShowcaseModal'
 
 interface SessionItem {
   id: string
@@ -97,14 +98,23 @@ export function SessionHistoryPanel({
 
   const handleToggleStar = useCallback(async (sessionId: string, isStarred: boolean, e: React.MouseEvent) => {
     e.stopPropagation()
-    try {
-      const endpoint = isStarred ? 'unstar' : 'star'
-      await restClient.put(`/api/chat/sessions/${sessionId}/${endpoint}`, {})
-      setSessions(prev => prev.map(s => s.id === sessionId ? { ...s, is_starred: !isStarred } : s))
-    } catch (err) {
-      console.error('Failed to toggle star:', err)
+    if (isStarred) {
+      // Unstar directly
+      try {
+        await restClient.put(`/api/chat/sessions/${sessionId}/unstar`, {})
+        setSessions(prev => prev.map(s => s.id === sessionId ? { ...s, is_starred: false } : s))
+      } catch (err) {
+        console.error('Failed to unstar:', err)
+      }
+    } else {
+      // Open publish modal
+      const session = sessions.find(s => s.id === sessionId)
+      setPublishTarget({ id: sessionId, title: session?.title || null })
     }
-  }, [])
+  }, [sessions])
+
+  // Publish to showcase modal state
+  const [publishTarget, setPublishTarget] = useState<{ id: string; title: string | null } | null>(null)
 
   // Inline rename state
   const [editingId, setEditingId] = useState<string | null>(null)
@@ -284,6 +294,23 @@ export function SessionHistoryPanel({
           </>
         )}
       </div>
+
+      {/* Publish to Showcase Modal */}
+      {publishTarget && (
+        <PublishToShowcaseModal
+          sessionId={publishTarget.id}
+          sessionTitle={publishTarget.title}
+          onClose={() => setPublishTarget(null)}
+          onPublished={() => {
+            setSessions(prev => prev.map(s => s.id === publishTarget.id ? { ...s, is_starred: true } : s))
+            setPublishTarget(null)
+          }}
+          onStarOnly={() => {
+            setSessions(prev => prev.map(s => s.id === publishTarget.id ? { ...s, is_starred: true } : s))
+            setPublishTarget(null)
+          }}
+        />
+      )}
     </div>
   )
 }

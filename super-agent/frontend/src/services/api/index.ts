@@ -2,7 +2,7 @@
  * API Layer Module
  * 
  * This module exports REST API clients and services.
- * The platform uses REST API backend (super-agent-backend) for all data operations.
+ * The platform uses REST API backend (backend) for all data operations.
  * 
  * Requirements: 11.1, 11.2, 11.3, 11.4, 11.5, 11.7
  */

@@ -15,6 +15,7 @@ import Markdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { useChatRoom } from '@/services/useChatRoom';
 import type { RoomMember, RoomMessage, RouteDecision } from '@/services/api/restChatRoomService';
+import { useTranslation } from '@/i18n';
 
 const CONFIDENCE_THRESHOLD = 0.5;
 
@@ -27,6 +28,7 @@ export function ChatRoom({ roomId }: ChatRoomProps) {
     room, members, messages, isLoading, error, isSending,
     sendMessage, removeMember, suggestAgent, confirmCreateAgent,
   } = useChatRoom({ roomId, pollInterval: 3000 });
+  const { t } = useTranslation();
 
   const [input, setInput] = useState('');
   const [mentionAgentId, setMentionAgentId] = useState<string | null>(null);
@@ -117,13 +119,13 @@ export function ChatRoom({ roomId }: ChatRoomProps) {
   };
 
   if (isLoading) {
-    return <div className="flex items-center justify-center h-full text-gray-400">Loading room...</div>;
+    return <div className="flex items-center justify-center h-full text-gray-400">{t('chatRoom.loading')}</div>;
   }
 
   if (error) {
     return (
       <div className="flex flex-col items-center justify-center h-full text-center p-6">
-        <p className="text-red-400 mb-2">Failed to load room</p>
+        <p className="text-red-400 mb-2">{t('chatRoom.loadFailed')}</p>
         <p className="text-sm text-gray-500">{error}</p>
       </div>
     );
@@ -133,13 +135,13 @@ export function ChatRoom({ roomId }: ChatRoomProps) {
     <div className="flex flex-col h-full bg-gray-950">
       {/* Header */}
       <div className="flex items-center justify-between px-4 py-3 border-b border-gray-800">
-        <h2 className="text-sm font-semibold text-white">{room?.title ?? 'Group Chat'}</h2>
+        <h2 className="text-sm font-semibold text-white">{room?.title ?? t('chatRoom.groupChat')}</h2>
         <button
           onClick={() => setShowMemberPanel(!showMemberPanel)}
           className="flex items-center gap-1.5 px-2 py-1 text-xs text-gray-400 hover:text-white hover:bg-gray-800 rounded transition-colors"
         >
           <Users size={14} />
-          <span>{members.length} members</span>
+          <span>{t('chatRoom.members').replace('{n}', String(members.length))}</span>
         </button>
       </div>
 
@@ -172,7 +174,7 @@ export function ChatRoom({ roomId }: ChatRoomProps) {
           title="Add agent to room"
         >
           <Plus size={10} />
-          Add
+          {t('chatRoom.add')}
         </button>
       </div>
 
@@ -182,7 +184,7 @@ export function ChatRoom({ roomId }: ChatRoomProps) {
         <div className="flex-1 overflow-y-auto px-4 py-4 space-y-3">
           {messages.length === 0 && (
             <div className="flex items-center justify-center h-full text-gray-500 text-sm">
-              No messages yet. Start the conversation!
+              {t('chatRoom.empty')}
             </div>
           )}
           {messages.map(msg => (
@@ -196,7 +198,7 @@ export function ChatRoom({ roomId }: ChatRoomProps) {
                 <HelpCircle size={14} />
               </div>
               <div className="max-w-[80%]">
-                <div className="text-xs text-gray-400 mb-1">Not sure who should answer — pick one:</div>
+                <div className="text-xs text-gray-400 mb-1">{t('chatRoom.uncertainPick')}</div>
                 <div className="flex flex-wrap gap-1.5">
                   {members.map(m => (
                     <button
@@ -213,7 +215,7 @@ export function ChatRoom({ roomId }: ChatRoomProps) {
                     onClick={() => { setUncertainRoute(null); setPendingMessage(null); }}
                     className="px-2 py-1.5 text-xs text-gray-500 hover:text-gray-300 transition-colors"
                   >
-                    Dismiss
+                    {t('chatRoom.dismiss')}
                   </button>
                 </div>
               </div>
@@ -227,7 +229,7 @@ export function ChatRoom({ roomId }: ChatRoomProps) {
         {showMemberPanel && (
           <div className="w-64 border-l border-gray-800 bg-gray-900 flex flex-col flex-shrink-0">
             <div className="flex items-center justify-between px-3 py-2 border-b border-gray-800">
-              <span className="text-xs font-medium text-gray-300">Members ({members.length})</span>
+              <span className="text-xs font-medium text-gray-300">{t('chatRoom.membersPanel')} ({members.length})</span>
               <button onClick={() => setShowMemberPanel(false)} className="text-gray-500 hover:text-white">
                 <X size={14} />
               </button>
@@ -243,7 +245,7 @@ export function ChatRoom({ roomId }: ChatRoomProps) {
                   <button
                     onClick={() => removeMember(m.agent_id)}
                     className="text-gray-600 hover:text-red-400 opacity-0 group-hover:opacity-100 transition-opacity"
-                    title="Remove"
+                    title={t('chatRoom.remove')}
                   >
                     <X size={12} />
                   </button>
@@ -279,15 +281,15 @@ export function ChatRoom({ roomId }: ChatRoomProps) {
               <input
                 value={agentDescription}
                 onChange={e => setAgentDescription(e.target.value)}
-                placeholder="Describe the agent you need..."
+                placeholder={t('chatRoom.agentPlaceholder')}
                 className="flex-1 px-3 py-1.5 bg-gray-900 border border-gray-600 rounded text-sm text-white placeholder-gray-500 outline-none focus:border-blue-500"
                 onKeyDown={e => e.key === 'Enter' && handleSuggestAgent()}
               />
               <button onClick={handleSuggestAgent} className="px-3 py-1.5 bg-blue-600 hover:bg-blue-500 text-white text-xs rounded transition-colors">
-                Generate
+                {t('chatRoom.generate')}
               </button>
               <button onClick={() => setShowAgentCreator(false)} className="px-2 py-1.5 text-gray-400 hover:text-white text-xs transition-colors">
-                Cancel
+                {t('common.cancel')}
               </button>
             </div>
           ) : (
@@ -299,13 +301,13 @@ export function ChatRoom({ roomId }: ChatRoomProps) {
               </div>
               <div className="flex items-center gap-2">
                 <button onClick={handleConfirmAgent} className="px-3 py-1.5 bg-green-600 hover:bg-green-500 text-white text-xs rounded transition-colors">
-                  Confirm & Add
+                  {t('chatRoom.confirmAdd')}
                 </button>
                 <button onClick={() => setSuggestedAgent(null)} className="px-2 py-1.5 text-gray-400 hover:text-white text-xs transition-colors">
-                  Adjust
+                  {t('chatRoom.adjust')}
                 </button>
                 <button onClick={() => { setSuggestedAgent(null); setShowAgentCreator(false); }} className="px-2 py-1.5 text-gray-400 hover:text-white text-xs transition-colors">
-                  Cancel
+                  {t('common.cancel')}
                 </button>
               </div>
             </div>
@@ -334,7 +336,7 @@ export function ChatRoom({ roomId }: ChatRoomProps) {
           value={input}
           onChange={handleInputChange}
           onKeyDown={e => e.key === 'Enter' && !e.shiftKey && handleSend()}
-          placeholder="Type a message... Use @ to mention an agent"
+          placeholder={t('chatRoom.placeholder')}
           disabled={isSending}
           className="flex-1 px-3 py-2 bg-gray-800 border border-gray-700 rounded-lg text-sm text-white placeholder-gray-500 outline-none focus:border-blue-500 disabled:opacity-50 transition-colors"
         />

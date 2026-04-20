@@ -7,9 +7,11 @@ import {
   FileText, Code, Eye, Loader2, Cloud,
   Container, Lock, Cpu, Activity, HardDrive,
   Network, DollarSign, Heart, Layers,
+  Github, Link, CheckCircle2, AlertCircle, X,
 } from 'lucide-react'
 import { restClient } from '@/services/api/restClient'
 import { GroupAccessPopover } from '@/components/GroupAccessPopover'
+import { useTranslation } from '@/i18n'
 
 /* ================================================================== */
 /*  Types                                                              */
@@ -32,6 +34,8 @@ interface ToolItem {
   installed?: boolean
   marketplaceUrl?: string
   marketplaceName?: string
+  /** The skills.sh install ref (e.g. "owner/repo@skill-name") */
+  installRef?: string
   /** Real skill/MCP UUID for API calls (e.g. group access). Differs from display `id`. */
   resourceId?: string
 }
@@ -85,6 +89,7 @@ function marketplaceSkillToToolItem(skill: MarketplaceSkillResult, index: number
     icon: Sparkles,
     tags: skill.name.split('-').filter(t => t.length > 1),
     author: skill.owner.split('/')[0] || skill.owner,
+    installRef: skill.installRef,
     marketplaceUrl: skill.url,
     marketplaceName: 'skills.sh',
   }
@@ -463,11 +468,11 @@ const STATIC_TOOLS: ToolItem[] = [
 /* ================================================================== */
 /*  Category config                                                    */
 /* ================================================================== */
-const CATEGORIES: { id: ToolCategory; label: string; icon: typeof Package; count: (tools: ToolItem[]) => number }[] = [
-  { id: 'all', label: 'All Tools', icon: Wrench, count: t => t.length },
-  { id: 'skills', label: 'Skills', icon: Sparkles, count: t => t.filter(x => x.category === 'skills').length },
-  { id: 'mcp', label: 'MCP Servers', icon: Server, count: t => t.filter(x => x.category === 'mcp').length },
-  { id: 'plugins', label: 'Plugins', icon: Puzzle, count: t => t.filter(x => x.category === 'plugins').length },
+const CATEGORIES: { id: ToolCategory; labelKey: string; icon: typeof Package; count: (tools: ToolItem[]) => number }[] = [
+  { id: 'all', labelKey: 'tools.allTools', icon: Wrench, count: items => items.length },
+  { id: 'skills', labelKey: 'tools.skills', icon: Sparkles, count: items => items.filter(x => x.category === 'skills').length },
+  { id: 'mcp', labelKey: 'tools.mcpServers', icon: Server, count: items => items.filter(x => x.category === 'mcp').length },
+  { id: 'plugins', labelKey: 'tools.plugins', icon: Puzzle, count: items => items.filter(x => x.category === 'plugins').length },
 ]
 
 /* ================================================================== */
@@ -488,9 +493,10 @@ const CATEGORY_TAB_STRIP: Record<string, string> = {
 /* ================================================================== */
 /*  Tool Card                                                          */
 /* ================================================================== */
-function ToolCard({ tool }: { tool: ToolItem }) {
+function ToolCard({ tool, installing, onInstall }: { tool: ToolItem; installing?: boolean; onInstall?: (tool: ToolItem) => void }) {
+  const { t } = useTranslation()
   const Icon = tool.icon
-  const categoryLabel = tool.category === 'skills' ? 'Skill' : tool.category === 'mcp' ? 'MCP' : 'Plugin'
+  const categoryLabel = tool.category === 'skills' ? t('tools.skill') : tool.category === 'mcp' ? t('tools.mcp') : t('tools.plugin')
   const categoryColor = tool.category === 'skills' ? 'text-yellow-400 bg-yellow-500/10' : tool.category === 'mcp' ? 'text-blue-400 bg-blue-500/10' : 'text-violet-400 bg-violet-500/10'
   const borderColor = CATEGORY_BORDER[tool.category] || 'border-l-gray-500'
 
@@ -553,7 +559,7 @@ function ToolCard({ tool }: { tool: ToolItem }) {
           ) : (
             <div className="flex items-center gap-3">
               <span className="text-[10px] text-gray-600 flex items-center gap-1">
-                <Wrench className="w-3 h-3" />Internal
+                <Wrench className="w-3 h-3" />{t('tools.internal')}
               </span>
               {(tool.category === 'skills' || tool.category === 'mcp') && tool.resourceId && (
                 <GroupAccessPopover
@@ -567,13 +573,416 @@ function ToolCard({ tool }: { tool: ToolItem }) {
 
           {tool.installed ? (
             <span className="text-[10px] font-medium px-2 py-0.5 rounded-full bg-green-500/10 text-green-400">
-              Installed
+              {t('tools.installed')}
             </span>
           ) : (
-            <button className="text-[10px] font-medium px-2.5 py-1 rounded-md bg-blue-600 hover:bg-blue-500 text-white transition-colors flex items-center gap-1">
-              <Download className="w-3 h-3" />Install
+            <button
+              onClick={(e) => { e.stopPropagation(); onInstall?.(tool) }}
+              disabled={installing}
+              className="text-[10px] font-medium px-2.5 py-1 rounded-md bg-blue-600 hover:bg-blue-500 text-white transition-colors flex items-center gap-1 disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {installing ? (
+                <><Loader2 className="w-3 h-3 animate-spin" />{t('tools.installingSkill')}</>
+              ) : (
+                <><Download className="w-3 h-3" />{t('tools.install')}</>
+              )}
             </button>
           )}
+        </div>
+      </div>
+    </div>
+  )
+}
+
+/* ================================================================== */
+/*  Import Skill Dialog (GitHub + Zip Upload)                          */
+/* ================================================================== */
+
+type ImportTab = 'github' | 'zip'
+
+interface ProbeResult {
+  found: boolean
+  repoPath: string
+  skills: Array<{ name: string; installRef: string; skillMdUrl: string; description: string | null }>
+  error?: string
+}
+
+interface ZipUploadResult {
+  skills: Array<{ skillId: string; name: string; displayName: string }>
+  errors: string[]
+}
+
+function ImportSkillDialog({ open, onClose, onImported }: {
+  open: boolean
+  onClose: () => void
+  onImported: () => void
+}) {
+  const [tab, setTab] = useState<ImportTab>('github')
+  const { t } = useTranslation()
+
+  // GitHub state
+  const [url, setUrl] = useState('')
+  const [probing, setProbing] = useState(false)
+  const [probeResult, setProbeResult] = useState<ProbeResult | null>(null)
+  const [installingSkill, setInstallingSkill] = useState<string | null>(null)
+  const [importedSkills, setImportedSkills] = useState<Set<string>>(new Set())
+
+  // Zip state
+  const [dragOver, setDragOver] = useState(false)
+  const [selectedFile, setSelectedFile] = useState<File | null>(null)
+  const [uploading, setUploading] = useState(false)
+  const [zipResult, setZipResult] = useState<ZipUploadResult | null>(null)
+
+  // Shared
+  const [error, setError] = useState<string | null>(null)
+
+  const reset = () => {
+    setUrl('')
+    setProbing(false)
+    setProbeResult(null)
+    setInstallingSkill(null)
+    setImportedSkills(new Set())
+    setDragOver(false)
+    setSelectedFile(null)
+    setUploading(false)
+    setZipResult(null)
+    setError(null)
+  }
+
+  const handleClose = () => {
+    reset()
+    onClose()
+  }
+
+  // ── GitHub handlers ──
+  const handleProbe = async () => {
+    if (!url.trim()) return
+    setProbing(true)
+    setProbeResult(null)
+    setError(null)
+    try {
+      const res = await restClient.post<{ data: ProbeResult }>('/api/skills/marketplace/probe-github', { url: url.trim() })
+      setProbeResult(res.data)
+      if (res.data.error) setError(res.data.error)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to check GitHub URL')
+    } finally {
+      setProbing(false)
+    }
+  }
+
+  const handleGitHubImport = async (skill: ProbeResult['skills'][0]) => {
+    setInstallingSkill(skill.name)
+    setError(null)
+    try {
+      await restClient.post('/api/skills/marketplace/import-github', {
+        url: url.trim(),
+        skillName: skill.name,
+        installRef: skill.installRef,
+        description: skill.description,
+      })
+      setImportedSkills(prev => new Set(prev).add(skill.name))
+      onImported()
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to import skill')
+    } finally {
+      setInstallingSkill(null)
+    }
+  }
+
+  // ── Zip handlers ──
+  const isValidArchive = (name: string) => {
+    const lower = name.toLowerCase()
+    return lower.endsWith('.zip') || lower.endsWith('.tar.gz') || lower.endsWith('.tgz')
+  }
+
+  const handleFileSelect = (file: File) => {
+    if (!isValidArchive(file.name)) {
+      setError(t('tools.unsupportedArchive'))
+      return
+    }
+    setSelectedFile(file)
+    setZipResult(null)
+    setError(null)
+  }
+
+  const handleDrop = (e: React.DragEvent) => {
+    e.preventDefault()
+    setDragOver(false)
+    const file = e.dataTransfer.files[0]
+    if (file) handleFileSelect(file)
+  }
+
+  const handleUpload = async () => {
+    if (!selectedFile) return
+    setUploading(true)
+    setError(null)
+    setZipResult(null)
+    try {
+      const formData = new FormData()
+      formData.append('file', selectedFile)
+      const res = await fetch('/api/skills/marketplace/upload-zip', {
+        method: 'POST',
+        body: formData,
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('auth_token') || ''}`,
+        },
+      })
+      const json = await res.json() as { data?: ZipUploadResult; error?: string }
+      if (!res.ok) {
+        setError(json.error || 'Upload failed')
+        return
+      }
+      setZipResult(json.data || null)
+      if (json.data?.skills.length) onImported()
+      if (json.data?.errors.length) {
+        setError(json.data.errors.join('; '))
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Upload failed')
+    } finally {
+      setUploading(false)
+    }
+  }
+
+  if (!open) return null
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm" onClick={handleClose}>
+      <div className="bg-gray-900 border border-gray-700 rounded-2xl w-full max-w-lg mx-4 shadow-2xl" onClick={e => e.stopPropagation()}>
+        {/* Header */}
+        <div className="flex items-center justify-between px-5 py-4 border-b border-gray-800">
+          <div className="flex items-center gap-2">
+            <Download className="w-5 h-5 text-gray-400" />
+            <h3 className="text-sm font-semibold text-white">{t('tools.importSkill')}</h3>
+          </div>
+          <button onClick={handleClose} className="text-gray-500 hover:text-gray-300 transition-colors">
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+
+        {/* Tabs */}
+        <div className="flex border-b border-gray-800">
+          <button
+            onClick={() => { setTab('github'); setError(null) }}
+            className={`flex-1 flex items-center justify-center gap-1.5 px-4 py-2.5 text-xs font-medium transition-colors ${
+              tab === 'github' ? 'text-white border-b-2 border-blue-500' : 'text-gray-500 hover:text-gray-300'
+            }`}
+          >
+            <Github className="w-3.5 h-3.5" />
+            {t('tools.githubUrl')}
+          </button>
+          <button
+            onClick={() => { setTab('zip'); setError(null) }}
+            className={`flex-1 flex items-center justify-center gap-1.5 px-4 py-2.5 text-xs font-medium transition-colors ${
+              tab === 'zip' ? 'text-white border-b-2 border-blue-500' : 'text-gray-500 hover:text-gray-300'
+            }`}
+          >
+            <Package className="w-3.5 h-3.5" />
+            {t('tools.uploadZipTab')}
+          </button>
+        </div>
+
+        {/* Body */}
+        <div className="px-5 py-4 space-y-4">
+
+          {/* ── GitHub Tab ── */}
+          {tab === 'github' && (
+            <>
+              <p className="text-xs text-gray-400">
+                {t('tools.githubHint')}
+              </p>
+              <div className="flex gap-2">
+                <div className="flex-1 relative">
+                  <Link className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-500" />
+                  <input
+                    type="text"
+                    value={url}
+                    onChange={e => { setUrl(e.target.value); setProbeResult(null); setError(null) }}
+                    onKeyDown={e => { if (e.key === 'Enter') handleProbe() }}
+                    placeholder="https://github.com/owner/repo/tree/main/skills"
+                    className="w-full pl-9 pr-3 py-2 bg-gray-800 border border-gray-700 rounded-lg text-sm text-white placeholder-gray-600 focus:outline-none focus:border-blue-500 transition-colors"
+                  />
+                </div>
+                <button
+                  onClick={handleProbe}
+                  disabled={probing || !url.trim()}
+                  className="px-4 py-2 bg-blue-600 hover:bg-blue-500 disabled:opacity-50 disabled:cursor-not-allowed text-white text-sm font-medium rounded-lg transition-colors flex items-center gap-1.5"
+                >
+                  {probing ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Search className="w-3.5 h-3.5" />}
+                  {t('tools.check')}
+                </button>
+              </div>
+
+              {probeResult && !probeResult.found && !error && (
+                <div className="flex items-center gap-2 px-3 py-2 bg-yellow-500/10 border border-yellow-500/20 rounded-lg">
+                  <AlertCircle className="w-3.5 h-3.5 text-yellow-400 flex-shrink-0" />
+                  <p className="text-xs text-yellow-400">{t('tools.noSkillMdFound')}</p>
+                </div>
+              )}
+
+              {probeResult && probeResult.found && probeResult.skills.length > 0 && (
+                <div className="space-y-2">
+                  <div className="flex items-center gap-1.5">
+                    <CheckCircle2 className="w-3.5 h-3.5 text-green-400" />
+                    <p className="text-xs text-green-400">
+                      Found {probeResult.skills.length} skill{probeResult.skills.length > 1 ? 's' : ''}
+                    </p>
+                  </div>
+                  <div className="space-y-2 max-h-60 overflow-y-auto">
+                    {probeResult.skills.map(skill => (
+                      <div key={skill.name} className="flex items-center justify-between px-3 py-2.5 bg-gray-800 border border-gray-700 rounded-lg">
+                        <div className="min-w-0 flex-1">
+                          <div className="flex items-center gap-2">
+                            <Sparkles className="w-3.5 h-3.5 text-yellow-400 flex-shrink-0" />
+                            <span className="text-sm font-medium text-white truncate">{skill.name}</span>
+                          </div>
+                          {skill.description && (
+                            <p className="text-[11px] text-gray-500 mt-0.5 ml-5.5 truncate">{skill.description}</p>
+                          )}
+                          <a href={skill.skillMdUrl} target="_blank" rel="noopener noreferrer"
+                            className="text-[10px] text-gray-600 hover:text-blue-400 mt-0.5 ml-5.5 flex items-center gap-1 transition-colors">
+                            <ExternalLink className="w-2.5 h-2.5" />SKILL.md
+                          </a>
+                        </div>
+                        {importedSkills.has(skill.name) ? (
+                          <span className="text-[10px] font-medium px-2 py-0.5 rounded-full bg-green-500/10 text-green-400 flex-shrink-0">
+                            {t('tools.installed')}
+                          </span>
+                        ) : (
+                          <button
+                            onClick={() => handleGitHubImport(skill)}
+                            disabled={installingSkill === skill.name}
+                            className="text-[10px] font-medium px-2.5 py-1 rounded-md bg-blue-600 hover:bg-blue-500 text-white transition-colors flex items-center gap-1 disabled:opacity-50 flex-shrink-0"
+                          >
+                            {installingSkill === skill.name ? (
+                              <><Loader2 className="w-3 h-3 animate-spin" />{t('tools.installingSkill')}</>
+                            ) : (
+                              <><Download className="w-3 h-3" />{t('tools.install')}</>
+                            )}
+                          </button>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </>
+          )}
+
+          {/* ── Zip Upload Tab ── */}
+          {tab === 'zip' && (
+            <>
+              <p className="text-xs text-gray-400">
+                {t('tools.zipHint')}
+              </p>
+
+              {/* Drop zone */}
+              <div
+                onDragOver={e => { e.preventDefault(); setDragOver(true) }}
+                onDragLeave={() => setDragOver(false)}
+                onDrop={handleDrop}
+                onClick={() => {
+                  const input = document.createElement('input')
+                  input.type = 'file'
+                  input.accept = '.zip,.tar.gz,.tgz'
+                  input.onchange = () => {
+                    if (input.files?.[0]) handleFileSelect(input.files[0])
+                  }
+                  input.click()
+                }}
+                className={`border-2 border-dashed rounded-xl p-6 text-center cursor-pointer transition-colors ${
+                  dragOver
+                    ? 'border-blue-500 bg-blue-500/5'
+                    : selectedFile
+                      ? 'border-green-500/50 bg-green-500/5'
+                      : 'border-gray-700 hover:border-gray-600 bg-gray-800/50'
+                }`}
+              >
+                {selectedFile ? (
+                  <div className="flex items-center justify-center gap-2">
+                    <Package className="w-5 h-5 text-green-400" />
+                    <div className="text-left">
+                      <p className="text-sm text-white">{selectedFile.name}</p>
+                      <p className="text-[10px] text-gray-500">{(selectedFile.size / 1024).toFixed(1)} KB</p>
+                    </div>
+                    <button
+                      onClick={e => { e.stopPropagation(); setSelectedFile(null); setZipResult(null); setError(null) }}
+                      className="ml-2 text-gray-500 hover:text-red-400 transition-colors"
+                    >
+                      <X className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+                ) : (
+                  <>
+                    <Package className="w-8 h-8 text-gray-600 mx-auto mb-2" />
+                    <p className="text-xs text-gray-400">{t('tools.dropZipHere')}</p>
+                    <p className="text-[10px] text-gray-600 mt-1">{t('tools.maxSize')}</p>
+                  </>
+                )}
+              </div>
+
+              {/* Upload button */}
+              {selectedFile && !zipResult && (
+                <button
+                  onClick={handleUpload}
+                  disabled={uploading}
+                  className="w-full py-2 bg-blue-600 hover:bg-blue-500 disabled:opacity-50 disabled:cursor-not-allowed text-white text-sm font-medium rounded-lg transition-colors flex items-center justify-center gap-1.5"
+                >
+                  {uploading ? (
+                    <><Loader2 className="w-3.5 h-3.5 animate-spin" />{t('tools.processingFile')}</>
+                  ) : (
+                    <><Download className="w-3.5 h-3.5" />{t('tools.uploadInstall')}</>
+                  )}
+                </button>
+              )}
+
+              {/* Upload results */}
+              {zipResult && zipResult.skills.length > 0 && (
+                <div className="space-y-2">
+                  <div className="flex items-center gap-1.5">
+                    <CheckCircle2 className="w-3.5 h-3.5 text-green-400" />
+                    <p className="text-xs text-green-400">
+                      Installed {zipResult.skills.length} skill{zipResult.skills.length > 1 ? 's' : ''}
+                    </p>
+                  </div>
+                  <div className="space-y-1.5">
+                    {zipResult.skills.map(skill => (
+                      <div key={skill.skillId} className="flex items-center gap-2 px-3 py-2 bg-gray-800 border border-gray-700 rounded-lg">
+                        <Sparkles className="w-3.5 h-3.5 text-yellow-400 flex-shrink-0" />
+                        <span className="text-sm text-white">{skill.displayName}</span>
+                        <span className="text-[10px] font-medium px-2 py-0.5 rounded-full bg-green-500/10 text-green-400 ml-auto">
+                          {t('tools.installed')}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {zipResult && zipResult.skills.length === 0 && !error && (
+                <div className="flex items-center gap-2 px-3 py-2 bg-yellow-500/10 border border-yellow-500/20 rounded-lg">
+                  <AlertCircle className="w-3.5 h-3.5 text-yellow-400 flex-shrink-0" />
+                  <p className="text-xs text-yellow-400">{t('tools.noSkillMdArchive')}</p>
+                </div>
+              )}
+            </>
+          )}
+
+          {/* Shared error display */}
+          {error && (
+            <div className="flex items-center gap-2 px-3 py-2 bg-red-500/10 border border-red-500/20 rounded-lg">
+              <AlertCircle className="w-3.5 h-3.5 text-red-400 flex-shrink-0" />
+              <p className="text-xs text-red-400">{error}</p>
+            </div>
+          )}
+        </div>
+
+        {/* Footer */}
+        <div className="px-5 py-3 border-t border-gray-800 flex justify-end">
+          <button onClick={handleClose} className="px-3 py-1.5 text-xs text-gray-400 hover:text-white transition-colors">
+            {t('common.close')}
+          </button>
         </div>
       </div>
     </div>
@@ -584,6 +993,7 @@ function ToolCard({ tool }: { tool: ToolItem }) {
 /*  Main Page                                                          */
 /* ================================================================== */
 export function Tools() {
+  const { t } = useTranslation()
   const [category, setCategory] = useState<ToolCategory>('all')
   const [source, setSource] = useState<ToolSource>('all')
   const [searchQuery, setSearchQuery] = useState('')
@@ -595,8 +1005,45 @@ export function Tools() {
   const [marketSearchResults, setMarketSearchResults] = useState<ToolItem[]>([])
   const [isSearchingMarketplace, setIsSearchingMarketplace] = useState(false)
   const [lastSearchedQuery, setLastSearchedQuery] = useState('')
+  const [installingId, setInstallingId] = useState<string | null>(null)
+  const [installedSkillNames, setInstalledSkillNames] = useState<Set<string>>(new Set())
+
+  // Import skill dialog
+  const [showImportDialog, setShowImportDialog] = useState(false)
 
   const isMarketplaceSkillSearch = (category === 'skills' || category === 'all') && source === 'marketplace'
+
+  // Load installed skill names from the org's skill catalog
+  const loadInstalledSkillNames = useCallback(async () => {
+    try {
+      const res = await restClient.get<{ data: Array<{ name: string }> }>('/api/skills')
+      setInstalledSkillNames(new Set((res.data || []).map(s => s.name.toLowerCase())))
+    } catch { /* ignore */ }
+  }, [])
+
+  useEffect(() => {
+    loadInstalledSkillNames()
+  }, [loadInstalledSkillNames])
+
+  // Install a marketplace skill
+  const handleInstall = useCallback(async (tool: ToolItem) => {
+    const installRef = tool.installRef
+    if (!installRef) return
+
+    setInstallingId(tool.id)
+    try {
+      await restClient.post('/api/skills/marketplace/install', { installRef })
+      // Refresh installed skill names so the card shows "Installed"
+      await loadInstalledSkillNames()
+      // Also refresh enterprise skills list so it appears in Internal tab
+      await loadEnterpriseSkills()
+    } catch (err) {
+      console.error('Install failed:', err)
+      alert(`Install failed: ${err instanceof Error ? err.message : 'Unknown error'}`)
+    } finally {
+      setInstallingId(null)
+    }
+  }, [])
 
   // Search the skills.sh marketplace API
   const searchMarketplace = useCallback(async (q: string) => {
@@ -691,14 +1138,27 @@ export function Tools() {
   // Deduplicate enterprise skills against static tools by name
   const staticNames = new Set(STATIC_TOOLS.map(t => t.name.toLowerCase()))
   const dedupedEnterprise = enterpriseSkills.filter(t => !staticNames.has(t.name.toLowerCase()))
-  const allTools = [...STATIC_TOOLS, ...dedupedEnterprise, ...marketplaceSkills]
+
+  // Mark marketplace skills as installed if they exist in the org's skill catalog
+  const markedMarketplace = marketplaceSkills.map(t => ({
+    ...t,
+    installed: installedSkillNames.has(t.name.toLowerCase()),
+  }))
+
+  const allTools = [...STATIC_TOOLS, ...dedupedEnterprise, ...markedMarketplace]
 
   // When searching in skills+marketplace mode, use API search results
   // instead of local filtering
   const useMarketplaceSearchResults = isMarketplaceSkillSearch && searchQuery.trim().length > 0
 
+  // Mark search results as installed too
+  const markedSearchResults = marketSearchResults.map(t => ({
+    ...t,
+    installed: installedSkillNames.has(t.name.toLowerCase()),
+  }))
+
   const filtered = useMarketplaceSearchResults
-    ? marketSearchResults
+    ? markedSearchResults
     : allTools.filter(tool => {
         if (category !== 'all' && tool.category !== category) return false
         if (source === 'internal' && tool.source !== 'internal') return false
@@ -736,7 +1196,7 @@ export function Tools() {
                 >
                   {stripColor && <span className={`w-0.5 h-3.5 rounded-full ${stripColor}`} />}
                   <CatIcon className="w-3.5 h-3.5" />
-                  {cat.label}
+                  {t(cat.labelKey)}
                   <span className={`text-[10px] ${isActive ? 'text-gray-400' : 'text-gray-600'}`}>
                     {cat.count(allTools)}
                   </span>
@@ -748,9 +1208,9 @@ export function Tools() {
           {/* Source filter */}
           <div className="flex items-center gap-1 bg-gray-900 rounded-lg p-0.5 border border-gray-800">
             {([
-              { id: 'all' as ToolSource, label: 'All' },
-              { id: 'internal' as ToolSource, label: 'Internal' },
-              { id: 'marketplace' as ToolSource, label: 'Marketplace' },
+              { id: 'all' as ToolSource, labelKey: 'tools.all' },
+              { id: 'internal' as ToolSource, labelKey: 'tools.internal' },
+              { id: 'marketplace' as ToolSource, labelKey: 'tools.marketplace' },
             ]).map(s => (
               <button
                 key={s.id}
@@ -759,7 +1219,7 @@ export function Tools() {
                   source === s.id ? 'bg-gray-700 text-white' : 'text-gray-500 hover:text-gray-300'
                 }`}
               >
-                {s.label}
+                {t(s.labelKey)}
               </button>
             ))}
           </div>
@@ -779,10 +1239,19 @@ export function Tools() {
                   searchMarketplace(searchQuery)
                 }
               }}
-              placeholder={isMarketplaceSkillSearch ? 'Search skills.sh marketplace...' : 'Search tools...'}
+              placeholder={isMarketplaceSkillSearch ? t('tools.searchMarketplace') : t('tools.searchTools')}
               className="w-full pl-9 pr-4 py-1.5 bg-gray-900 border border-gray-800 rounded-lg text-sm text-white placeholder-gray-600 focus:outline-none focus:border-gray-600 transition-colors"
             />
           </div>
+
+          {/* Import from GitHub / Zip */}
+          <button
+            onClick={() => setShowImportDialog(true)}
+            className="flex items-center gap-1.5 px-3 py-1.5 bg-gray-900 border border-gray-800 rounded-lg text-xs font-medium text-gray-400 hover:text-white hover:border-gray-600 transition-colors flex-shrink-0"
+          >
+            <Download className="w-3.5 h-3.5" />
+            {t('tools.import')}
+          </button>
         </div>
 
       </div>
@@ -793,7 +1262,7 @@ export function Tools() {
           <div className="flex items-center justify-center py-4 mb-4">
             <Loader2 className="w-4 h-4 text-blue-400 animate-spin" />
             <span className="ml-2 text-sm text-gray-500">
-              {isSearchingMarketplace ? 'Searching skills.sh...' : 'Loading marketplace skills...'}
+              {isSearchingMarketplace ? t('tools.searchingMarketplace') : t('tools.loadingMarketplace')}
             </span>
           </div>
         ) : null}
@@ -802,25 +1271,36 @@ export function Tools() {
             <Package className="w-10 h-10 text-gray-700 mx-auto mb-3" />
             <p className="text-sm text-gray-500">
               {useMarketplaceSearchResults
-                ? `No skills found for "${searchQuery}" on skills.sh`
-                : 'No tools match your filters'}
+                ? t('tools.noMarketResults').replace('{q}', searchQuery)
+                : t('tools.noMatchFilters')}
             </p>
             <p className="text-xs text-gray-600 mt-1">
               {useMarketplaceSearchResults
-                ? 'Try a different search term'
-                : 'Try adjusting the category, source, or search query'}
+                ? t('tools.tryDifferent')
+                : t('tools.tryAdjusting')}
             </p>
           </div>
         ) : (
           <div className="columns-1 md:columns-2 lg:columns-3 gap-4 space-y-4">
             {filtered.map(tool => (
               <div key={tool.id} className="break-inside-avoid">
-                <ToolCard tool={tool} />
+                <ToolCard
+                  tool={tool}
+                  installing={installingId === tool.id}
+                  onInstall={tool.source === 'marketplace' && !tool.installed ? handleInstall : undefined}
+                />
               </div>
             ))}
           </div>
         )}
       </div>
+
+      {/* Import Skill Dialog */}
+      <ImportSkillDialog
+        open={showImportDialog}
+        onClose={() => setShowImportDialog(false)}
+        onImported={() => { loadInstalledSkillNames(); loadEnterpriseSkills() }}
+      />
     </div>
   )
 }

@@ -134,6 +134,7 @@ export async function generateScope(
   description: string,
   onEvent: GenerateCallback,
   signal?: AbortSignal,
+  language?: string,
 ): Promise<string> {
   const token = getAuthToken();
   const response = await fetch(`${API_BASE_URL}/api/scope-generator/generate`, {
@@ -142,7 +143,7 @@ export async function generateScope(
       'Content-Type': 'application/json',
       ...(token ? { Authorization: `Bearer ${token}` } : {}),
     },
-    body: JSON.stringify({ description }),
+    body: JSON.stringify({ description, language }),
     signal,
   });
 
@@ -242,11 +243,15 @@ export async function generateScopeWithDocument(
   description: string,
   onEvent: GenerateCallback,
   signal?: AbortSignal,
+  language?: string,
 ): Promise<string> {
   const token = getAuthToken();
   const formData = new FormData();
   formData.append('file', file);
   formData.append('description', description);
+  if (language) {
+    formData.append('language', language);
+  }
 
   const response = await fetch(`${API_BASE_URL}/api/scope-generator/generate-with-document`, {
     method: 'POST',

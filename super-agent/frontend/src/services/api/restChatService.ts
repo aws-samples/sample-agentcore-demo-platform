@@ -346,10 +346,14 @@ export const RestChatService = {
    */
   async createSession(sopContext?: string, businessScopeId?: string): Promise<ApiChatSession> {
     try {
-      const response = await restClient.post<ApiChatSession>('/api/chat/sessions', {
+      const body = {
         sop_context: sopContext || null,
         business_scope_id: businessScopeId || null,
-      });
+        provision_workspace: !!businessScopeId,
+      };
+      console.log('[RestChatService] createSession body:', JSON.stringify(body));
+      const response = await restClient.post<ApiChatSession>('/api/chat/sessions', body);
+      console.log('[RestChatService] createSession response id:', response.id, 'scope:', response.business_scope_id);
       return response;
     } catch (error) {
       if (error instanceof ServiceError) throw error;

@@ -22,6 +22,7 @@ export const createChatSessionSchema = z.object({
   agent_id: uuidSchema.optional().nullable(),
   sop_context: z.string().optional().nullable(),
   context: z.record(z.string(), z.unknown()).default({}),
+  provision_workspace: z.boolean().optional(),
 });
 
 /**
@@ -81,6 +82,7 @@ export const chatMessageResponseSchema = z.object({
 export const chatStreamRequestSchema = z.object({
   agent_id: uuidSchema.optional(),
   business_scope_id: uuidSchema.optional(),
+  mention_agent_id: uuidSchema.optional(),
   session_id: uuidSchema.optional(),
   message: z.string().min(1, 'Message is required'),
   context: z.record(z.string(), z.unknown()).optional(),

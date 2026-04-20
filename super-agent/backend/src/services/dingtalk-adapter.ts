@@ -149,20 +149,37 @@ export class DingTalkAdapter implements IMAdapter {
     const clientId = cfg?.client_id;
     const clientSecret = binding.bot_token_enc;
 
-    // Try sessionWebhook fast-path first (no token needed)
+    // Priority 1: sessionWebhook from Stream mode (fastest, no token needed)
     const sessionWebhook = replyContext?.dingtalkSessionWebhook as string | undefined;
     if (sessionWebhook?.startsWith(DINGTALK_WEBHOOK_PREFIX)) {
       try {
         await this.sendViaSessionWebhook(sessionWebhook, text);
         return;
       } catch (err) {
-        console.warn(`[DINGTALK] sessionWebhook failed, falling back to API:`, err instanceof Error ? err.message : err);
+        console.warn(`[DINGTALK] sessionWebhook failed, trying next method:`, err instanceof Error ? err.message : err);
       }
     }
 
-    // Fall back to REST API
+    // Priority 2: binding.webhook_url (Outgoing Webhook mode — the oapi.dingtalk.com/robot/send URL)
+    const bindingWebhook = binding.webhook_url || cfg?.webhook_url;
+    if (bindingWebhook) {
+      const chunks = this.splitMessage(text, 20000);
+      for (const chunk of chunks) {
+        const resp = await fetch(bindingWebhook, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ msgtype: 'markdown', markdown: { title: 'Reply', text: chunk } }),
+        });
+        if (!resp.ok) {
+          console.error(`[DINGTALK] webhook_url reply error: ${resp.status} ${await resp.text()}`);
+        }
+      }
+      return;
+    }
+
+    // Priority 3: REST API with access token (Stream mode fallback)
     if (!clientId || !clientSecret) {
-      console.error(`[DINGTALK] Missing client_id/clientSecret for binding ${binding.id}`);
+      console.error(`[DINGTALK] No reply method available for binding ${binding.id} (no sessionWebhook, no webhook_url, no client_id)`);
       return;
     }
 
@@ -244,6 +261,21 @@ export class DingTalkAdapter implements IMAdapter {
     await dwClient.connect();
     activeConnections.set(bindingId, { binding, client: dwClient });
     console.log(`[DINGTALK] Stream connected for binding ${bindingId}`);
+
+    // Reconnect on disconnect (network flap, server restart, etc.)
+    const reconnect = () => {
+      console.warn(`[DINGTALK] Stream disconnected for binding ${bindingId}, reconnecting in 10s...`);
+      activeConnections.delete(bindingId);
+      setTimeout(() => {
+        this.connectBot(binding).catch(err => {
+          console.error(`[DINGTALK] Reconnect failed for ${bindingId}:`, err instanceof Error ? err.message : err);
+        });
+      }, 10_000);
+    };
+    if (typeof (dwClient as any).on === 'function') {
+      (dwClient as any).on('disconnect', reconnect);
+      (dwClient as any).on('error', reconnect);
+    }
   }
 
   // ── Private: REST API methods ──
@@ -264,8 +296,8 @@ export class DingTalkAdapter implements IMAdapter {
       body: JSON.stringify({
         robotCode,
         openConversationId: conversationId,
-        msgParam: JSON.stringify({ content: text }),
-        msgKey: 'sampleText',
+        msgParam: JSON.stringify({ title: 'Reply', text }),
+        msgKey: 'sampleMarkdown',
       }),
     });
     if (!resp.ok) console.error(`[DINGTALK] replyGroupMessage error: ${resp.status} ${await resp.text()}`);
@@ -278,8 +310,8 @@ export class DingTalkAdapter implements IMAdapter {
       body: JSON.stringify({
         robotCode,
         userIds,
-        msgParam: JSON.stringify({ content: text }),
-        msgKey: 'sampleText',
+        msgParam: JSON.stringify({ title: 'Reply', text }),
+        msgKey: 'sampleMarkdown',
       }),
     });
     if (!resp.ok) console.error(`[DINGTALK] sendDirectMessage error: ${resp.status} ${await resp.text()}`);
@@ -287,11 +319,8 @@ export class DingTalkAdapter implements IMAdapter {
 
   private stripBotMentions(text: string, atUsers?: Array<{ dingtalkId: string }>): string {
     if (!atUsers?.length) return text.trim();
-    let result = text;
-    for (const _user of atUsers) {
-      result = result.replace(/@\S+/, '');
-    }
-    return result.trim();
+    // Remove all @mentions (DingTalk inserts @nickname before the actual message)
+    return text.replace(/@\S+\s*/g, '').trim();
   }
 
   private async discoverBindings(): Promise<IMChannelBindingEntity[]> {

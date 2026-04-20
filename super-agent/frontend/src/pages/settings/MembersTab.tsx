@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { UserPlus, Trash2, ChevronDown, Loader2, AlertCircle, X, Mail, Clock, KeyRound, Copy, Check, RefreshCw } from 'lucide-react';
 import { useMembers } from '@/services/useMembers';
+import { useTranslation } from '@/i18n';
 import type { MemberRole } from '@/services/api/restMembersService';
 
 const ROLES: MemberRole[] = ['owner', 'admin', 'member', 'viewer'];
@@ -28,6 +29,7 @@ interface Props {
 
 export function MembersTab({ isAdmin, currentUserId }: Props) {
   const { members, isLoading, error, clearError, invite, updateRole, remove, provision } = useMembers();
+  const { t } = useTranslation();
   const [mode, setMode] = useState<AddMode>(null);
 
   // Invite form state
@@ -78,7 +80,7 @@ export function MembersTab({ isAdmin, currentUserId }: Props) {
   };
 
   const handleRemove = async (id: string, name: string) => {
-    if (!confirm(`Remove ${name} from the organization?`)) return;
+    if (!confirm(t('members.confirmRemove').replace('{name}', name))) return;
     await remove(id);
   };
 
@@ -96,10 +98,10 @@ export function MembersTab({ isAdmin, currentUserId }: Props) {
       {/* Credentials reveal after provision */}
       {provResult && (
         <div className="p-4 bg-green-500/10 border border-green-500/30 rounded-xl">
-          <p className="text-sm font-medium text-green-400 mb-1">User created successfully</p>
-          <p className="text-xs text-gray-400 mb-3">Share these credentials with the user. The password won't be shown again.</p>
+          <p className="text-sm font-medium text-green-400 mb-1">{t('members.userCreated')}</p>
+          <p className="text-xs text-gray-400 mb-3">{t('members.credentialsHint')}</p>
           <div className="space-y-2">
-            {[{ label: 'Username', value: provResult.username, masked: false }, { label: 'Password', value: provResult.password, masked: true }].map(({ label, value, masked }) => (
+            {[{ label: t('members.username'), value: provResult.username, masked: false }, { label: t('members.password'), value: provResult.password, masked: true }].map(({ label, value, masked }) => (
               <div key={label} className="flex items-center gap-2">
                 <span className="text-xs text-gray-500 w-20 shrink-0">{label}</span>
                 <code className="flex-1 px-2 py-1 bg-gray-900 rounded text-xs text-gray-300 font-mono">{masked ? '•'.repeat(value.length) : value}</code>
@@ -109,7 +111,7 @@ export function MembersTab({ isAdmin, currentUserId }: Props) {
               </div>
             ))}
           </div>
-          <button onClick={() => setProvResult(null)} className="mt-3 text-xs text-green-400 hover:text-green-300">Dismiss</button>
+          <button onClick={() => setProvResult(null)} className="mt-3 text-xs text-green-400 hover:text-green-300">{t('members.dismiss')}</button>
         </div>
       )}
 
@@ -121,14 +123,14 @@ export function MembersTab({ isAdmin, currentUserId }: Props) {
             className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-lg text-sm"
           >
             <KeyRound className="w-4 h-4" />
-            Create User
+            {t('members.createUser')}
           </button>
           <button
             onClick={() => setMode('invite')}
             className="flex items-center gap-2 px-4 py-2 bg-gray-700 hover:bg-gray-600 text-white rounded-lg text-sm"
           >
             <UserPlus className="w-4 h-4" />
-            Invite by Email
+            {t('members.inviteByEmail')}
           </button>
         </div>
       )}
@@ -136,9 +138,9 @@ export function MembersTab({ isAdmin, currentUserId }: Props) {
       {/* Provision form */}
       {isAdmin && mode === 'provision' && (
         <div className="p-4 bg-gray-800/50 border border-gray-700 rounded-xl space-y-4">
-          <h3 className="text-sm font-medium text-white">Create user with credentials</h3>
+          <h3 className="text-sm font-medium text-white">{t('members.createWithCredentials')}</h3>
           <div>
-            <label className="block text-xs text-gray-400 mb-1">Username (email)</label>
+            <label className="block text-xs text-gray-400 mb-1">{t('members.usernameEmail')}</label>
             <input
               type="text"
               value={provUsername}
@@ -148,7 +150,7 @@ export function MembersTab({ isAdmin, currentUserId }: Props) {
             />
           </div>
           <div>
-            <label className="block text-xs text-gray-400 mb-1">Full Name</label>
+            <label className="block text-xs text-gray-400 mb-1">{t('members.fullName')}</label>
             <input
               type="text"
               value={provFullName}
@@ -158,7 +160,7 @@ export function MembersTab({ isAdmin, currentUserId }: Props) {
             />
           </div>
           <div>
-            <label className="block text-xs text-gray-400 mb-1">Password</label>
+            <label className="block text-xs text-gray-400 mb-1">{t('members.password')}</label>
             <div className="flex gap-2">
               <input
                 type="text"
@@ -169,21 +171,19 @@ export function MembersTab({ isAdmin, currentUserId }: Props) {
               <button
                 onClick={() => setProvPassword(generatePassword())}
                 className="p-2 bg-gray-700 hover:bg-gray-600 rounded-lg text-gray-300"
-                title="Regenerate"
               >
                 <RefreshCw className="w-4 h-4" />
               </button>
               <button
                 onClick={() => copyToClipboard(provPassword, 'pw')}
                 className="p-2 bg-gray-700 hover:bg-gray-600 rounded-lg text-gray-300"
-                title="Copy"
               >
                 {copiedField === 'pw' ? <Check className="w-4 h-4 text-green-400" /> : <Copy className="w-4 h-4" />}
               </button>
             </div>
           </div>
           <div>
-            <label className="block text-xs text-gray-400 mb-1">Role</label>
+            <label className="block text-xs text-gray-400 mb-1">{t('members.role')}</label>
             <select
               value={provRole}
               onChange={(e) => setProvRole(e.target.value as MemberRole)}
@@ -193,14 +193,14 @@ export function MembersTab({ isAdmin, currentUserId }: Props) {
             </select>
           </div>
           <div className="flex gap-2 justify-end">
-            <button onClick={() => setMode(null)} className="px-4 py-2 text-sm text-gray-400 hover:text-white">Cancel</button>
+            <button onClick={() => setMode(null)} className="px-4 py-2 text-sm text-gray-400 hover:text-white">{t('common.cancel')}</button>
             <button
               onClick={handleProvision}
               disabled={isProvisioning || !provUsername.trim() || !provPassword.trim()}
               className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-500 disabled:opacity-50 text-white rounded-lg text-sm"
             >
               {isProvisioning && <Loader2 className="w-4 h-4 animate-spin" />}
-              Create User
+              {t('members.createUser')}
             </button>
           </div>
         </div>
@@ -209,7 +209,7 @@ export function MembersTab({ isAdmin, currentUserId }: Props) {
       {/* Invite form */}
       {isAdmin && mode === 'invite' && (
         <div className="p-4 bg-gray-800/50 border border-gray-700 rounded-xl space-y-4">
-          <h3 className="text-sm font-medium text-white">Invite by email</h3>
+          <h3 className="text-sm font-medium text-white">{t('members.inviteByEmailTitle')}</h3>
           <div className="flex gap-3">
             <input
               type="email"
@@ -228,14 +228,14 @@ export function MembersTab({ isAdmin, currentUserId }: Props) {
             </select>
           </div>
           <div className="flex gap-2 justify-end">
-            <button onClick={() => setMode(null)} className="px-4 py-2 text-sm text-gray-400 hover:text-white">Cancel</button>
+            <button onClick={() => setMode(null)} className="px-4 py-2 text-sm text-gray-400 hover:text-white">{t('common.cancel')}</button>
             <button
               onClick={handleInvite}
               disabled={isInviting || !inviteEmail.trim()}
               className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-500 disabled:opacity-50 text-white rounded-lg text-sm"
             >
               {isInviting && <Loader2 className="w-4 h-4 animate-spin" />}
-              Send Invite
+              {t('members.sendInvite')}
             </button>
           </div>
         </div>
@@ -251,9 +251,9 @@ export function MembersTab({ isAdmin, currentUserId }: Props) {
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b border-gray-800 bg-gray-800/40">
-                <th className="text-left px-4 py-3 text-xs font-medium text-gray-400 uppercase tracking-wider">Member</th>
-                <th className="text-left px-4 py-3 text-xs font-medium text-gray-400 uppercase tracking-wider">Role</th>
-                <th className="text-left px-4 py-3 text-xs font-medium text-gray-400 uppercase tracking-wider">Status</th>
+                <th className="text-left px-4 py-3 text-xs font-medium text-gray-400 uppercase tracking-wider">{t('members.colMember')}</th>
+                <th className="text-left px-4 py-3 text-xs font-medium text-gray-400 uppercase tracking-wider">{t('members.colRole')}</th>
+                <th className="text-left px-4 py-3 text-xs font-medium text-gray-400 uppercase tracking-wider">{t('members.colStatus')}</th>
                 {isAdmin && <th className="px-4 py-3" />}
               </tr>
             </thead>
@@ -273,7 +273,7 @@ export function MembersTab({ isAdmin, currentUserId }: Props) {
                         <div>
                           <div className="text-white font-medium">
                             {member.name || member.invited_email || member.email || 'Unknown'}
-                            {isCurrentUser && <span className="ml-2 text-xs text-gray-500">(you)</span>}
+                            {isCurrentUser && <span className="ml-2 text-xs text-gray-500">{t('members.you')}</span>}
                           </div>
                           {member.status === 'pending' ? (
                             <div className="flex items-center gap-1 text-xs text-gray-500">
@@ -309,10 +309,10 @@ export function MembersTab({ isAdmin, currentUserId }: Props) {
                     <td className="px-4 py-3">
                       {member.status === 'pending' ? (
                         <span className="flex items-center gap-1 text-xs text-yellow-400">
-                          <Clock className="w-3 h-3" /> Pending
+                          <Clock className="w-3 h-3" /> {t('members.pending')}
                         </span>
                       ) : (
-                        <span className="text-xs text-green-400">Active</span>
+                        <span className="text-xs text-green-400">{t('members.active')}</span>
                       )}
                     </td>
                     {isAdmin && (
@@ -321,7 +321,7 @@ export function MembersTab({ isAdmin, currentUserId }: Props) {
                           <button
                             onClick={() => handleRemove(member.id, member.name || member.email || member.invited_email || 'this member')}
                             className="p-1.5 text-gray-500 hover:text-red-400 hover:bg-red-400/10 rounded transition-colors"
-                            title="Remove member"
+                            title={t('members.removeMember')}
                           >
                             <Trash2 className="w-4 h-4" />
                           </button>
@@ -334,7 +334,7 @@ export function MembersTab({ isAdmin, currentUserId }: Props) {
             </tbody>
           </table>
           {members.length === 0 && !isLoading && (
-            <div className="text-center py-10 text-gray-500 text-sm">No members yet.</div>
+            <div className="text-center py-10 text-gray-500 text-sm">{t('members.noMembers')}</div>
           )}
         </div>
       )}

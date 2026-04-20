@@ -6,6 +6,7 @@
 import { FastifyInstance } from 'fastify';
 import { authenticate, requireModifyAccess } from '../middleware/auth.js';
 import { projectService } from '../services/project.service.js';
+import { governanceService } from '../services/project-governance.service.js';
 
 export async function projectRoutes(fastify: FastifyInstance): Promise<void> {
 
@@ -32,7 +33,7 @@ export async function projectRoutes(fastify: FastifyInstance): Promise<void> {
     return reply.send(project);
   });
 
-  fastify.put<{ Params: { id: string }; Body: { name?: string; description?: string; repo_url?: string } }>(
+  fastify.put<{ Params: { id: string }; Body: { name?: string; description?: string; repo_url?: string; business_scope_id?: string; agent_id?: string } }>(
     '/:id',
     { preHandler: [authenticate, requireModifyAccess] },
     async (request, reply) => {
@@ -243,6 +244,122 @@ export async function projectRoutes(fastify: FastifyInstance): Promise<void> {
     async (request, reply) => {
       const project = await projectService.updateSettings(request.user!.orgId, request.params.id, request.user!.id, request.body);
       return reply.send(project);
+    }
+  );
+
+  /**
+   * POST /:id/sync-workspace — Sync workspace files from S3 back to local
+   */
+  fastify.post<{ Params: { id: string } }>(
+    '/:id/sync-workspace',
+    { preHandler: [authenticate] },
+    async (request, reply) => {
+      try {
+        const result = await projectService.syncWorkspaceFromS3(
+          request.user!.orgId, request.params.id, request.user!.id,
+        );
+        return reply.send(result);
+      } catch (err) {
+        request.log.error({ err }, 'Workspace sync failed');
+        return reply.status(500).send({
+          error: err instanceof Error ? err.message : 'Sync failed',
+          code: 'SYNC_FAILED',
+        });
+      }
+    }
+  );
+
+  // ==========================================================================
+  // AI Governance
+  // ==========================================================================
+
+  /**
+   * POST /:id/issues/:issueId/enrich — Trigger AI enrichment for an issue
+   */
+  fastify.post<{ Params: { id: string; issueId: string } }>(
+    '/:id/issues/:issueId/enrich',
+    { preHandler: [authenticate] },
+    async (request, reply) => {
+      governanceService.enrichIssue(
+        request.user!.orgId, request.params.id, request.params.issueId, request.user!.id,
+      ).catch(err => request.log.error({ err }, 'Enrichment failed'));
+      return reply.send({ status: 'started' });
+    }
+  );
+
+  /**
+   * GET /:id/issues/:issueId/relations — Get relations for an issue
+   */
+  fastify.get<{ Params: { id: string; issueId: string } }>(
+    '/:id/issues/:issueId/relations',
+    { preHandler: [authenticate] },
+    async (request, reply) => {
+      const relations = await governanceService.getIssueRelations(request.params.id, request.params.issueId);
+      return reply.send({ data: relations });
+    }
+  );
+
+  /**
+   * GET /:id/relations — Get all relations for a project
+   */
+  fastify.get<{ Params: { id: string } }>(
+    '/:id/relations',
+    { preHandler: [authenticate] },
+    async (request, reply) => {
+      const relations = await governanceService.getProjectRelations(request.params.id);
+      return reply.send({ data: relations });
+    }
+  );
+
+  /**
+   * PATCH /:id/relations/:relationId/review — Confirm or dismiss a relation
+   */
+  fastify.patch<{ Params: { id: string; relationId: string }; Body: { action: 'confirmed' | 'dismissed' } }>(
+    '/:id/relations/:relationId/review',
+    { preHandler: [authenticate] },
+    async (request, reply) => {
+      await governanceService.reviewRelation(request.params.relationId, request.user!.id, request.body.action);
+      return reply.send({ ok: true });
+    }
+  );
+
+  /**
+   * POST /:id/triage — Generate AI triage report
+   */
+  fastify.post<{ Params: { id: string } }>(
+    '/:id/triage',
+    { preHandler: [authenticate] },
+    async (request, reply) => {
+      const report = await governanceService.generateTriageReport(
+        request.user!.orgId, request.params.id, request.user!.id,
+      );
+      return reply.send(report);
+    }
+  );
+
+  /**
+   * POST /:id/issues/:issueId/reanalyze — Re-trigger enrichment for a stale issue
+   */
+  fastify.post<{ Params: { id: string; issueId: string } }>(
+    '/:id/issues/:issueId/reanalyze',
+    { preHandler: [authenticate] },
+    async (request, reply) => {
+      governanceService.enrichIssue(
+        request.user!.orgId, request.params.id, request.params.issueId, request.user!.id,
+      ).catch(err => request.log.error({ err }, 'Re-analysis failed'));
+      return reply.send({ status: 'started' });
+    }
+  );
+
+  /**
+   * GET /:id/issues/:issueId/diff — Get code diff for an issue
+   */
+  fastify.get<{ Params: { id: string; issueId: string } }>(
+    '/:id/issues/:issueId/diff',
+    { preHandler: [authenticate] },
+    async (request, reply) => {
+      const diff = await projectService.getIssueDiff(request.params.id, request.params.issueId);
+      return reply.send(diff);
     }
   );
 }
