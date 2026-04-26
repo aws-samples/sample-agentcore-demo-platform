@@ -1,6 +1,9 @@
 #!/bin/bash
 set -euo pipefail
 
+# Disable AWS CLI pager (compatible with both v1 and v2)
+export AWS_PAGER=""
+
 # =============================================================================
 # Super Agent — Full Deploy Script (CDK + CloudFront + AgentCore)
 #
@@ -144,7 +147,7 @@ if [ "$SKIP_AGENTCORE" = false ]; then
   # --- 3a: ECR Repository ---
   echo "  [3a] Ensuring ECR repository..."
   aws ecr describe-repositories --repository-names super-agent-agentcore --region "$REGION" 2>/dev/null \
-    || aws ecr create-repository --repository-name super-agent-agentcore --region "$REGION" --no-cli-pager
+    || aws ecr create-repository --repository-name super-agent-agentcore --region "$REGION"
   echo "  ECR: $ECR_URI"
 
   # --- 3b: IAM Execution Role ---
@@ -163,8 +166,7 @@ if [ "$SKIP_AGENTCORE" = false ]; then
           "Action": "sts:AssumeRole"
         }]
       }' \
-      --description "Execution role for Super Agent AgentCore containers" \
-      --no-cli-pager
+      --description "Execution role for Super Agent AgentCore containers"
   fi
 
   # Always update permissions to latest
@@ -279,7 +281,7 @@ if [ "$SKIP_AGENTCORE" = false ]; then
       --role-arn "$ROLE_ARN" \
       --network-configuration '{"networkMode":"PUBLIC"}' \
       --environment-variables "$ENV_VARS" \
-      --region "$REGION" --no-cli-pager
+      --region "$REGION"
   else
     echo "  Creating new runtime..."
     RUNTIME_OUTPUT=$(aws bedrock-agentcore-control create-agent-runtime \
@@ -330,7 +332,7 @@ if [ "$SKIP_AGENTCORE" = false ]; then
       \"sleep 2\",
       \"systemctl status backend --no-pager -l\"
     ]" \
-    --no-cli-pager --output json --query "Command.CommandId" 2>/dev/null
+    --output json --query "Command.CommandId" 2>/dev/null
 
   echo "  AgentCore mode enabled. Backend restarting..."
   sleep 5

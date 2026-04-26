@@ -1,6 +1,9 @@
 #!/bin/bash
 set -euo pipefail
 
+# Disable AWS CLI pager (compatible with both v1 and v2)
+export AWS_PAGER=""
+
 # =============================================================================
 # Super Agent — Unified Deploy Script
 #
@@ -122,7 +125,7 @@ if [ "$AUTH_MODE" = "cognito" ] && [ -n "$COGNITO_USER_POOL_ID" ]; then
     --allowed-o-auth-scopes openid email profile \
     --allowed-o-auth-flows-user-pool-client \
     --supported-identity-providers COGNITO \
-    --region "$REGION" --no-cli-pager
+    --region "$REGION"
   echo "  Done."
 
   if [ -n "$COGNITO_PASSWORD" ]; then
@@ -135,7 +138,7 @@ if [ "$AUTH_MODE" = "cognito" ] && [ -n "$COGNITO_USER_POOL_ID" ]; then
       --user-pool-id "$COGNITO_USER_POOL_ID" \
       --username "$ADMIN_EMAIL" \
       --password "$COGNITO_PASSWORD" --permanent \
-      --region "$REGION" --no-cli-pager
+      --region "$REGION"
     echo "  Done. Login: $ADMIN_EMAIL"
   fi
 fi
@@ -354,6 +357,7 @@ if [ "$SKIP_BACKEND" = false ]; then
     -e "$RSYNC_SSH" \
     --exclude='node_modules' \
     --exclude='.env' \
+    --exclude='data/' \
     backend/ \
     "$SSH_USER@localhost:/opt/super-agent/backend/"
 
