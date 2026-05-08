@@ -1,0 +1,181 @@
+{
+  "title": "智能语音客服全流程工作流",
+  "description": "覆盖从用户来电接入到通话结束的端到端智能语音客服处理流程，包含语音识别、意图路由、知识检索、情绪管理、质检监控等核心环节的自动化编排。",
+  "tasks": [
+    {
+      "id": "task-1",
+      "title": "通话接入与会话初始化",
+      "type": "agent",
+      "prompt": "执行通话接入流程：1)识别接入协议类型（电话SIP/WebRTC/WebSocket）并加载对应编解码配置；2)分配唯一session_id创建会话实例；3)通过来电号码或用户Token识别用户身份；4)查询该用户24小时内的历史会话记录，若存在则加载上下文摘要；5)初始化对话状态机为SESSION_INIT状态；6)通知情绪感知引擎和质检Agent开始监听。输出会话初始化结果，包含session_id、用户画像、历史上下文（如有）、接入渠道信息。",
+      "agentRef": "dialogue-orchestrator",
+      "dependentTasks": [],
+      "requiredIntegrations": ["telephony-gateway", "user-profile-service", "session-cache"]
+    },
+    {
+      "id": "task-2",
+      "title": "语音流处理与ASR转写",
+      "type": "action",
+      "prompt": "接收实时音频流并执行语音处理管线：1)对音频流执行波束成形和噪声抑制预处理；2)运行VAD端点检测识别用户说话起止时间；3)将有效语音段送入ASR引擎进行流式转写，每200ms输出一次增量结果；4)用户停止说话后输出最终转写文本和整句置信度评分；5)同步将音频帧发送给情绪感知引擎进行声学分析。确保ASR首包延迟<300ms，WER<10%。",
+      "agentRef": "dialogue-orchestrator",
+      "dependentTasks": ["task-1"],
+      "requiredIntegrations": ["asr-engine", "audio-processing-pipeline"]
+    },
+    {
+      "id": "task-3",
+      "title": "实时情绪分析",
+      "type": "agent",
+      "prompt": "对接收到的音频帧执行实时情绪分析：1)以200ms窗口对音频进行声学特征提取（基频F0、语速SPS、RMS能量、停顿模式、频谱特征）；2)将14维特征向量送入情绪分类模型，输出四级情绪标签（正面/中性/负面/愤怒）和0-100强度评分；3)更新情绪变化轨迹，计算趋势方向；4)检测情绪突变事件（1秒内强度变化>40分）；5)维护愤怒计数器，达到阈值时生成升级信号。持续将情绪状态和策略建议推送给对话编排引擎。",
+      "agentRef": "emotion-perception",
+      "dependentTasks": ["task-1"],
+      "requiredIntegrations": ["emotion-model-service"]
+    },
+    {
+      "id": "task-4",
+      "title": "意图识别与路由决策",
+      "type": "agent",
+      "prompt": "接收ASR最终转写文本和当前情绪状态，执行意图识别和路由：1)对转写文本进行意图预分类（单领域/跨领域/闲聊/无法识别）；2)提取关键实体信息（订单号、产品名、日期、金额等）；3)结合对话上下文进行意图消歧；4)根据意图分类确定路由目标：单领域查询路由到知识检索Agent，操作类意图路由到业务闭环Scope，跨领域意图执行任务拆解；5)对无法识别的意图执行追问策略（最多3次）。输出意图分类结果、实体列表和路由决策，确保决策耗时<50ms。",
+      "agentRef": "dialogue-orchestrator",
+      "dependentTasks": ["task-2", "task-3"],
+      "requiredIntegrations": ["intent-classification-model"]
+    },
+    {
+      "id": "task-5",
+      "title": "意图类型分支判断",
+      "type": "condition",
+      "prompt": "根据意图识别结果进行分支路由判断：如果意图为单领域查询或咨询类，进入知识检索流程；如果意图为跨领域复杂问题，进入多Agent并行编排流程；如果意图为操作类（退款/改签/下单等），转交业务闭环Scope处理；如果连续3次无法识别意图，转人工处理。输出路由分支决策。",
+      "agentRef": "dialogue-orchestrator",
+      "dependentTasks": ["task-4"],
+      "requiredIntegrations": []
+    },
+    {
+      "id": "task-6",
+      "title": "知识库检索与答案生成",
+      "type": "agent",
+      "prompt": "执行业务知识库检索和答案生成：1)对查询文本进行预处理（提取核心语句、扩展同义词、确定检索范围）；2)并行执行语义向量检索和BM25关键词匹配双通道检索；3)使用Cross-Encoder Re-ranker对候选结果进行精排，输出Top5结果；4)对Top1结果进行多维度置信度评估（语义匹配度×0.35+实体覆盖率×0.25+时效性×0.20+权威度×0.10+上下文一致性×0.10）；5)高置信度(>=0.85)直接生成回复，中等置信度(0.6-0.85)附加确认追问，低置信度(<0.6)推荐相似问题；6)检查是否需要附加合规声明（风险提示/免责声明）；7)将答案转化为适合TTS朗读的口语化表达。",
+      "agentRef": "knowledge-retrieval",
+      "dependentTasks": ["task-5"],
+      "requiredIntegrations": ["vector-database", "knowledge-base", "reranker-service"]
+    },
+    {
+      "id": "task-7",
+      "title": "多Agent任务编排（跨领域场景）",
+      "type": "agent",
+      "prompt": "处理跨领域复杂意图的多Agent任务编排：1)分析已拆解的子意图列表，确定每个子任务的目标Agent和执行参数；2)构建子任务间的依赖关系图（DAG），确定并行和串行执行策略；3)并行下发无依赖关系的子任务给对应Agent，为每个子任务设置3秒超时；4)收集各子任务执行结果，处理超时和失败场景；5)将多个Agent返回的结果按用户原始提问顺序整合为一个连贯回复，使用自然过渡词连接不同领域答案；6)控制最终回复长度不超过200字（约30秒语音时长）。输出整合后的完整回复文本和各子任务执行状态。",
+      "agentRef": "dialogue-orchestrator",
+      "dependentTasks": ["task-5"],
+      "requiredIntegrations": []
+    },
+    {
+      "id": "task-8",
+      "title": "情绪响应策略决策",
+      "type": "condition",
+      "prompt": "根据情绪感知引擎输出的实时情绪状态进行策略决策：如果情绪为正面或中性，维持正常对话流程和标准TTS参数；如果情绪为负面（强度30-60），切换为安抚话术模板并降低语速10-15%；如果情绪为负面（强度>60）或首次/二次检测到愤怒，执行高优安抚+主动提供解决方案；如果第三次检测到愤怒，强制触发转人工流程并生成交接包。输出情绪响应级别和对应策略参数。",
+      "agentRef": "dialogue-orchestrator",
+      "dependentTasks": ["task-3", "task-6"],
+      "requiredIntegrations": []
+    },
+    {
+      "id": "task-9",
+      "title": "TTS语音合成与播报",
+      "type": "action",
+      "prompt": "将生成的回复文本进行TTS语音合成和播报：1)接收回复文本和TTS参数（语速、语调、情感标签——根据情绪响应策略动态调整）；2)对文本进行预处理：数字/日期/金额的口语化标注、长文本自然断句、停顿标记插入；3)调用TTS引擎进行流式合成，使用情绪适配的语调模型（负面情绪时语速降低、语调沉稳）；4)通过对应通道流式推送音频（首包延迟<150ms）；5)跟踪播放状态，记录当前播放位置支持打断恢复。确保合成语音MOS>=4.0。",
+      "agentRef": "dialogue-orchestrator",
+      "dependentTasks": ["task-8"],
+      "requiredIntegrations": ["tts-engine", "audio-streaming-service"]
+    },
+    {
+      "id": "task-10",
+      "title": "打断检测与处理",
+      "type": "condition",
+      "prompt": "在TTS播报过程中持续监控用户打断信号：1)区分真正的用户插话（连续语音>300ms+有意义语义内容）和非打断事件（咳嗽、环境噪声、'嗯'等反馈词）；2)确认打断后在100ms内执行：停止当前TTS音频播放、记录已播放位置、将打断语音送入ASR转写；3)打断内容转写完成后重新进入意图识别流程。如果误打断（实际是噪声），恢复TTS播放继续之前内容。输出打断确认结果和后续处理指令。",
+      "agentRef": "dialogue-orchestrator",
+      "dependentTasks": ["task-9"],
+      "requiredIntegrations": ["vad-service"]
+    },
+    {
+      "id": "task-11",
+      "title": "实时质检监控",
+      "type": "agent",
+      "prompt": "对通话全程执行实时质量检测：1)在通话开始时根据业务线加载对应合规规则集（必说话术清单、禁止话术列表、敏感信息模式）；2)持续监控每轮对话文本，跟踪必说话术的触发状态和截止时间；3)对话术即将超时（剩余5秒）时向对话编排引擎发送实时提醒；4)检测禁止话术和敏感信息泄露，命中时即时告警；5)识别高风险对话模式（投诉升级征兆、业务操作异常、欺诈信号）并按等级触发干预；6)维护本通通话的实时合规评分（100分起扣制）。全程质检覆盖率必须100%，合规话术遗漏检出率>=98%。",
+      "agentRef": "quality-inspector",
+      "dependentTasks": ["task-1"],
+      "requiredIntegrations": ["compliance-rule-engine", "alert-service"]
+    },
+    {
+      "id": "task-12",
+      "title": "会话结束与上下文持久化",
+      "type": "agent",
+      "prompt": "执行通话结束流程和数据持久化：1)检测结束信号（用户确认解决/挂机/超时/转人工完成）；2)播放个性化结束语；3)生成结构化会话摘要（核心问题列表、已解决问题、未解决问题、关键实体、最终情绪状态、建议的后续跟进）；4)将会话摘要写入24小时有效的上下文缓存；5)触发质检Agent生成完整事后质检报告；6)更新通话KPI指标（AHT/FCR预测/CSAT预测）；7)释放会话资源（关闭音频通道、清理状态机实例）。确保摘要生成成功率>=99%，关键信息提取完整性>=95%。",
+      "agentRef": "dialogue-orchestrator",
+      "dependentTasks": ["task-9"],
+      "requiredIntegrations": ["session-cache", "analytics-service"]
+    },
+    {
+      "id": "task-13",
+      "title": "事后质检报告生成",
+      "type": "agent",
+      "prompt": "通话结束后生成完整的多维度质检评分报告：1)聚合分析数据（完整对话转写、情绪轨迹、合规事件记录、业务操作日志）；2)评估服务态度分（0-100）：语言礼貌度×25%+情绪管理×25%+主动性×25%+耐心程度×25%；3)评估问题解决分（0-100）：首次解决×40%+方案准确性×30%+信息完整性×20%+后续跟进×10%；4)评估合规分（0-100）：基于必说话术完整性和违规事件扣分；5)计算综合评级（A>=90/B75-89/C60-74/D<60）；6)对B级以下通话生成具体改进建议（引用对话原文）；7)统计通话KPI指标（AHT、FCR、CSAT预测）。报告生成时间不超过通话时长的10%。",
+      "agentRef": "quality-inspector",
+      "dependentTasks": ["task-12"],
+      "requiredIntegrations": ["quality-report-storage", "analytics-service"]
+    }
+  ],
+  "variables": [
+    {
+      "variableId": "var-1",
+      "name": "sessionId",
+      "variableType": "string",
+      "description": "通话会话唯一标识符",
+      "required": true
+    },
+    {
+      "variableId": "var-2",
+      "name": "userId",
+      "variableType": "string",
+      "description": "用户唯一标识（来电号码或账号ID）",
+      "required": true
+    },
+    {
+      "variableId": "var-3",
+      "name": "channelType",
+      "variableType": "string",
+      "description": "接入渠道类型（telephone/webrtc/websocket）",
+      "required": true
+    },
+    {
+      "variableId": "var-4",
+      "name": "businessLine",
+      "variableType": "string",
+      "description": "业务线标识（决定合规规则集和知识库范围）",
+      "required": true
+    },
+    {
+      "variableId": "var-5",
+      "name": "historicalContext",
+      "variableType": "string",
+      "description": "24小时内历史会话的上下文摘要（JSON格式）",
+      "required": false
+    },
+    {
+      "variableId": "var-6",
+      "name": "emotionState",
+      "variableType": "string",
+      "description": "当前情绪状态（JSON格式：含label/intensity/trend/angry_count）",
+      "required": false
+    },
+    {
+      "variableId": "var-7",
+      "name": "currentIntent",
+      "variableType": "string",
+      "description": "当前识别的用户意图（JSON格式：含category/detail/entities/confidence）",
+      "required": false
+    },
+    {
+      "variableId": "var-8",
+      "name": "complianceRuleSet",
+      "variableType": "string",
+      "description": "当前业务线适用的合规规则集标识",
+      "required": true
+    }
+  ]
+}

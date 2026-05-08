@@ -1,0 +1,190 @@
+{
+  "title": "内容合规审核全链路工作流",
+  "description": "覆盖内容生成前拦截、生成后多模态审核、置信度分流、人工复核和数据回流的完整审核工作流。通过置信度分流机制实现AI自动化与人工兜底的高效协作，确保FN<2%、FP<1.5%的审核准确率。",
+  "tasks": [
+    {
+      "id": "task-1",
+      "title": "前置安全检测",
+      "type": "agent",
+      "prompt": "接收用户提交的内容生成请求，执行全方位前置安全检测。具体步骤：1）对输入文本进行Unicode标准化处理，消除零宽字符和编码混淆；2）运行攻击模式匹配引擎，检测Prompt Injection、Jailbreak、DAN攻击等已知攻击模式；3）执行PII个人隐私信息检测（身份证号/手机号/银行卡等）；4）运行敏感关键词多级过滤；5）进行语义意图分类，将请求归类为正常/灰色地带/明确违规三级。输出标准化检测结果，包含决策（BLOCK/SANITIZE/PASS）、风险等级、置信度分数和命中规则列表。",
+      "agentRef": "pre-generation-guard",
+      "dependentTasks": [],
+      "requiredIntegrations": ["攻击模式库", "敏感词库", "PII检测引擎"]
+    },
+    {
+      "id": "task-2",
+      "title": "前置拦截决策分支",
+      "type": "condition",
+      "prompt": "根据前置安全检测的输出结果进行决策分支：如果检测决策为BLOCK（明确违规），则进入违规拦截处理流程，记录拦截日志并通知用户请求被拒绝；如果检测决策为SANITIZE（灰色地带），则进入输入净化改写流程，将敏感部分替换为安全表达后放行；如果检测决策为PASS（安全），则直接放行内容进入后续生成和审核环节。判断依据为前置安全检测任务输出的decision字段。",
+      "agentRef": "pre-generation-guard",
+      "dependentTasks": ["task-1"],
+      "requiredIntegrations": []
+    },
+    {
+      "id": "task-3",
+      "title": "输入净化改写",
+      "type": "agent",
+      "prompt": "对前置检测标记为灰色地带的输入内容执行安全净化改写。具体步骤：1）分析前序检测标记的风险点位置和类型；2）评估每个风险点是否可通过改写消除（本质违规不适合净化应直接拒绝）；3）选择最适合的净化策略（替换/删除/重构/脱敏）；4）执行净化改写，确保语法通顺、语义连贯、核心意图保留；5）对净化后内容重新执行安全检测验证。输出净化后的安全文本和变更清单，标注改动位置和原因。净化改动比例不应超过原文30%。",
+      "agentRef": "pre-generation-guard",
+      "dependentTasks": ["task-2"],
+      "requiredIntegrations": ["安全检测引擎"]
+    },
+    {
+      "id": "task-4",
+      "title": "拦截日志记录",
+      "type": "document",
+      "prompt": "对前置检测判定为明确违规的请求，记录完整的拦截日志。日志内容包含：原始请求内容hash（不存明文）、检测时间戳、命中的攻击类型和规则ID列表、置信度分数、处置动作（BLOCK）、用户通知内容。将攻击特征提取并归档到攻击模式库，用于后续规则库更新。同时生成脱敏后的攻击样本供审核策略中枢进行规则效果分析。",
+      "agentRef": "pre-generation-guard",
+      "dependentTasks": ["task-2"],
+      "requiredIntegrations": ["审计日志系统", "攻击模式库"]
+    },
+    {
+      "id": "task-5",
+      "title": "多模态内容审核",
+      "type": "agent",
+      "prompt": "对已生成的内容执行全维度多模态合规审核。具体步骤：1）识别内容类型并执行对应预处理（文本分段/图片OCR/音频ASR/视频关键帧提取）；2）并行运行各维度审核模型——文本维度（涉政/涉黄/涉暴/广告法/虚假信息/侵权）、图片维度（色情/暴力/敏感符号/版权/人脸隐私）、音频维度（语音内容/背景音异常）、视频维度（关键帧+音轨+字幕）；3）对混合内容执行跨模态关联分析；4）对各维度结果进行校准和加权综合，输出最终置信度分数；5）执行违规类型多标签分类并判定严重度。输出：综合置信度（0-1）、违规类型标签列表、各维度评分、关键证据定位。零容忍类高置信度命中时立即触发告警。",
+      "agentRef": "multimodal-review-engine",
+      "dependentTasks": ["task-3"],
+      "requiredIntegrations": ["文本审核模型", "图片审核模型", "音频ASR", "视频分析引擎"]
+    },
+    {
+      "id": "task-6",
+      "title": "置信度分流决策",
+      "type": "condition",
+      "prompt": "基于多模态审核引擎输出的综合置信度分数执行三级分流决策。判定逻辑：1）高置信度（>0.95）：如果判定为安全则自动放行，如果判定为违规则自动拒绝——两种情况都无需人工介入；2）中置信度（0.7-0.95）：进入规则引擎二次判定通道，利用业务白名单、创作者信誉、历史判例等辅助信息进行精细化判定；3）低置信度（<0.7）：直接创建人工复核工单。注意不同违规类型可能使用差异化阈值，零容忍类的自动拒绝阈值可降至0.90。",
+      "agentRef": "human-ai-reviewer",
+      "dependentTasks": ["task-5"],
+      "requiredIntegrations": []
+    },
+    {
+      "id": "task-7",
+      "title": "高置信度自动处置",
+      "type": "agent",
+      "prompt": "对高置信度（>0.95）的审核结果执行自动处置。如果判定为安全：写入审核通过日志，释放内容进入正常发布流程。如果判定为违规：写入审核拒绝日志（含完整判定依据和证据），触发违规通知给内容创作方（说明违规类型和原因），对零容忍类违规同步触发监管报送流程。所有自动处置决策记录完整的审计日志，包含置信度分数、违规标签、命中规则和处置动作，保留180天用于合规追溯。",
+      "agentRef": "human-ai-reviewer",
+      "dependentTasks": ["task-6"],
+      "requiredIntegrations": ["审计日志系统", "内容发布系统", "通知系统"]
+    },
+    {
+      "id": "task-8",
+      "title": "规则引擎二次判定",
+      "type": "agent",
+      "prompt": "对中置信度（0.7-0.95）的内容执行规则引擎二次精细化判定。具体检查维度：1）行业白名单匹配——医学术语、新闻引用、学术讨论等场景的豁免判定；2）创作者信誉评估——高信誉创作者（历史违规率<0.1%）可适当放宽判定标准；3）历史判例参考——检索相似内容的历史审核结论作为参考；4）渠道敏感度配置——新闻资讯渠道从严、UGC社区适度宽松。综合以上维度输出二次判定结论：通过（放行）、不通过（转人工）、不确定（转人工）。记录完整的二次判定依据和参考信息。",
+      "agentRef": "human-ai-reviewer",
+      "dependentTasks": ["task-6"],
+      "requiredIntegrations": ["行业白名单库", "创作者信誉系统", "判例库"]
+    },
+    {
+      "id": "task-9",
+      "title": "人工复核工单创建与分配",
+      "type": "agent",
+      "prompt": "为需要人工复核的内容创建标准化工单并分配给合适的审核员。具体步骤：1）创建工单，包含原始内容预览、AI预判结果（置信度+违规标签+关键证据高亮）、建议判定和参考判例；2）计算优先级分数——综合时效性（30%权重）、影响范围（25%）、违规严重度（30%）、SLA剩余时间（15%）；涉政/涉恐类强制置顶；3）匹配审核员——涉政类分配资深审核员、涉黄类分配专项审核员、多语言类分配对应语言能力审核员；4）在满足能力要求的审核员中选择负载最低者分配；5）启动SLA计时——工作时间30分钟/非工作时间2小时/涉政涉恐15分钟。",
+      "agentRef": "human-ai-reviewer",
+      "dependentTasks": ["task-8"],
+      "requiredIntegrations": ["工单系统", "审核员管理系统"]
+    },
+    {
+      "id": "task-10",
+      "title": "SLA监控与超时升级",
+      "type": "agent",
+      "prompt": "持续监控所有在途人工复核工单的SLA状态，执行超时预警和自动升级。监控规则：1）SLA 80%时间到达且未开始处理——发送提醒通知给当前分配的审核员；2）SLA到期仍未完成——自动升级给Team Lead，同时将工单重新分配给其他空闲审核员；3）SLA超过150%——升级通知管理层，标记为应急状态。同时监控队列健康度：队列深度>平时3倍预警、平均等待时间>SLA 50%预警、在线审核员不足预警。输出实时队列仪表盘数据和SLA达标率统计。",
+      "agentRef": "human-ai-reviewer",
+      "dependentTasks": ["task-9"],
+      "requiredIntegrations": ["通知系统", "排班系统"]
+    },
+    {
+      "id": "task-11",
+      "title": "审核结果回流与数据标注",
+      "type": "agent",
+      "prompt": "收集人工复核结果，执行数据标注和训练数据回流。具体步骤：1）接收审核员提交的复核结论（通过/违规/争议）和判定依据；2）与AI原始判定结果对比，标注样本类型——AI判违规+人工判安全=FP样本、AI判安全+人工判违规=FN样本、双方一致=TP/TN样本；3）对FP和FN案例生成不一致分析报告，标注不一致原因（规则缺陷/模型盲区/边缘案例）；4）将标注后的样本格式化写入训练数据集；5）当训练数据集累积达到阈值（≥500条新增标注）时，触发模型微调流程通知。回传不一致分析报告给审核策略中枢，用于规则优化。",
+      "agentRef": "human-ai-reviewer",
+      "dependentTasks": ["task-10"],
+      "requiredIntegrations": ["训练数据管理系统", "模型训练平台"]
+    },
+    {
+      "id": "task-12",
+      "title": "审核效果监控与报告",
+      "type": "agent",
+      "prompt": "执行审核系统效果的持续监控和定期报告生成。具体步骤：1）从审核日志系统采集原始数据，进行清洗和对齐；2）计算核心指标——FN率（目标<2%）、FP率（目标<1.5%）、自动化率（目标>80%）、人工响应时间（目标<30分钟）、服务可用性（目标>99.9%）；3）执行趋势分析和异常检测——移动平均+标准差检测异常点、周环比/月环比分析；4）当指标异常时执行归因分析——按违规类型/规则/渠道/时间维度拆解；5）生成报告——日报（核心指标+环比+异常）、周报（趋势+Top问题+建议）、月报（全面复盘+ROI）。连续3天超标自动触发策略复盘预警。",
+      "agentRef": "review-strategy-hub",
+      "dependentTasks": ["task-11"],
+      "requiredIntegrations": ["审计日志系统", "数据分析平台", "告警系统"]
+    },
+    {
+      "id": "task-13",
+      "title": "策略优化与规则迭代",
+      "type": "agent",
+      "prompt": "基于审核效果监控数据和人工复核回流数据，执行审核策略的持续优化。具体步骤：1）分析FN/FP报告中的高频失败模式，识别规则缺陷和模型盲区；2）根据分析结论制定优化方案——可能包括：调整规则阈值、新增覆盖规则、下线无效规则、调整置信度分流阈值；3）对优化方案进行技术+业务+法务三方评审；4）评审通过后进入灰度发布流程——NoOp观察≥24小时→Shadow对比≥48小时（一致率>95%）→Prod逐步放量；5）上线后持续7天强化监控，确认优化效果符合预期。输出策略优化记录，写入版本管理系统。",
+      "agentRef": "review-strategy-hub",
+      "dependentTasks": ["task-12"],
+      "requiredIntegrations": ["规则管理系统", "版本控制系统"]
+    },
+    {
+      "id": "task-14",
+      "title": "审计日志归档与合规检查",
+      "type": "document",
+      "prompt": "管理审核全链路审计日志的归档和定期合规检查。具体操作：1）确保每条审核记录包含完整信息——原始内容hash、审核结果、审核依据、操作人员ID、时间戳、处置动作；2）执行日志完整性校验（每小时一次），使用SHA-256摘要和Merkle Tree结构验证不可篡改；3）管理数据生命周期——热数据（30天内高性能存储）、温数据（30-180天标准存储）、冷数据（180天后安全销毁）；4）每季度配合独立审计团队执行合规抽检——随机抽取1%已审核内容进行复核，不一致率>5%触发全面排查。输出合规状态报告和数据完整性证明。",
+      "agentRef": "human-ai-reviewer",
+      "dependentTasks": ["task-7", "task-11"],
+      "requiredIntegrations": ["审计日志系统", "归档存储系统"]
+    }
+  ],
+  "variables": [
+    {
+      "variableId": "var-1",
+      "name": "contentInput",
+      "variableType": "string",
+      "description": "用户提交的原始内容生成请求或已生成的待审核内容",
+      "required": true
+    },
+    {
+      "variableId": "var-2",
+      "name": "confidenceThresholdHigh",
+      "variableType": "number",
+      "description": "高置信度分流阈值，默认0.95，高于此值自动处置",
+      "required": false
+    },
+    {
+      "variableId": "var-3",
+      "name": "confidenceThresholdLow",
+      "variableType": "number",
+      "description": "低置信度分流阈值，默认0.7，低于此值直接转人工复核",
+      "required": false
+    },
+    {
+      "variableId": "var-4",
+      "name": "contentType",
+      "variableType": "string",
+      "description": "内容类型标识：text/image/audio/video/mixed",
+      "required": true
+    },
+    {
+      "variableId": "var-5",
+      "name": "channelId",
+      "variableType": "string",
+      "description": "内容来源渠道标识，影响审核严格度和规则配置",
+      "required": false
+    },
+    {
+      "variableId": "var-6",
+      "name": "creatorId",
+      "variableType": "string",
+      "description": "内容创作者ID，用于查询信誉等级和历史违规记录",
+      "required": false
+    },
+    {
+      "variableId": "var-7",
+      "name": "urgencyLevel",
+      "variableType": "string",
+      "description": "审核紧急程度：normal/urgent/emergency，影响SLA和灰度流程",
+      "required": false
+    },
+    {
+      "variableId": "var-8",
+      "name": "reviewResult",
+      "variableType": "object",
+      "description": "审核最终结果对象，包含决策、置信度、违规标签、处置动作等",
+      "required": false
+    }
+  ]
+}

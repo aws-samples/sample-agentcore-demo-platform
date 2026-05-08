@@ -1,0 +1,107 @@
+{
+  "version": "1.0.0",
+  "generatedAt": "2025-01-13T12:00:00.000Z",
+  "generator": "super-agent-batch-v2",
+  "industry": {
+    "id": "voice-ai",
+    "name": "语音智能体",
+    "icon": "🎙️",
+    "color": "#6C5CE7"
+  },
+  "stats": {
+    "scopeCount": 4,
+    "agentCount": 13,
+    "skillCount": 48,
+    "workflowCount": 4,
+    "twinCount": 1,
+    "sopCount": 4
+  },
+  "scopes": [
+    {
+      "dirName": "intelligent-voice-service",
+      "name": "智能语音客服",
+      "agents": ["dialogue-orchestrator", "emotion-perception", "knowledge-retrieval", "quality-inspector"],
+      "skills": [
+        "acoustic-feature-analysis",
+        "compliance-tagging",
+        "confidence-scoring",
+        "context-memory-management",
+        "dialogue-state-management",
+        "emotion-classification",
+        "emotion-trajectory-tracking",
+        "escalation-strategy",
+        "hybrid-search",
+        "intent-routing",
+        "knowledge-versioning",
+        "kpi-calculation",
+        "multi-agent-orchestration",
+        "post-call-analysis",
+        "realtime-compliance-monitoring",
+        "risk-detection"
+      ],
+      "hasWorkflow": true,
+      "hasSop": true
+    },
+    {
+      "dirName": "multilingual-voice-service",
+      "name": "多语言语音服务",
+      "agents": ["language-router", "transcription-analyst", "realtime-translator"],
+      "skills": [
+        "bilingual-dialogue-management",
+        "call-quality-inspection",
+        "code-switching-segmentation",
+        "dialect-recognition",
+        "language-detection",
+        "meeting-summarization",
+        "realtime-translation",
+        "speech-transcription",
+        "terminology-management"
+      ],
+      "hasWorkflow": true,
+      "hasSop": true
+    },
+    {
+      "dirName": "voice-driven-business",
+      "name": "语音驱动业务闭环",
+      "agents": ["transaction-executor", "flow-guide", "identity-verifier"],
+      "skills": [
+        "api-transaction-management",
+        "business-flow-orchestration",
+        "confirmation-protocol",
+        "execution-monitoring",
+        "multi-factor-verification",
+        "parameter-collection",
+        "rollback-compensation",
+        "security-audit-logging",
+        "voiceprint-authentication"
+      ],
+      "hasWorkflow": true,
+      "hasSop": true
+    },
+    {
+      "dirName": "voice-enabled-hardware",
+      "name": "语音赋能智能硬件",
+      "agents": ["device-orchestrator", "intent-parser", "personalization-learner"],
+      "skills": [
+        "behavior-pattern-mining",
+        "conflict-resolution",
+        "context-management",
+        "device-state-management",
+        "fuzzy-intent-reasoning",
+        "natural-language-parsing",
+        "preference-modeling",
+        "proactive-recommendation",
+        "scene-orchestration"
+      ],
+      "hasWorkflow": true,
+      "hasSop": true
+    }
+  ],
+  "digitalTwins": [
+    {
+      "dirName": "语音产品总监",
+      "name": "语音产品总监",
+      "role": "Head of Voice AI / 语音智能产品总监"
+    }
+  ]
+}

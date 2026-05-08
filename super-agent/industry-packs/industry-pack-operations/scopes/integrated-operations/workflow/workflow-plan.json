@@ -1,0 +1,201 @@
+{
+  "title": "综合运营管理全流程工作流",
+  "description": "覆盖财务管控、决策支持、流程自动化和跨域协同四大主流程的综合运营管理工作流，实现数据驱动决策、成本精细管控、流程自动化运维和跨部门高效协同",
+  "tasks": [
+    {
+      "id": "task-1",
+      "title": "每日数据采集与整合",
+      "type": "agent",
+      "prompt": "执行每日数据采集任务：从客户运营域、会员运营域、电商运营域和财务系统采集核心指标数据。包括客户总量/新增/流失/LTV、会员活跃度/复购率、GMV/UV/转化率/GPM、营收/成本/利润率等。对采集数据进行清洗校验（缺失值检测、一致性校验、异常值标记），完成指标计算和多维度聚合，更新运营数据全景仪表盘。标注各数据源的更新时间和数据质量状态。",
+      "agentRef": "decision-accelerator",
+      "dependentTasks": [],
+      "requiredIntegrations": ["客户数据平台", "会员系统", "电商平台API", "财务系统"]
+    },
+    {
+      "id": "task-2",
+      "title": "预算执行数据更新",
+      "type": "agent",
+      "prompt": "每日10:00前完成前日预算执行数据更新：获取各业务线、成本科目、渠道的实际支出数据，计算累计支出与预算基准的偏差百分比。同时计算时间进度消耗比（已用预算比例 vs 月份时间进度比例），按近7日消耗速度预测月末累计支出。输出各维度的消耗进度和健康状态标注（正常/关注/预警）。",
+      "agentRef": "finance-ops-analyst",
+      "dependentTasks": [],
+      "requiredIntegrations": ["财务系统", "投放平台费用接口"]
+    },
+    {
+      "id": "task-3",
+      "title": "预算差异检测与分级",
+      "type": "condition",
+      "prompt": "基于每日预算执行数据更新结果，检测各维度的偏差是否触达预警阈值。判断条件：偏差≤10%为正常（绿色），10-15%为黄色预警，15-20%为橙色预警，>20%为红色预警。同时检测是否存在单一渠道ROI连续3天下滑的情况。输出分级预警清单，标注各项的预警等级和是否需要进入归因分析流程。",
+      "agentRef": "finance-ops-analyst",
+      "dependentTasks": ["task-2"],
+      "requiredIntegrations": []
+    },
+    {
+      "id": "task-4",
+      "title": "预算差异归因分析",
+      "type": "agent",
+      "prompt": "对触发预警（差异>10%）的预算项目执行归因分析，需在2小时内完成。分析步骤：1）定位偏差最大的业务线/科目（一级归因）；2）深入驱动因子分析——区分是量变还是价变（二级归因）；3）区分可控因素（投放策略调整/活动超支）和不可控因素（平台政策变化/市场环境）（三级归因）；4）计算各因子贡献度百分比；5）评估月末累计影响预测。输出结构化归因报告，包含Top3原因、贡献度、影响评估和建议行动（按紧急度排序）。对于红色预警（>20%），附加建议冻结新增支出并升级管理层审批。",
+      "agentRef": "finance-ops-analyst",
+      "dependentTasks": ["task-3"],
+      "requiredIntegrations": ["财务系统", "投放平台数据"]
+    },
+    {
+      "id": "task-5",
+      "title": "运营指标异常检测",
+      "type": "agent",
+      "prompt": "基于每日采集的全域运营数据执行异常检测。检测规则：1）单指标突变——当前值偏离近30天动态基线超过2个标准差；2）趋势偏离——连续3天以上的单调变化且斜率超过历史均值；3）多指标联动异常——关联指标变化方向或比例出现逻辑矛盾（如UV上升但转化率下降）；4）目标达成风险——按当前进度外推月度目标达成率<70%。对检出的异常执行自动诊断：排除数据质量问题、检查外部/内部事件关联、执行相关性分析。30分钟内输出诊断报告，包含异常描述、影响范围、Top3可能原因（附概率）、验证建议和应对方案。",
+      "agentRef": "decision-accelerator",
+      "dependentTasks": ["task-1"],
+      "requiredIntegrations": ["各业务域数据接口"]
+    },
+    {
+      "id": "task-6",
+      "title": "异常严重程度判定",
+      "type": "condition",
+      "prompt": "对检出的运营指标异常进行严重程度判定。判断维度：1）偏离幅度（>3σ为严重/2-3σ为中等）；2）影响范围（影响核心营收指标为严重/影响辅助指标为中等）；3）持续时间（>3天为趋势性/1-3天为观察期）；4）是否为多指标联动（联动异常更严重）。严重异常：立即生成紧急行动计划建议并通知管理层；中等异常：纳入日报并标记跟踪；轻微异常：记录但不触发行动。",
+      "agentRef": "decision-accelerator",
+      "dependentTasks": ["task-5"],
+      "requiredIntegrations": []
+    },
+    {
+      "id": "task-7",
+      "title": "自动化流程日常健康检查",
+      "type": "agent",
+      "prompt": "每日06:00执行所有运行中自动化流程的健康检查。检查内容：1）逐一确认各流程最近一次执行状态（成功/失败/超时/跳过）；2）采集执行时长并与基线对比（超过正常值2倍标记异常）；3）检查数据处理量（与历史均值偏差>30%标记异常）；4）验证上下游依赖系统可用性；5）检查错误日志中是否有新的错误模式。输出健康状态大盘：各流程状态摘要（正常/告警/故障）、今日需关注事项、趋势性风险提示。对于连续失败>3次的流程，自动暂停并切换人工处理模式。",
+      "agentRef": "process-automation-butler",
+      "dependentTasks": [],
+      "requiredIntegrations": ["流程调度引擎", "监控系统"]
+    },
+    {
+      "id": "task-8",
+      "title": "自动化故障响应与回退",
+      "type": "condition",
+      "prompt": "基于健康检查结果判断是否需要启动故障响应流程。判断条件：1）是否存在连续失败>3次的流程（是→自动暂停并回退人工处理）；2）是否存在执行时间持续增长的趋势（是→预防性告警）；3）故障类型分类——暂时性错误（网络/超时）等待恢复后自动重启 vs 永久性错误（数据源变更/接口失效）生成维修工单通知维护人员。确保30分钟内完成故障检出，2小时内完成修复。",
+      "agentRef": "process-automation-butler",
+      "dependentTasks": ["task-7"],
+      "requiredIntegrations": ["告警系统", "工单系统"]
+    },
+    {
+      "id": "task-9",
+      "title": "跨域协作任务管理",
+      "type": "agent",
+      "prompt": "管理当前所有活跃的跨域协作任务。执行以下操作：1）检查新创建的任务是否已在1小时内完成分配确认，未确认的自动提醒；2）更新所有在途任务的进度状态（基于系统数据和人工报告）；3）识别关键路径上的风险任务；4）检测超时任务并按规则触发分级升级——超时50%通知负责人、超时100%通知上级、超时200%通知管理层；5）处理资源冲突——按P0>P1>P2优先级排序，同级按截止时间排序。输出每日任务看板更新和需要关注的事项清单。",
+      "agentRef": "collaboration-hub",
+      "dependentTasks": [],
+      "requiredIntegrations": ["项目管理系统", "通讯系统"]
+    },
+    {
+      "id": "task-10",
+      "title": "跨域问题协调处理",
+      "type": "agent",
+      "prompt": "处理从其他流程升级过来的跨域协调需求，包括：1）预算预警中需跨部门协调的成本问题（从财务运营分析师接收）；2）自动化运维中发现的跨系统/跨部门流程卡点（从流程自动化管家接收）；3）舆情事件中需跨部门处理的问题（从会员运营域接收）。对每个协调需求：识别涉及的责任方、创建协作任务、分配负责人、设定时间线、跟踪处理进度直至闭环。确保信息透明传递，所有相关方知悉进展。",
+      "agentRef": "collaboration-hub",
+      "dependentTasks": ["task-4", "task-8"],
+      "requiredIntegrations": ["项目管理系统", "通讯系统"]
+    },
+    {
+      "id": "task-11",
+      "title": "月度运营报告数据汇总",
+      "type": "agent",
+      "prompt": "每月1-2号执行月度运营报告的数据汇总工作。步骤：1）采集上月全量数据（覆盖客户运营、会员运营、电商运营、财务运营四大域）；2）按标准指标口径计算所有核心KPI；3）执行数据质量检查——抽样验证≥20个指标与源系统数值一致；4）计算同比（vs去年同月）和环比（vs上月）；5）汇总月度关键事件和里程碑。输出标准化数据集，标注数据完整性和质量状态。如有数据缺失，明确标注并提供估算值。",
+      "agentRef": "decision-accelerator",
+      "dependentTasks": ["task-1"],
+      "requiredIntegrations": ["全域数据仓库"]
+    },
+    {
+      "id": "task-12",
+      "title": "月度运营报告生成与发布",
+      "type": "document",
+      "prompt": "基于月度数据汇总结果，生成完整的月度运营报告。报告结构：1）Executive Summary（3-5句话全局概览）；2）KPI总览表（核心指标卡片：当前值/同比/环比/目标达成率）；3）各域详细分析——客户域（LTV/流失率/识别准确率）、会员域（活跃度/复购率/NPS）、电商域（GMV/GPM/转化率/ROI）、财务域（营收/成本/利润率/预算执行）；4）关键发现Top5（按影响度排序）；5）风险预警和机会识别；6）行动建议（每条附数据支撑和优先级）；7）下月展望。协同财务运营分析师完成预算vs实际的综合分析部分。确保3号前完成发布。",
+      "agentRef": "decision-accelerator",
+      "dependentTasks": ["task-11"],
+      "requiredIntegrations": ["报告分发系统"]
+    },
+    {
+      "id": "task-13",
+      "title": "月度自动化效率报告",
+      "type": "document",
+      "prompt": "每月1号生成上月自动化效率报告。内容包括：1）执行摘要——本月关键数字（总节省工时/自动化率/平均成功率）；2）各流程明细——逐个流程的执行次数、成功率、节省工时、ROI；3）成功率和可用率统计（目标≥99%）；4）异常事件汇总——本月故障次数/修复时长/影响范围；5）趋势分析——近6个月效率提升趋势；6）新增/下线流程说明；7）优化建议——效率提升空间最大的流程和改进方向；8）下月计划——计划新增的自动化流程和预期效果。节省工时的计算需透明可审计（执行次数×人工单次耗时）。",
+      "agentRef": "process-automation-butler",
+      "dependentTasks": ["task-7"],
+      "requiredIntegrations": ["流程调度引擎"]
+    },
+    {
+      "id": "task-14",
+      "title": "周度协作效率报告",
+      "type": "document",
+      "prompt": "每周一生成上周协作效率周报。内容包括：1）核心指标——准时完成率（目标≥80%）、平均处理时长、首次响应时间（目标≤1小时）、升级率；2）本周任务统计——新建/完成/在途/超时任务数量及环比变化；3）按业务域的效率分布——各域的响应时效和完成率对比；4）瓶颈分析——Top3耗时最长的环节和原因分析（资源不足/依赖阻塞/需求不清/优先级冲突）；5）升级事件回顾——本周触发升级的任务及处置结果；6）改进建议——可操作的优化方案；7）上周建议的执行跟踪。",
+      "agentRef": "collaboration-hub",
+      "dependentTasks": ["task-9"],
+      "requiredIntegrations": ["项目管理系统"]
+    },
+    {
+      "id": "task-15",
+      "title": "ROI核算与资源配置建议",
+      "type": "agent",
+      "prompt": "执行各渠道/活动/商品线的ROI核算。步骤：1）按分析维度归集直接成本和分摊间接成本；2）量化收益（GMV/订单收入+品牌曝光估算+新客LTV估算）；3）计算各维度ROI值并排名；4）识别Top3高效渠道（建议加大投入）和Bottom3低效渠道（建议缩减或优化）；5）评估边际ROI趋势——追加投入时ROI变化方向；6）制定资源重配建议——从低效向高效迁移的具体方案和预期收益提升。特别关注ROI<1持续的投放计划，建议暂停。单一渠道ROI连续3天下滑需建议预算重新分配。",
+      "agentRef": "finance-ops-analyst",
+      "dependentTasks": ["task-2", "task-1"],
+      "requiredIntegrations": ["投放平台", "电商平台", "财务系统"]
+    },
+    {
+      "id": "task-16",
+      "title": "流程自动化机会评估",
+      "type": "agent",
+      "prompt": "季度性扫描各业务域的流程自动化机会。步骤：1）收集各域当前的重复性工作清单（数据录入/报表生成/信息同步/审批流转/定时通知）；2）评估每个流程的自动化可行性（数据源是否有API？规则是否明确可编码？）；3）计算自动化ROI（频率×单次耗时×人力成本 / 实施成本）；4）按ROI从高到低排序，筛选ROI≥2的流程；5）高频+低复杂度优先（快赢项目）；6）输出自动化机会清单和推荐实施路线图。对于ROI<2的需求，建议暂缓并说明原因。",
+      "agentRef": "process-automation-butler",
+      "dependentTasks": [],
+      "requiredIntegrations": ["各业务域系统"]
+    }
+  ],
+  "variables": [
+    {
+      "variableId": "var-1",
+      "name": "reportingPeriod",
+      "variableType": "string",
+      "description": "当前报告周期（如2024-01表示2024年1月）",
+      "required": true
+    },
+    {
+      "variableId": "var-2",
+      "name": "budgetVarianceThreshold",
+      "variableType": "string",
+      "description": "预算差异预警阈值配置（默认：黄色10%/橙色15%/红色20%）",
+      "required": false
+    },
+    {
+      "variableId": "var-3",
+      "name": "anomalyDetectionSensitivity",
+      "variableType": "string",
+      "description": "异常检测灵敏度（默认偏离均值2个标准差触发）",
+      "required": false
+    },
+    {
+      "variableId": "var-4",
+      "name": "automationTargetRate",
+      "variableType": "string",
+      "description": "流程自动化率目标（默认70%）",
+      "required": false
+    },
+    {
+      "variableId": "var-5",
+      "name": "taskEscalationRules",
+      "variableType": "string",
+      "description": "任务升级规则配置（默认：一级50%超时/二级100%/三级200%）",
+      "required": false
+    },
+    {
+      "variableId": "var-6",
+      "name": "roiBaseline",
+      "variableType": "string",
+      "description": "ROI基准线（默认3.0，低于此值标记为低效）",
+      "required": false
+    },
+    {
+      "variableId": "var-7",
+      "name": "dataSourceList",
+      "variableType": "string",
+      "description": "数据源接入清单（客户系统/会员系统/电商平台/财务系统的接入配置）",
+      "required": true
+    }
+  ]
+}

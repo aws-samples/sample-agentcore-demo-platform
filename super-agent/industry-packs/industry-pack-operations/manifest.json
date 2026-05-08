@@ -1,0 +1,132 @@
+{
+  "version": "1.0.0",
+  "generatedAt": "2025-05-21T09:00:00.000Z",
+  "generator": "super-agent-batch-v2",
+  "industry": {
+    "id": "operations",
+    "name": "运营管理",
+    "icon": "⚙️",
+    "color": "#6366F1"
+  },
+  "stats": {
+    "scopeCount": 4,
+    "agentCount": 15,
+    "skillCount": 49,
+    "workflowCount": 4,
+    "twinCount": 1,
+    "sopCount": 4
+  },
+  "scopes": [
+    {
+      "dirName": "customer-operations",
+      "name": "客户运营",
+      "agents": [
+        "customer-insight-analyst",
+        "lifecycle-strategist",
+        "knowledge-ops-curator"
+      ],
+      "skills": [
+        "ab-testing-management",
+        "customer-profile-building",
+        "customer-segmentation-analysis",
+        "insight-report-generation",
+        "knowledge-extraction-curation",
+        "knowledge-quality-audit",
+        "knowledge-retrieval-optimization",
+        "lifecycle-strategy-design",
+        "retention-campaign-execution"
+      ],
+      "hasWorkflow": true,
+      "hasSop": true
+    },
+    {
+      "dirName": "membership-operations",
+      "name": "会员运营",
+      "agents": [
+        "membership-growth-engine",
+        "social-content-strategist",
+        "brand-sentinel"
+      ],
+      "skills": [
+        "benefits-optimization",
+        "churn-prediction-retention",
+        "content-calendar-planning",
+        "content-performance-analysis",
+        "crisis-alert-response",
+        "membership-tier-management",
+        "reputation-analysis",
+        "sentiment-monitoring",
+        "social-content-generation"
+      ],
+      "hasWorkflow": true,
+      "hasSop": true
+    },
+    {
+      "dirName": "ecommerce-operations",
+      "name": "电商运营",
+      "agents": [
+        "digital-anchor",
+        "live-director",
+        "livestream-strategist",
+        "store-ops-manager",
+        "traffic-optimizer"
+      ],
+      "skills": [
+        "audience-targeting-management",
+        "emergency-response-handling",
+        "live-product-presentation",
+        "livestream-data-monitoring",
+        "livestream-planning",
+        "livestream-script-execution",
+        "multi-platform-listing",
+        "post-livestream-review",
+        "product-copywriting",
+        "product-knowledge-management",
+        "realtime-barrage-interaction",
+        "realtime-scheduling-dispatch",
+        "roi-realtime-optimization",
+        "sales-script-design",
+        "traffic-investment-strategy"
+      ],
+      "hasWorkflow": true,
+      "hasSop": true
+    },
+    {
+      "dirName": "integrated-operations",
+      "name": "综合运营管理",
+      "agents": [
+        "finance-ops-analyst",
+        "decision-accelerator",
+        "process-automation-butler",
+        "collaboration-hub"
+      ],
+      "skills": [
+        "anomaly-detection",
+        "automation-design",
+        "automation-monitoring",
+        "budget-planning",
+        "collaboration-reporting",
+        "cost-monitoring",
+        "data-integration-analysis",
+        "efficiency-reporting",
+        "escalation-management",
+        "operations-reporting",
+        "process-discovery",
+        "resource-coordination",
+        "roi-calculation",
+        "task-lifecycle-management",
+        "trend-forecasting",
+        "variance-analysis"
+      ],
+      "hasWorkflow": true,
+      "hasSop": true
+    }
+  ],
+  "digitalTwins": [
+    {
+      "dirName": "运营总监",
+      "name": "运营总监",
+      "role": "VP of Operations / 运营副总裁"
+    }
+  ]
+}

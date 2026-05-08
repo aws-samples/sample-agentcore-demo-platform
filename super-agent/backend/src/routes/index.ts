@@ -68,6 +68,7 @@ import { ragRoutes } from './rag.routes.js';
 import { userGroupRoutes } from './userGroups.routes.js';
 import { tokenUsageRoutes } from './token-usage.routes.js';
 import { showcaseRoutes } from './showcase.routes.js';
+import { packDeployRoutes } from './pack-deploy.routes.js';
 import { llmProxyRoutes } from './llm-proxy.routes.js';
 import { connectorRoutes } from './connectors.routes.js';
 import { supportRoutes, supportSettingsRoutes, supportKnowledgeRoutes } from './support.routes.js';
@@ -242,6 +243,9 @@ export async function registerRoutes(fastify: FastifyInstance): Promise<void> {
 
   // Showcase Routes (企业Agent大赏)
   await fastify.register(showcaseRoutes, { prefix: '/api/showcase' });
+
+  // Pack Deploy Routes (行业Pack领用)
+  await fastify.register(packDeployRoutes, { prefix: '/api/packs' });
 
   // IM Webhook Routes (receive messages from Slack, Discord, etc. — no JWT auth)
   await fastify.register(imWebhookRoutes, { prefix: '/api/im' });

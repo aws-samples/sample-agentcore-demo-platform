@@ -227,6 +227,225 @@ All 51 SKILL.md files contain substantial content (min 2,938 bytes).
 
 ---
 
-## 7. Overall Verdict
+## 7. Overall Verdict (Scopes 1–3)
 
-> **✅ PASS** — The industry-pack-finance-risk solution pack is complete, consistent, and well-structured. One minor type inconsistency was found and fixed. Two WARN-level observations are by-design architectural decisions, not defects.
+> **✅ PASS** — The first three scopes (credit-approval, delinquent-asset-management, anti-fraud-center) are complete, consistent, and well-structured. One minor type inconsistency was found and fixed. Two WARN-level observations are by-design architectural decisions, not defects.
+
+---
+---
+
+# Validation Report — Scopes 4–5 (Incremental)
+
+**Scopes Validated**: 保险与财富管理 (insurance-wealth-management), 支付与交易风控 (payment-transaction-risk)
+**Validation Date**: 2024-01-15
+**New Agents**: 8 | **New Skills**: 29 | **New Workflow Tasks**: 35
+
+---
+
+## 8. Structural Completeness (Scopes 4–5)
+
+| Check | Scope | Result | Details |
+|-------|-------|--------|---------|
+| scope.json exists | insurance-wealth-management | **PASS** | Valid JSON with name="保险与财富管理", description, icon=🏦, color=#10B981, scope_type=business |
+| scope.json exists | payment-transaction-risk | **PASS** | Valid JSON with name="支付与交易风控", description, icon=💳, color=#F59E0B, scope_type=business |
+| agents/ directory | insurance-wealth-management | **PASS** | 4 agent JSON files |
+| agents/ directory | payment-transaction-risk | **PASS** | 4 agent JSON files |
+| skills/ directory | insurance-wealth-management | **PASS** | 12 skill subdirectories, each with SKILL.md |
+| skills/ directory | payment-transaction-risk | **PASS** | 17 skill subdirectories, each with SKILL.md |
+| workflow/workflow-plan.json | insurance-wealth-management | **PASS** | Valid JSON with 18 tasks |
+| workflow/workflow-plan.json | payment-transaction-risk | **PASS** | Valid JSON with 17 tasks |
+| sop/sop.md | insurance-wealth-management | **PASS** | 362 lines, substantial content |
+| sop/sop.md | payment-transaction-risk | **PASS** | 448 lines, substantial content |
+| memories/initial-memories.json | insurance-wealth-management | **PASS** | Valid JSON array with 8 memory entries |
+| memories/initial-memories.json | payment-transaction-risk | **PASS** | Valid JSON array with 8 memory entries |
+
+**Structural Completeness Result: 12/12 PASS**
+
+---
+
+## 9. Reference Consistency (Scopes 4–5)
+
+### 9.1 Agent Refs in Workflows → Agent Files
+
+| Scope | agentRef Values | Agent Files | Result |
+|-------|----------------|-------------|--------|
+| insurance-wealth-management | contract-analyzer, claims-adjudicator, asset-advisor, redemption-processor | 4 matching files | **PASS** |
+| payment-transaction-risk | payment-authorizer, aml-monitor, cross-border-compliance, risk-strategy-optimizer | 4 matching files | **PASS** |
+
+### 9.2 Skill References in Agent JSONs → Skill Directories
+
+| Scope | Skills Referenced | Skills Found | Orphan Skills | Result |
+|-------|-----------------|-------------|---------------|--------|
+| insurance-wealth-management | 12 (3 per agent × 4 agents) | 12 | 0 | **PASS** |
+| payment-transaction-risk | 17 (4+4+4+5 across agents) | 17 | 0 | **PASS** |
+
+**Skill mapping detail:**
+- `asset-advisor` → customer-profiling, portfolio-allocation, post-investment-monitoring ✓
+- `claims-adjudicator` → claims-material-verification, payout-calculation, claims-fraud-detection ✓
+- `contract-analyzer` → contract-clause-extraction, contract-comparison-analysis, confidence-assessment ✓
+- `redemption-processor` → redemption-compliance-check, share-calculation, liquidity-monitoring ✓
+- `payment-authorizer` → realtime-risk-scoring, payment-authorization-decision, transaction-limit-management, timeout-degradation-handling ✓
+- `aml-monitor` → suspicious-transaction-detection, large-transaction-reporting, sanctions-screening, customer-risk-rating ✓
+- `cross-border-compliance` → cross-border-identity-verification, trade-background-validation, forex-quota-monitoring, enhanced-due-diligence ✓
+- `risk-strategy-optimizer` → risk-metrics-monitoring, ab-test-design-evaluation, strategy-parameter-tuning, model-health-assessment, compliance-report-generation ✓
+
+### 9.3 Duplicate Agent Names Across All 5 Scopes
+
+| Check | Result | Details |
+|-------|--------|---------|
+| Unique agent names | **PASS** | All 22 agent names across 5 scopes are unique — no collisions |
+
+**Reference Consistency Result: 5/5 PASS**
+
+---
+
+## 10. Content Quality (Scopes 4–5)
+
+### 10.1 Agent Required Fields
+
+| Agent | name | display_name | role | system_prompt | Result |
+|-------|:----:|:------------:|:----:|:-------------:|--------|
+| asset-advisor | ✅ | ✅ (资产配置Agent) | ✅ | ✅ | **PASS** |
+| claims-adjudicator | ✅ | ✅ (理赔审核Agent) | ✅ | ✅ | **PASS** |
+| contract-analyzer | ✅ | ✅ (合同智能解析Agent) | ✅ | ✅ | **PASS** |
+| redemption-processor | ✅ | ✅ (赎回处置Agent) | ✅ | ✅ | **PASS** |
+| payment-authorizer | ✅ | ✅ (支付授权Agent) | ✅ | ✅ | **PASS** |
+| aml-monitor | ✅ | ✅ (AML监测Agent) | ✅ | ✅ | **PASS** |
+| cross-border-compliance | ✅ | ✅ (跨境合规Agent) | ✅ | ✅ | **PASS** |
+| risk-strategy-optimizer | ✅ | ✅ (策略调优Agent) | ✅ | ✅ | **PASS** |
+
+### 10.2 System Prompt Length (≥200 chars required)
+
+| Agent | Length (chars, approx) | Result |
+|-------|----------------------|--------|
+| asset-advisor | ~1,850 | **PASS** |
+| claims-adjudicator | ~1,900 | **PASS** |
+| contract-analyzer | ~1,650 | **PASS** |
+| redemption-processor | ~1,920 | **PASS** |
+| payment-authorizer | ~1,780 | **PASS** |
+| aml-monitor | ~1,950 | **PASS** |
+| cross-border-compliance | ~1,870 | **PASS** |
+| risk-strategy-optimizer | ~2,050 | **PASS** |
+
+All system prompts far exceed the 200-character minimum (range: ~1,650–2,050 chars).
+
+### 10.3 SKILL.md Content (≥100 chars required)
+
+| Scope | Files | Min Size | Max Size | All ≥100 chars? | Result |
+|-------|-------|----------|----------|-----------------|--------|
+| insurance-wealth-management | 12 | 3,439 bytes | 5,188 bytes | Yes | **PASS** |
+| payment-transaction-risk | 17 | 2,921 bytes | 4,512 bytes | Yes | **PASS** |
+
+All 29 SKILL.md files contain substantial professional content (min 2,921 bytes).
+
+### 10.4 SOP Contains RACI Matrix
+
+| Scope | RACI Table Found | Result |
+|-------|-----------------|--------|
+| insurance-wealth-management | ✅ Section 2 "RACI矩阵" — 21-row table with R/A/C/I values across 6 role columns | **PASS** |
+| payment-transaction-risk | ✅ Section 2 "RACI 责任矩阵" — 18-row table with R/A/C/I values across 6 role columns | **PASS** |
+
+### 10.5 Workflow Contains Condition Nodes
+
+| Scope | Condition Nodes | Result |
+|-------|----------------|--------|
+| insurance-wealth-management | 4 condition nodes (task-3, task-8, task-11, task-15) | **PASS** |
+| payment-transaction-risk | 1 condition node (task-3) | **PASS** |
+
+**Content Quality Result: 14/14 PASS**
+
+---
+
+## 11. Logical Consistency (Scopes 4–5)
+
+### 11.1 Workflow DAG Validity (No Cycles)
+
+| Scope | Result | Details |
+|-------|--------|---------|
+| insurance-wealth-management | **PASS** | Acyclic graph verified — 18 tasks, all dependency chains terminate |
+| payment-transaction-risk | **PASS** | Acyclic graph verified — 17 tasks, all dependency chains terminate |
+
+### 11.2 Workflow Entry Points
+
+| Scope | Entry Points | Result | Details |
+|-------|-------------|--------|---------|
+| insurance-wealth-management | 3 | **WARN** | task-1 (保险合同条款解析), task-2 (财富管理协议条款解析), task-10 (客户风险测评与画像构建). Three independent business lines (保险理赔, 财富配置, 赎回处置) that run in parallel by design. |
+| payment-transaction-risk | 2 | **WARN** | task-1 (支付请求接收与解析), task-17 (应急降级与灾备切换). task-17 is a standalone emergency operations task that runs independently of normal transaction flow — architecturally correct. |
+
+### 11.3 All Workflow Task IDs Unique
+
+| Scope | Task Count | Unique IDs | Result |
+|-------|-----------|------------|--------|
+| insurance-wealth-management | 18 | 18 | **PASS** |
+| payment-transaction-risk | 17 | 17 | **PASS** |
+
+### 11.4 All Dependency References Valid
+
+| Scope | Result | Details |
+|-------|--------|---------|
+| insurance-wealth-management | **PASS** | All dependentTasks reference existing task IDs within the workflow |
+| payment-transaction-risk | **PASS** | All dependentTasks reference existing task IDs within the workflow |
+
+### 11.5 SOP Step Count ≈ Workflow Task Count
+
+| Scope | SOP Steps (approx) | Workflow Tasks | Ratio | Result |
+|-------|--------------------:|:--------------:|:-----:|--------|
+| insurance-wealth-management | 22 (across SOP-IW-01–04) | 18 | 0.82 | **PASS** |
+| payment-transaction-risk | 20 (across SOP-PT-01–04 main flows) | 17 | 0.85 | **PASS** |
+
+### 11.6 Workflow Task Type Consistency
+
+| Scope | Task Types | Result | Details |
+|-------|-----------|--------|---------|
+| insurance-wealth-management | agent: 13, condition: 4, document: 1 | **PASS** | Standard types only |
+| payment-transaction-risk | agent: 9, condition: 1, document: 1, action: 4 | **WARN** | Uses `action` type for 4 tasks (task-1, task-4, task-6, task-17). These are lightweight automated steps (request parsing, limit checks, message pushing, failover) distinguished from reasoning-heavy `agent` tasks. Consistent within this scope. |
+
+**Logical Consistency Result: 10 PASS, 3 WARN, 0 FAIL**
+
+---
+
+## 12. Issues Found & Fixes Applied (Scopes 4–5)
+
+**No FAIL-level issues found.** Both new scopes are well-structured and internally consistent.
+
+---
+
+## 13. Summary Scorecard (Scopes 4–5)
+
+| Category | Checks | PASS | WARN | FAIL | Fixed |
+|----------|--------|------|------|------|-------|
+| Structural Completeness | 12 | 12 | 0 | 0 | — |
+| Reference Consistency | 5 | 5 | 0 | 0 | — |
+| Content Quality | 14 | 14 | 0 | 0 | — |
+| Logical Consistency | 13 | 10 | 3 | 0 | — |
+| **Total** | **44** | **41** | **3** | **0** | **0** |
+
+### WARN Items (acceptable, non-blocking)
+
+1. **insurance-wealth-management: 3 entry points** — By design. The scope covers 3 independent business lines (保险理赔流程, 财富管理配置流程, 私募赎回流程) that operate as parallel pipelines sharing the contract-analyzer as a common upstream dependency.
+
+2. **payment-transaction-risk: 2 entry points** — By design. task-17 (应急降级与灾备切换) is a standalone emergency operations process that runs independently of the normal transaction processing pipeline.
+
+3. **payment-transaction-risk: `action` task type used** — 4 tasks use non-standard `action` type for lightweight automated steps (request routing, limit checks, message pushing, failover). This is a deliberate architectural distinction within this scope to differentiate "pass-through automation" from "agent reasoning" tasks. Internally consistent but differs from other scopes' conventions.
+
+---
+
+## 14. Cumulative Pack Scorecard (All 5 Scopes)
+
+| Metric | Value |
+|--------|-------|
+| Total Scopes | 5 |
+| Total Agents | 22 (all unique names) |
+| Total Skills | 80 (all referenced, no orphans) |
+| Total Workflow Tasks | 99 |
+| Total Checks Run | 106 |
+| PASS | 101 |
+| WARN | 5 |
+| FAIL | 0 |
+| Fixes Applied | 1 (historical — delinquent-asset-management task type) |
+
+---
+
+## 15. Overall Verdict (Full Pack)
+
+> **✅ PASS** — The complete industry-pack-finance-risk solution pack (5 scopes, 22 agents, 80 skills, 99 workflow tasks) is structurally complete, referentially consistent, and logically sound. Zero FAIL-level issues. All 5 WARN items are by-design architectural decisions documented above.

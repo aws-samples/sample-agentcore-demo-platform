@@ -1,0 +1,226 @@
+{
+  "title": "电商运营全链路工作流",
+  "description": "覆盖直播运营循环、商品运营循环和投放运营循环三大主流程，通过5个Agent的协同实现电商运营从策划到执行、从监控到复盘的完整闭环。",
+  "tasks": [
+    {
+      "id": "task-1",
+      "title": "制定直播计划",
+      "type": "agent",
+      "prompt": "基于历史直播数据和当前商品库存情况，制定下一场直播的完整计划。包括：确定直播主题和目标GMV，从可用商品池中选择15-30个商品并按引流款/利润款/爆款/福利款分类编排，设计排品时序（考虑平台算法特性），设定每品目标GMV和讲解时长，设计2-3个互动玩法及触发时机。输出结构化直播计划书，包含时间线甘特图、排品表、目标分解表和资源需求清单。",
+      "agentRef": "livestream-strategist",
+      "dependentTasks": [],
+      "requiredIntegrations": ["商品库存系统", "历史直播数据库", "平台流量数据"]
+    },
+    {
+      "id": "task-2",
+      "title": "编写话术脚本",
+      "type": "agent",
+      "prompt": "基于直播计划中的排品列表和各商品知识卡片，为本场直播编写完整话术脚本。为每个品设计：开场hook（5秒吸引注意力）、核心卖点讲解（3个以内）、场景描绘、价格锚定话术和逼单话术。同时准备：开场暖场话术、品与品之间的过渡话术、互动环节规则话术、收场话术和应急备用话术。所有话术需通过当前平台的违规词检测，标注可灵活调整部分和必须严格执行部分。",
+      "agentRef": "livestream-strategist",
+      "dependentTasks": ["task-1", "task-3"],
+      "requiredIntegrations": ["商品知识库", "平台合规规则库"]
+    },
+    {
+      "id": "task-3",
+      "title": "确认商品知识库完备性",
+      "type": "agent",
+      "prompt": "检查直播计划中所有排品的商品知识卡片完备性。确认每个商品的知识卡片完备度≥90%，包含：基础信息、规格参数、核心卖点Top5（每个含支撑证据）、FAQ Top10、竞品对比表、话术建议和注意事项。如发现信息缺失，立即补充采集。同步生成直播用的简版知识卡片供数字主播使用。输出各商品知识完备度评分和缺失项清单。",
+      "agentRef": "store-ops-manager",
+      "dependentTasks": ["task-1"],
+      "requiredIntegrations": ["商品知识库", "供应商信息系统"]
+    },
+    {
+      "id": "task-4",
+      "title": "制定投放策略",
+      "type": "agent",
+      "prompt": "基于直播计划的时间安排和目标GMV，制定本场直播的完整投放策略。包括：选择投放平台组合（巨量千川/磁力金牛/直通车等），分配总预算到各平台和各时段（预热20%+直播中60%+追投20%），设定各计划的出价策略和目标ROI，构建人群定向方案（基础定向+兴趣行为+高级定向），准备投放素材配置。设定自动优化规则（ROI≥3加码/ROI<1暂停），输出完整投放计划书含应急预案。",
+      "agentRef": "traffic-optimizer",
+      "dependentTasks": ["task-1"],
+      "requiredIntegrations": ["巨量千川", "磁力金牛", "直通车", "客户画像系统"]
+    },
+    {
+      "id": "task-5",
+      "title": "开播前检查确认",
+      "type": "agent",
+      "prompt": "在开播前T-10分钟执行最终全量检查。确认清单包括：1)数字主播实例运行正常（画面/声音/网络），2)话术脚本已加载就绪，3)排品顺序和互动规则已配置，4)商品链接全部正常（价格/库存/SKU），5)投放计划已启动预热，6)备用主播实例待命。逐项确认并输出开播许可（全部通过）或阻塞问题清单（任一项未通过则不允许开播）。",
+      "agentRef": "live-director",
+      "dependentTasks": ["task-2", "task-3", "task-4"],
+      "requiredIntegrations": ["直播技术系统", "电商平台API"]
+    },
+    {
+      "id": "task-6",
+      "title": "开播检查是否通过",
+      "type": "condition",
+      "prompt": "判断开播前检查是否全部通过。如果所有检查项均为通过状态，则流转到直播执行环节；如果存在未通过项，则流转到问题修复环节，修复后重新检查。",
+      "agentRef": "live-director",
+      "dependentTasks": ["task-5"],
+      "requiredIntegrations": []
+    },
+    {
+      "id": "task-7",
+      "title": "执行直播内容",
+      "type": "agent",
+      "prompt": "按照已加载的话术脚本和排品顺序执行直播内容输出。执行流程：1)开场暖场话术（欢迎+今日福利预告+引导关注），2)按排品顺序逐品讲解（hook→卖点→场景→价格→逼单），3)品间执行过渡话术，4)响应场控调度师的实时指令（切品/互动/节奏调整），5)实时解析观众弹幕并在3秒内回复。所有输出需标注当前状态（正常讲解/互动环节/过渡/应急），并持续通过平台合规检测。",
+      "agentRef": "digital-anchor",
+      "dependentTasks": ["task-6"],
+      "requiredIntegrations": ["直播推流系统", "弹幕系统", "商品知识库"]
+    },
+    {
+      "id": "task-8",
+      "title": "实时数据监控与调度",
+      "type": "agent",
+      "prompt": "直播全程执行实时数据监控和节奏调度。每10秒采集核心指标（在线人数/停留时长/互动率/转化率/GPM），每15分钟输出数据快照报告。当检测到异常时立即启动干预：在线人数5分钟内下降>30%→触发福利品/抽奖；单品转化率<预期50%→发出切品指令；互动率连续10分钟<2%→触发弹幕互动话术。每30分钟主动发起一次大互动事件。所有调度指令格式：[指令类型]+[内容]+[数据依据]+[预期效果]。异常情况（技术故障/违规预警）立即启动应急预案。",
+      "agentRef": "live-director",
+      "dependentTasks": ["task-6"],
+      "requiredIntegrations": ["直播平台数据API", "监控系统"]
+    },
+    {
+      "id": "task-9",
+      "title": "投放实时优化",
+      "type": "agent",
+      "prompt": "直播过程中持续监控各投放计划效果并执行实时优化。每小时检查各计划ROI并执行自动规则：ROI≥3加码20%预算，1≤ROI<3调整定向/创意，ROI<1持续30分钟自动暂停。响应场控调度师的加投/减投需求（5分钟内执行）。监控日预算消耗节奏（偏差≤10%）。追踪素材效果，淘汰低效素材。记录所有优化操作日志供复盘使用。输出每小时投放效果简报。",
+      "agentRef": "traffic-optimizer",
+      "dependentTasks": ["task-6"],
+      "requiredIntegrations": ["巨量千川API", "磁力金牛API", "直通车API"]
+    },
+    {
+      "id": "task-10",
+      "title": "判断直播是否结束",
+      "type": "condition",
+      "prompt": "判断当前直播是否达到收播条件。收播条件包括：1)达到计划直播时长，2)所有排品讲解完毕，3)紧急情况被迫收播。如果直播继续则循环执行监控和内容输出，如果满足收播条件则进入收播和复盘环节。",
+      "agentRef": "live-director",
+      "dependentTasks": ["task-7", "task-8", "task-9"],
+      "requiredIntegrations": []
+    },
+    {
+      "id": "task-11",
+      "title": "生成直播复盘报告",
+      "type": "agent",
+      "prompt": "在收播后60分钟内完成复盘报告生成。步骤：1)拉取平台后台全量数据并与自有监控数据交叉核对（确保100%准确），2)计算目标达成率（GMV/UV/GPM/转化率vs计划），3)分品分析（TOP5爆款原因+BOTTOM5滞销原因），4)话术效果评估（哪些话术转化高/哪些需要优化），5)流量分析（各渠道质量/付费流量ROI），6)时段分析（哪些时段高效/哪些时段低效），7)输出5-10条具体可执行的优化建议。报告格式：执行摘要→数据总览→分品分析→话术效果→流量分析→优化建议→下场计划输入。",
+      "agentRef": "livestream-strategist",
+      "dependentTasks": ["task-10"],
+      "requiredIntegrations": ["直播平台后台", "数据分析系统"]
+    },
+    {
+      "id": "task-12",
+      "title": "输出日投放复盘",
+      "type": "agent",
+      "prompt": "在每日22:00前完成当日投放复盘报告。汇总当日全量投放数据：总消耗/总GMV/整体ROI，分平台效果明细（消耗/GMV/ROI/CPA），分计划TOP10（高效原因分析）和BOTTOM10（低效原因分析），分人群效果排名（哪些人群包ROI最高），素材效果排名（哪些创意CTR/CVR最优）。基于分析输出次日优化方向：预算重新分配建议、人群调整建议、素材更换建议、出价调整建议。",
+      "agentRef": "traffic-optimizer",
+      "dependentTasks": ["task-10"],
+      "requiredIntegrations": ["投放数据系统"]
+    },
+    {
+      "id": "task-13",
+      "title": "更新商品表现数据",
+      "type": "agent",
+      "prompt": "基于直播复盘报告中的商品表现数据，更新商品知识库和表现记录。执行：1)更新各商品的直播转化率、GMV贡献和观众反馈数据，2)标注爆款商品（加入'直播推荐'标签，建议加大备货），3)标注滞销商品（触发文案优化或促销建议），4)更新商品知识卡片中的FAQ（基于本场观众高频提问），5)更新话术建议（基于本场高转化话术），6)评估是否有商品需要启动下架/优化流程。输出商品表现更新报告。",
+      "agentRef": "store-ops-manager",
+      "dependentTasks": ["task-11"],
+      "requiredIntegrations": ["商品知识库", "库存管理系统"]
+    },
+    {
+      "id": "task-14",
+      "title": "沉淀优化策略",
+      "type": "agent",
+      "prompt": "将本场直播的关键经验和数据沉淀到运营知识库，形成可复用的策略资产。包括：1)提炼爆款规律（品类×价格带×话术风格×时段×排品位置的最优组合），2)更新话术效果库（标注高转化话术模板和低效话术黑名单），3)更新投放经验库（人群×素材×出价的最优配置），4)记录异常处理案例（问题×方案×效果），5)更新平台算法洞察（本场观察到的流量分配规律变化）。所有沉淀内容需关联具体数据支撑。输出知识库更新清单。",
+      "agentRef": "livestream-strategist",
+      "dependentTasks": ["task-11", "task-12"],
+      "requiredIntegrations": ["运营知识库"]
+    },
+    {
+      "id": "task-15",
+      "title": "商品信息采集与文案生成",
+      "type": "agent",
+      "prompt": "对新入库商品执行信息采集和AI文案生成。步骤：1)采集商品基础信息（品名/规格/成分/功效/价格/卖点），2)获取竞品TOP5的文案和定价数据，3)获取平台搜索热词（近7天该品类TOP关键词），4)生成多平台文案包——淘宝标题(≤30字)/抖音标题(≤20字)/拼多多标题(≤60字)各3-5版本，5)撰写五点卖点描述（按功效→成分→场景→口碑→保障排序），6)生成详情页文案框架，7)确定SEO关键词策略。所有文案通过广告法和平台违规词自动检测。输出完整文案包和合规检查报告。",
+      "agentRef": "store-ops-manager",
+      "dependentTasks": [],
+      "requiredIntegrations": ["供应商系统", "竞品数据", "平台搜索数据"]
+    },
+    {
+      "id": "task-16",
+      "title": "文案是否通过合规审查",
+      "type": "condition",
+      "prompt": "判断AI生成的商品文案是否通过合规审查（广告法+平台规范）。如果通过，进入人工确认和上架环节；如果未通过，识别具体违规点并自动修改后重新提交检测。常见违规：绝对化用语、虚假功效宣称、价格虚标、违禁品类描述。",
+      "agentRef": "store-ops-manager",
+      "dependentTasks": ["task-15"],
+      "requiredIntegrations": ["合规检测系统"]
+    },
+    {
+      "id": "task-17",
+      "title": "多平台适配上架",
+      "type": "agent",
+      "prompt": "将审核通过的商品文案按各平台规范进行适配并执行上架。逐平台执行：1)调整标题长度和关键词策略适配目标平台，2)确认主图规格（淘宝800×800白底/抖音1:1场景图/快手3:4竖图/拼多多750×352），3)适配详情页格式，4)设置各平台价格策略（考虑扣点差异），5)配置SKU/库存/运费模板/服务承诺，6)提交审核并跟踪状态。上架后24小时内完成展示验证（搜索可见/页面正常/可下单）。上架成功率目标≥98%。输出各平台上架状态表和验证报告。",
+      "agentRef": "store-ops-manager",
+      "dependentTasks": ["task-16"],
+      "requiredIntegrations": ["淘宝开放平台", "抖音小店API", "快手小店API", "拼多多API"]
+    },
+    {
+      "id": "task-18",
+      "title": "商品表现监控与优化",
+      "type": "agent",
+      "prompt": "对所有在售商品进行持续表现监控，识别问题并触发优化流程。每日检查：1)销量趋势（上架7天销量为0→标记滞销），2)评价趋势（差评率>5%→暂停推广+分析原因），3)转化率对比（<品类均值50%→触发文案优化），4)搜索排名变化（下降>10位→检查关键词策略），5)库存预警（库存<7天消耗量→通知补货）。对发现的问题输出处理建议：文案优化/价格调整/推广加码/下架清退。输出商品健康度日报。",
+      "agentRef": "store-ops-manager",
+      "dependentTasks": ["task-17"],
+      "requiredIntegrations": ["电商平台数据API", "库存管理系统"]
+    }
+  ],
+  "variables": [
+    {
+      "variableId": "var-1",
+      "name": "targetGmv",
+      "variableType": "number",
+      "description": "本场直播的目标GMV金额（元）",
+      "required": true
+    },
+    {
+      "variableId": "var-2",
+      "name": "livestreamPlatform",
+      "variableType": "string",
+      "description": "直播平台选择（douyin/taobao/kuaishou）",
+      "required": true
+    },
+    {
+      "variableId": "var-3",
+      "name": "totalBudget",
+      "variableType": "number",
+      "description": "本场直播的总投放预算（元）",
+      "required": true
+    },
+    {
+      "variableId": "var-4",
+      "name": "targetRoi",
+      "variableType": "number",
+      "description": "目标投放ROI（默认≥3）",
+      "required": true
+    },
+    {
+      "variableId": "var-5",
+      "name": "livestreamDuration",
+      "variableType": "number",
+      "description": "计划直播时长（小时）",
+      "required": true
+    },
+    {
+      "variableId": "var-6",
+      "name": "productPool",
+      "variableType": "string",
+      "description": "可选商品池ID或商品列表JSON",
+      "required": true
+    },
+    {
+      "variableId": "var-7",
+      "name": "anchorPersona",
+      "variableType": "string",
+      "description": "数字主播人设风格（活泼种草/专业导购/亲民信任）",
+      "required": true
+    },
+    {
+      "variableId": "var-8",
+      "name": "newProductInfo",
+      "variableType": "string",
+      "description": "新商品基础信息JSON（用于商品上架流程）",
+      "required": false
+    }
+  ]
+}

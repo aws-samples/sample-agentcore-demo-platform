@@ -1,0 +1,172 @@
+{
+  "title": "语音驱动业务闭环工作流",
+  "description": "从业务意图接收到事务执行完成的端到端语音业务操作流程，覆盖参数收集、身份验证、确认机制、事务执行和异常处理的完整链路",
+  "tasks": [
+    {
+      "id": "task-1",
+      "title": "业务意图接收与流程激活",
+      "type": "agent",
+      "prompt": "接收来自对话编排引擎的业务类意图标签和初始参数。评估意图分类置信度：如果置信度>=85%直接匹配流程模板，如果置信度<85%则生成自然语言澄清话术引导用户明确意图。匹配成功后初始化流程实例，创建唯一flow_instance_id，从用户首句话中预提取已知参数。输出激活的流程模板类型、预填充参数集合和流程初始状态。",
+      "agentRef": "flow-guide",
+      "dependentTasks": [],
+      "requiredIntegrations": ["dialogue-orchestrator-upstream"]
+    },
+    {
+      "id": "task-2",
+      "title": "业务参数智能收集",
+      "type": "agent",
+      "prompt": "基于已激活的流程模板，识别所有必填和可选参数。按优先级顺序生成自然语言追问话术收集缺失参数。处理用户语音中的特殊表达：将相对时间转为绝对时间，将口语数字标准化，解析指代和省略。对提取的参数执行格式校验和业务规则校验。关键数字参数（金额、数量）必须主动确认。如用户一次提供多个参数则批量确认。每轮收集后检查参数完整性，完整则输出确认的参数集合进入下一步。",
+      "agentRef": "flow-guide",
+      "dependentTasks": ["task-1"],
+      "requiredIntegrations": ["nlu-entity-extraction"]
+    },
+    {
+      "id": "task-3",
+      "title": "操作风险等级评估",
+      "type": "condition",
+      "prompt": "根据当前业务操作类型评估风险等级。判断规则：查询类操作（余额查询、订单状态）为低风险；修改类操作（改签、更改预约、修改收货地址）为中风险；资金类操作（支付、转账、退款、大额操作>=5000元）为高风险。输出风险等级标签（low/medium/high）决定后续身份验证策略。",
+      "agentRef": "flow-guide",
+      "dependentTasks": ["task-2"],
+      "requiredIntegrations": []
+    },
+    {
+      "id": "task-4",
+      "title": "多因子身份验证执行",
+      "type": "agent",
+      "prompt": "根据风险等级执行对应的身份验证策略。低风险：从当前对话音频中静默提取声纹特征，与注册模板比对，置信度>=95%即通过（用户无感知）。中风险：执行显式声纹验证（播放引导语要求用户说特定句子）+口头密码验证。高风险：声纹验证+发送短信OTP验证码并要求用户口述。同时执行反欺骗检测（回放攻击/合成语音/语音变换）。验证通过生成verification_token（有效期5分钟），失败允许重试（最多3次），超次锁定并触发转人工。",
+      "agentRef": "identity-verifier",
+      "dependentTasks": ["task-3"],
+      "requiredIntegrations": ["voiceprint-engine", "sms-gateway", "anti-spoofing-service"]
+    },
+    {
+      "id": "task-5",
+      "title": "验证结果判定分支",
+      "type": "condition",
+      "prompt": "检查身份验证结果：如果验证通过（verification_token有效）则流转到关键信息确认步骤；如果验证失败且重试次数未耗尽则回到身份验证步骤重新执行；如果验证失败且重试次数已耗尽（>=3次）则触发账户锁定和转人工流程。",
+      "agentRef": "identity-verifier",
+      "dependentTasks": ["task-4"],
+      "requiredIntegrations": []
+    },
+    {
+      "id": "task-6",
+      "title": "关键信息完整确认",
+      "type": "agent",
+      "prompt": "组装操作摘要，必须包含三要素：金额/数量、时间/日期、对象/目标。生成自然对话式确认话术（如'好的，确认为您将3月15日北京到上海的航班改签到3月17日同一航班，需补差价120元，确认吗？'）。等待用户响应并解析：肯定确认则生成confirmation_token；否定则返回参数修改步骤；部分修正则更新参数后重新确认。对于资金类操作，首次确认后间隔2秒执行二次确认（要求用户明确说'确认支付'等特定词组）。二次确认不可跳过。",
+      "agentRef": "flow-guide",
+      "dependentTasks": ["task-5"],
+      "requiredIntegrations": []
+    },
+    {
+      "id": "task-7",
+      "title": "确认结果分支处理",
+      "type": "condition",
+      "prompt": "判断用户确认结果：如果获得完整确认（普通操作一次确认通过，资金操作二次确认通过）则进入事务执行；如果用户否定或要求修改则回到参数收集步骤；如果用户连续3次否定则建议转人工或终止流程；如果确认超时（30秒无响应）则暂停流程并告知用户可稍后恢复。",
+      "agentRef": "flow-guide",
+      "dependentTasks": ["task-6"],
+      "requiredIntegrations": []
+    },
+    {
+      "id": "task-8",
+      "title": "业务事务预检与执行",
+      "type": "agent",
+      "prompt": "验证verification_token和confirmation_token双令牌有效性。执行事务预检：余额充足性、库存可用性、业务规则合规性、幂等性检查（去重）。预检通过后调用后端业务系统API执行实际操作。管理事务状态机（INITIALIZED→EXECUTING→SUCCESS/FAILED/TIMEOUT）。设置超时阈值（资金类30s，非资金类15s）。成功时生成结果摘要和通知内容；失败时分类错误（可重试/不可重试/需人工）并生成替代方案建议。",
+      "agentRef": "transaction-executor",
+      "dependentTasks": ["task-7"],
+      "requiredIntegrations": ["order-system-api", "payment-gateway", "booking-system-api", "notification-service"]
+    },
+    {
+      "id": "task-9",
+      "title": "执行结果分支处理",
+      "type": "condition",
+      "prompt": "判断事务执行结果：成功则进入结果通知步骤；失败且错误分类为可重试（5xx/超时）则自动重试（最多2次）；失败且不可重试（4xx/业务规则拒绝）则进入异常处理提供替代方案；超时（30秒无响应）则挂起事务并告知用户稍后通知结果。",
+      "agentRef": "transaction-executor",
+      "dependentTasks": ["task-8"],
+      "requiredIntegrations": []
+    },
+    {
+      "id": "task-10",
+      "title": "执行结果语音播报与通知",
+      "type": "agent",
+      "prompt": "将事务执行Agent返回的结构化结果转化为自然语言播报给用户。成功示例：'改签已完成！新航班是3月17日CA1234，差价120元已从您的账户扣除，确认短信已发送到您的手机'。同时触发确认通知发送：短信（含操作摘要和订单号）和APP推送。更新用户操作历史记录。告知用户如有问题可随时来电咨询。",
+      "agentRef": "flow-guide",
+      "dependentTasks": ["task-9"],
+      "requiredIntegrations": ["sms-service", "push-notification-service"]
+    },
+    {
+      "id": "task-11",
+      "title": "异常处理与替代方案提供",
+      "type": "agent",
+      "prompt": "当事务执行失败时，在5秒内向用户告知失败原因（使用用户友好的自然语言，不暴露技术细节）。根据失败类型提供替代方案：航班满→查询同日其他航班；库存不足→推荐相似商品；支付失败→建议更换支付方式。如果是系统性故障（下游服务不可用），告知用户'系统暂时繁忙，建议稍后重试'并提供回拨选项。所有不可自动恢复的异常在60秒内转接人工，并传递完整对话上下文。",
+      "agentRef": "flow-guide",
+      "dependentTasks": ["task-9"],
+      "requiredIntegrations": ["human-agent-routing"]
+    },
+    {
+      "id": "task-12",
+      "title": "操作审计日志归档",
+      "type": "agent",
+      "prompt": "对整个操作链路生成完整的审计日志：记录从意图接收到执行完成的每个环节（时间戳、操作内容、执行结果、耗时）。归档确认音频文件（保留90天）。执行安全审计：检测异常操作模式（同用户短时间大量操作、异常时段大额操作等），更新用户安全信誉分。将操作数据沉淀用于后续流程优化分析。确保日志写入不可篡改存储。",
+      "agentRef": "identity-verifier",
+      "dependentTasks": ["task-10", "task-11"],
+      "requiredIntegrations": ["audit-log-storage", "risk-control-system"]
+    }
+  ],
+  "variables": [
+    {
+      "variableId": "var-1",
+      "name": "businessIntent",
+      "variableType": "string",
+      "description": "从对话编排引擎接收的业务意图标签（如flight_change, order_create, payment等）",
+      "required": true
+    },
+    {
+      "variableId": "var-2",
+      "name": "userContext",
+      "variableType": "object",
+      "description": "用户上下文信息，包含user_id、历史订单、语言偏好、声纹注册状态等",
+      "required": true
+    },
+    {
+      "variableId": "var-3",
+      "name": "collectedParams",
+      "variableType": "object",
+      "description": "流程中逐步收集并确认的业务参数集合",
+      "required": true
+    },
+    {
+      "variableId": "var-4",
+      "name": "riskLevel",
+      "variableType": "string",
+      "description": "操作风险等级评估结果（low/medium/high），决定身份验证策略",
+      "required": true
+    },
+    {
+      "variableId": "var-5",
+      "name": "verificationToken",
+      "variableType": "string",
+      "description": "身份验证通过后生成的一次性令牌，有效期5分钟",
+      "required": true
+    },
+    {
+      "variableId": "var-6",
+      "name": "confirmationToken",
+      "variableType": "string",
+      "description": "用户确认操作后生成的确认凭证，含资金操作的二次确认标记",
+      "required": true
+    },
+    {
+      "variableId": "var-7",
+      "name": "transactionResult",
+      "variableType": "object",
+      "description": "事务执行结果，包含状态、结果摘要、通知内容、错误分类等",
+      "required": false
+    },
+    {
+      "variableId": "var-8",
+      "name": "flowInstanceId",
+      "variableType": "string",
+      "description": "当前流程实例的唯一标识，用于状态持久化和中断恢复",
+      "required": true
+    }
+  ]
+}

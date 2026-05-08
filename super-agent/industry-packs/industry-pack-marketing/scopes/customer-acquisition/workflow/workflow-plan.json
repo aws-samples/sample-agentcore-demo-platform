@@ -1,0 +1,208 @@
+{
+  "title": "用户获客与智能外呼全流程",
+  "description": "覆盖从线索接入、评分分级、外呼触达、私域运营到流失预警的获客全链路自动化工作流。实现7×24小时智能外呼、ABCD四级线索评分、A级线索1小时内流转、客户生命周期分层运营和提前7天流失预警。",
+  "tasks": [
+    {
+      "id": "task-1",
+      "title": "线索接入与数据清洗",
+      "type": "agent",
+      "prompt": "接收来自广告投放（表单填写/咨询点击）、官网（注册/浏览）和活动（报名/签到）的原始线索数据。执行以下清洗步骤：1）手机号格式校验和空号检测；2）基于手机号+公司名的联合去重，重复线索更新已有记录；3）黑名单和DNC名单过滤；4）虚假信息识别（乱码、测试数据）；5）字段标准化处理。完成后输出有效线索列表和无效线索过滤报告。整个过程需在30分钟内完成。",
+      "agentRef": "lead-scorer",
+      "dependentTasks": [],
+      "requiredIntegrations": ["CRM系统", "号码验证服务", "黑名单数据库"]
+    },
+    {
+      "id": "task-2",
+      "title": "线索初始评分与分级",
+      "type": "agent",
+      "prompt": "对清洗后的有效线索执行多维度评分模型：基于用户行为数据（页面浏览深度、表单类型、内容下载）权重40%、对话信号（如有历史记录）权重35%、用户画像（企业规模、行业、职位）权重25%综合计算。输出ABCD四级评分结果：A级（≥80分）、B级（60-79分）、C级（40-59分）、D级（<40分）。对于新进线索数据不完整的情况，基于可用维度计算并标注数据完整度。确保评分有至少2个维度贡献才可判定为A级。",
+      "agentRef": "lead-scorer",
+      "dependentTasks": ["task-1"],
+      "requiredIntegrations": ["CDP客户数据平台", "网站行为分析系统"]
+    },
+    {
+      "id": "task-3",
+      "title": "A级线索判定分流",
+      "type": "condition",
+      "prompt": "判断线索评分结果：如果评分等级为A级（≥80分且至少2个维度同时达标），则进入A级线索紧急流转路径；如果评分为B/C级，则进入外呼触达路径；如果评分为D级，则进入低频维护池。",
+      "agentRef": "lead-scorer",
+      "dependentTasks": ["task-2"],
+      "requiredIntegrations": []
+    },
+    {
+      "id": "task-4",
+      "title": "A级线索CRM紧急分配",
+      "type": "agent",
+      "prompt": "将A级线索在1小时内分配到CRM中具体销售人员。执行分配逻辑：1）查询销售团队匹配规则（行业>地域>负载均衡）；2）如有历史沟通记录优先分配原销售；3）调用CRM API推送完整线索包（基本信息+评分明细+行为轨迹+通话摘要）；4）发送分配通知（CRM通知+企微消息）；5）启动SLA监控计时器。T+15分钟未查看发送提醒，T+30分钟升级主管，T+60分钟自动转分配。确保分配系统回执确认成功。",
+      "agentRef": "lead-scorer",
+      "dependentTasks": ["task-3"],
+      "requiredIntegrations": ["CRM系统", "企业微信", "短信网关"]
+    },
+    {
+      "id": "task-5",
+      "title": "B/C级线索外呼任务创建",
+      "type": "agent",
+      "prompt": "为B/C级线索创建外呼任务：1）按优先级排序名单（B级优先于C级，近期有行为的优先于无行为的）；2）验证号码有效性和拨打时间窗口（9:00-21:00）；3）匹配话术模板（B级用深度沟通话术，C级用初筛话术）；4）加载客户历史信息用于个性化开场；5）设置并发控制参数确保系统负载可控。输出结构化外呼任务包。",
+      "agentRef": "outbound-caller",
+      "dependentTasks": ["task-3"],
+      "requiredIntegrations": ["外呼系统", "话术模板库"]
+    },
+    {
+      "id": "task-6",
+      "title": "智能外呼执行与对话",
+      "type": "agent",
+      "prompt": "执行智能外呼任务：1）按名单顺序发起呼叫；2）接通后执行多轮对话——开场白→需求探测→产品介绍→意向确认；3）实时进行意图识别（感兴趣/犹豫/拒绝/投诉），根据识别结果切换对应话术分支；4）控制通话时长（初筛≤3分钟，深度沟通≤8分钟）；5）通话结束后立即生成结构化摘要（意向标签、关键需求、异议点、情感评分、下一步建议）；6）未接通的按2h/6h/24h间隔安排重呼，最多3次。实时监控投诉率，超过0.1%立即暂停批次。",
+      "agentRef": "outbound-caller",
+      "dependentTasks": ["task-5"],
+      "requiredIntegrations": ["外呼系统", "语音识别服务", "意图识别引擎"]
+    },
+    {
+      "id": "task-7",
+      "title": "外呼结果评估与评分更新",
+      "type": "condition",
+      "prompt": "根据外呼通话结果判断下一步动作：1）意向升级（客户表达明确兴趣/询问价格/请求方案）→触发重新评分，可能升至A级；2）犹豫/待定→安排nurturing序列+下次重呼；3）明确拒绝→标记为D级暂停该客户所有自动触达；4）投诉→立即加入DNC名单+标记需人工跟进；5）未接通且已达3次→标记无法触达，转短信/其他渠道尝试。",
+      "agentRef": "lead-scorer",
+      "dependentTasks": ["task-6"],
+      "requiredIntegrations": ["CRM系统"]
+    },
+    {
+      "id": "task-8",
+      "title": "外呼意向升级线索重新评分",
+      "type": "agent",
+      "prompt": "对外呼中意向升级的客户执行重新评分：将通话中获得的新信号（明确需求表达+20、询问价格+15、请求方案+12、同意面访+25）加入评分模型重新计算。如果新评分达到A级标准（≥80分且多维度达标），立即触发A级线索CRM紧急分配流程。如果仍为B级，将通话摘要和新标签更新到客户记录，进入下一轮nurturing。",
+      "agentRef": "lead-scorer",
+      "dependentTasks": ["task-7"],
+      "requiredIntegrations": ["CDP客户数据平台", "CRM系统"]
+    },
+    {
+      "id": "task-9",
+      "title": "转化客户入池私域运营",
+      "type": "agent",
+      "prompt": "将成功转化的客户（完成首次购买/签约）纳入私域客户池并执行初始分层：1）创建客户私域档案（基本信息+购买记录+渠道偏好+获客来源）；2）标记为'新客层'（首购≤30天）；3）启动新客引导序列——发送欢迎消息、首购礼说明、引导关注公众号/加入社群/完善会员信息；4）设置30天后自动重新分层检查点。确保新客在入池后24小时内收到首次触达。",
+      "agentRef": "private-domain-operator",
+      "dependentTasks": ["task-4"],
+      "requiredIntegrations": ["会员系统", "企业微信", "公众号平台"]
+    },
+    {
+      "id": "task-10",
+      "title": "客户生命周期分层运营",
+      "type": "agent",
+      "prompt": "每日执行客户池全量分层更新：基于RFM模型（最近购买Recency、购买频次Frequency、消费金额Monetary）和互动活跃度数据，将客户动态分配到四个层级——新客层（首购≤30天）、活跃层（近30天有购买或近7天高频互动≥3次/周）、沉默层（30-60天无购买且14天无互动）、流失风险层（>60天无购买且>30天无互动）。记录层间流动数据，检测异常趋势（如活跃→沉默大批量转移）。针对各层执行差异化运营策略：活跃层→交叉推荐和复购促进；沉默层→定向唤醒内容+限时优惠；严格控制触达频率（短信≤2条/周、Push≤1次/天）。",
+      "agentRef": "private-domain-operator",
+      "dependentTasks": ["task-9"],
+      "requiredIntegrations": ["会员系统", "营销自动化平台", "短信网关", "App Push服务"]
+    },
+    {
+      "id": "task-11",
+      "title": "流失预警模型运行",
+      "type": "agent",
+      "prompt": "每日凌晨运行流失预测模型：输入客户活跃度变化趋势（7天vs30天vs90天）、购买频率衰减率、互动深度下降、退订行为、投诉历史、优惠券使用率变化等特征，输出每个客户的流失概率和预计流失时间。将流失概率>70%的客户标记为高风险，按价值分级（P0=高LTV+高风险、P1=中高价值、P2=中低价值）。分析每个高风险客户的TOP3流失驱动因子。当日9:00前输出完整预警名单和风险报告。",
+      "agentRef": "private-domain-operator",
+      "dependentTasks": ["task-10"],
+      "requiredIntegrations": ["机器学习平台", "客户数据仓库"]
+    },
+    {
+      "id": "task-12",
+      "title": "流失预警等级判定",
+      "type": "condition",
+      "prompt": "根据流失预警结果判定处理路径：P0级客户（高LTV+流失概率>80%）→进入高优先挽留流程，需24小时内制定个性化方案并在48小时内执行企微+电话双重触达；P1级客户→进入标准挽留流程，48小时内通过Push+短信触达；P2级客户→进入批量触达流程；无高风险客户时→记录当日模型运行健康状态。如果预警量暴增（>2倍日均），触发异常审查流程。",
+      "agentRef": "private-domain-operator",
+      "dependentTasks": ["task-11"],
+      "requiredIntegrations": []
+    },
+    {
+      "id": "task-13",
+      "title": "高优先挽留方案执行",
+      "type": "agent",
+      "prompt": "为P0级流失风险客户执行挽留：1）24小时内制定个性化方案——根据流失原因选择策略（价格敏感→专属折扣≥20%+会员保级；体验不满→1v1关怀+服务补偿；竞品吸引→差异化权益+迁移成本提醒；自然衰退→新品推荐+社群活动邀请）；2）48小时内执行首次触达——企微1v1消息+安排外呼关怀电话（协调智能外呼Agent）+发放专属优惠；3）3天后检查响应，无响应则二次触达（升级优惠力度）；4）30天观察期后判定挽回成功/失败。单客挽留成本不超过其3个月预期贡献的30%。",
+      "agentRef": "private-domain-operator",
+      "dependentTasks": ["task-12"],
+      "requiredIntegrations": ["企业微信", "外呼系统", "优惠券系统", "营销自动化平台"]
+    },
+    {
+      "id": "task-14",
+      "title": "挽留外呼关怀执行",
+      "type": "agent",
+      "prompt": "执行流失客户挽留外呼任务：使用挽留专属话术模板，内容侧重情感关怀和专属权益传递。通话目标：1）了解客户流失/沉默原因；2）传递专属挽留优惠；3）解决具体不满（如有）；4）重建连接感。通话时长控制在5-8分钟。通话后生成详细摘要，特别记录流失原因和客户对挽留方案的反应。如果客户表达强烈不满或要求不再联系，立即尊重其意愿并加入排除名单。",
+      "agentRef": "outbound-caller",
+      "dependentTasks": ["task-13"],
+      "requiredIntegrations": ["外呼系统", "语音识别服务"]
+    },
+    {
+      "id": "task-15",
+      "title": "评分模型定期验证",
+      "type": "agent",
+      "prompt": "每两周执行一次评分模型准确性验证：1）提取验证周期内所有已评分线索；2）关联CRM中的最终转化结果；3）计算各级别实际转化率——A级目标>30%、D级目标<5%；4）计算整体AUC评分；5）与上一验证周期对比检测漂移（偏差>10%判定为漂移）；6）漂移时分析原因（数据质量变化/市场环境变化/渠道结构变化）并生成调优建议；7）严重漂移时启动模型重训练+AB测试方案。确保验证周期内各级别样本量≥50条。输出模型健康度报告。",
+      "agentRef": "lead-scorer",
+      "dependentTasks": ["task-4", "task-8"],
+      "requiredIntegrations": ["CRM系统", "数据仓库", "机器学习平台"]
+    },
+    {
+      "id": "task-16",
+      "title": "获客成本周度核算",
+      "type": "document",
+      "prompt": "每周一核算上周获客成本：1）汇集各渠道广告花费（来自投放Scope）和外呼运营成本；2）统计各渠道带来的成交客户数；3）计算分渠道CAC和综合CAC；4）计算CAC环比变化——环比上升>10%触发渠道策略审视告警；5）计算LTV/CAC比值——目标>3:1，低于2:1发出盈利告警；6）生成周度获客成本报告，包含分渠道对比、趋势图数据和优化建议。确保每周一12:00前完成。",
+      "agentRef": "lead-scorer",
+      "dependentTasks": ["task-4", "task-6"],
+      "requiredIntegrations": ["广告平台API", "财务系统", "CRM系统"]
+    }
+  ],
+  "variables": [
+    {
+      "variableId": "var-1",
+      "name": "leadSource",
+      "variableType": "string",
+      "description": "线索来源渠道标识（ad_form/website_register/event_signup/referral）",
+      "required": true
+    },
+    {
+      "variableId": "var-2",
+      "name": "leadData",
+      "variableType": "object",
+      "description": "原始线索数据包，包含姓名、手机号、公司名、来源详情、表单内容等",
+      "required": true
+    },
+    {
+      "variableId": "var-3",
+      "name": "scoringResult",
+      "variableType": "object",
+      "description": "线索评分结果，包含总分、等级(ABCD)、各维度得分、主要得分因子",
+      "required": true
+    },
+    {
+      "variableId": "var-4",
+      "name": "outboundCallResult",
+      "variableType": "object",
+      "description": "外呼通话结果，包含接通状态、通话时长、意向标签、关键需求、摘要文本",
+      "required": false
+    },
+    {
+      "variableId": "var-5",
+      "name": "customerSegment",
+      "variableType": "string",
+      "description": "客户生命周期分层标识（new_customer/active/silent/churn_risk）",
+      "required": false
+    },
+    {
+      "variableId": "var-6",
+      "name": "churnPrediction",
+      "variableType": "object",
+      "description": "流失预测结果，包含流失概率、预计流失时间、优先级(P0/P1/P2)、流失驱动因子",
+      "required": false
+    },
+    {
+      "variableId": "var-7",
+      "name": "crmAssignmentId",
+      "variableType": "string",
+      "description": "CRM系统中线索分配的唯一标识，用于SLA追踪和结果回流",
+      "required": false
+    },
+    {
+      "variableId": "var-8",
+      "name": "retentionCampaignId",
+      "variableType": "string",
+      "description": "挽留活动唯一标识，关联方案、执行记录和效果追踪",
+      "required": false
+    }
+  ]
+}

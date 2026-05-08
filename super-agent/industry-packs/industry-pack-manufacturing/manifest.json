@@ -1,0 +1,157 @@
+{
+  "version": "1.0.0",
+  "generatedAt": "2025-01-20T12:00:00.000Z",
+  "generator": "super-agent-batch-v2",
+  "industry": {
+    "id": "manufacturing",
+    "name": "制造业",
+    "icon": "🏭",
+    "color": "#F97316"
+  },
+  "stats": {
+    "scopeCount": 5,
+    "agentCount": 18,
+    "skillCount": 61,
+    "workflowCount": 5,
+    "twinCount": 1,
+    "sopCount": 5
+  },
+  "scopes": [
+    {
+      "dirName": "quality-management",
+      "name": "质量管理",
+      "agents": [
+        "quality-inspection-analyst",
+        "quality-issue-resolver",
+        "quality-improvement-strategist",
+        "supplier-quality-engineer"
+      ],
+      "skills": [
+        "corrective-action-tracking",
+        "eight-d-problem-solving",
+        "fmea-management",
+        "inspection-data-analysis",
+        "management-review-reporting",
+        "quality-improvement-planning",
+        "quality-report-generation",
+        "root-cause-analysis",
+        "scar-management",
+        "spc-monitoring",
+        "supplier-performance-scoring",
+        "supplier-quality-assessment"
+      ],
+      "hasWorkflow": true,
+      "hasSop": true
+    },
+    {
+      "dirName": "supply-chain-management",
+      "name": "供应链管理",
+      "agents": [
+        "procurement-planner",
+        "supplier-relationship-manager",
+        "inventory-optimization-agent",
+        "supply-chain-risk-analyst"
+      ],
+      "skills": [
+        "abc-xyz-classification",
+        "contingency-plan-management",
+        "dead-stock-management",
+        "inventory-monitoring-optimization",
+        "mrp-procurement-analysis",
+        "procurement-cost-optimization",
+        "purchase-order-tracking",
+        "supplier-development-audit",
+        "supplier-evaluation-scoring",
+        "supplier-risk-monitoring",
+        "supply-chain-stress-testing",
+        "supply-risk-monitoring"
+      ],
+      "hasWorkflow": true,
+      "hasSop": true
+    },
+    {
+      "dirName": "equipment-maintenance",
+      "name": "设备维护管理",
+      "agents": [
+        "maintenance-planner",
+        "fault-diagnosis-agent",
+        "spare-parts-manager"
+      ],
+      "skills": [
+        "failure-mode-analysis",
+        "fault-diagnosis",
+        "inventory-optimization",
+        "maintenance-scheduling",
+        "overhaul-planning",
+        "parts-demand-forecasting",
+        "pm-execution-tracking",
+        "pm-plan-generation",
+        "procurement-coordination",
+        "repair-knowledge-base",
+        "root-cause-analysis",
+        "spare-parts-inventory"
+      ],
+      "hasWorkflow": true,
+      "hasSop": true
+    },
+    {
+      "dirName": "iot-production-optimization",
+      "name": "工业IoT与产线优化",
+      "agents": [
+        "iot-monitoring-analyst",
+        "predictive-maintenance-agent",
+        "production-line-optimizer",
+        "smart-equipment-assistant"
+      ],
+      "skills": [
+        "alert-management",
+        "anomaly-detection",
+        "bottleneck-analysis",
+        "capacity-planning",
+        "equipment-status-query",
+        "failure-mode-analysis",
+        "health-score-calculation",
+        "maintenance-recommendation",
+        "model-performance-monitoring",
+        "oee-analysis",
+        "operational-knowledge-qa",
+        "parameter-advisory",
+        "production-scheduling",
+        "rul-prediction",
+        "sensor-data-analysis",
+        "troubleshooting-guide"
+      ],
+      "hasWorkflow": true,
+      "hasSop": true
+    },
+    {
+      "dirName": "customer-feedback-improvement",
+      "name": "客户反馈与产品改进",
+      "agents": [
+        "feedback-collection-classifier",
+        "defect-pattern-analyst",
+        "improvement-tracker"
+      ],
+      "skills": [
+        "batch-process-correlation",
+        "defect-clustering-analysis",
+        "effectiveness-verification",
+        "eight-d-trigger-management",
+        "feedback-structuring-classification",
+        "improvement-progress-tracking",
+        "multi-channel-feedback-collection",
+        "urgency-assessment-escalation",
+        "voc-report-generation"
+      ],
+      "hasWorkflow": true,
+      "hasSop": true
+    }
+  ],
+  "digitalTwins": [
+    {
+      "dirName": "运营总监",
+      "name": "运营总监",
+      "role": "COO / VP of Operations"
+    }
+  ]
+}

@@ -1,0 +1,208 @@
+{
+  "title": "客户反馈与产品改进闭环工作流",
+  "description": "从多渠道客户反馈采集开始，经过结构化处理、智能分类、紧急升级判定、缺陷模式聚类分析、批次工艺关联、8D改进触发、改善进度跟踪、效果量化验证，到月度VOC报告输出的全流程工作流。确保客户声音被系统性地转化为产品和工艺改进行动，并验证改善效果。",
+  "tasks": [
+    {
+      "id": "task-1",
+      "title": "多渠道反馈数据采集",
+      "type": "agent",
+      "prompt": "执行每日定时反馈数据采集任务。连接所有配置的反馈渠道（客诉系统、退货单、售后工单、经销商报告、社交媒体），基于上次采集时间戳增量拉取新数据。执行多维度去重处理（同一客户+同一产品SN+7天窗口去重），输出去重后的原始反馈数据集。记录各渠道采集状态和数量统计，对异常渠道发出告警。确保采集完整性>=99%。",
+      "agentRef": "feedback-collection-classifier",
+      "dependentTasks": [],
+      "requiredIntegrations": ["CRM系统", "ERP退货模块", "售后服务系统", "经销商Portal", "社交媒体监控API"]
+    },
+    {
+      "id": "task-2",
+      "title": "反馈结构化处理与智能分类",
+      "type": "agent",
+      "prompt": "对新采集的原始反馈数据执行结构化处理和智能分类。使用NLP技术从非结构化文本中提取关键字段：产品型号、序列号/批次号、缺陷现象描述、发生频率、严重程度。将每条反馈按四级分类体系（产品缺陷/使用问题/功能建议/其他）进行分类，输出分类置信度评分。对置信度低于80%的反馈标记为待人工复核。对产品缺陷类反馈在24小时内完成与具体产品型号和生产批次的关联。",
+      "agentRef": "feedback-collection-classifier",
+      "dependentTasks": ["task-1"],
+      "requiredIntegrations": ["产品主数据库", "MES批次追溯系统"]
+    },
+    {
+      "id": "task-3",
+      "title": "紧急程度评估与分流",
+      "type": "agent",
+      "prompt": "对所有分类为产品缺陷的反馈执行紧急程度评估。基于安全影响(40%)、影响范围(30%)、业务影响(20%)、时间紧迫性(10%)四维度打分，判定紧急等级P1-P4。对P1(安全类)缺陷立即触发升级流程（1小时内通知质量总监），对P2(批量性)问题4小时内通知质量经理。P3/P4纳入常规分析。将分流结果传递给后续分析环节。",
+      "agentRef": "feedback-collection-classifier",
+      "dependentTasks": ["task-2"],
+      "requiredIntegrations": ["通知系统（短信/邮件/IM）", "质量管理系统"]
+    },
+    {
+      "id": "task-4",
+      "title": "紧急程度判定分支",
+      "type": "condition",
+      "prompt": "判断当前反馈的紧急等级。如果为P1（安全类缺陷，涉及人身伤害风险），执行立即升级路径并启动产品召回评估。如果为P2（批量性问题，同批次多客户反馈），执行24小时调查启动路径。如果为P3或P4（一般缺陷），纳入常规每周分析流程。",
+      "agentRef": "feedback-collection-classifier",
+      "dependentTasks": ["task-3"],
+      "requiredIntegrations": []
+    },
+    {
+      "id": "task-5",
+      "title": "安全类缺陷紧急升级处理",
+      "type": "action",
+      "prompt": "对P1级安全类缺陷执行紧急升级处理：1)即时通知质量总监（电话+系统消息）；2)创建紧急事件工单，包含所有已知信息（产品型号/批次/缺陷描述/影响客户/潜在风险）；3)冻结同批次在途和在库产品；4)启动产品召回评估预流程；5)通知质量管理Scope的质量异常处理专家。5分钟内必须收到接收确认，否则自动升级到更高层级。",
+      "agentRef": "feedback-collection-classifier",
+      "dependentTasks": ["task-4"],
+      "requiredIntegrations": ["质量管理系统", "ERP库存管理", "通知系统"]
+    },
+    {
+      "id": "task-6",
+      "title": "每周缺陷聚类分析",
+      "type": "agent",
+      "prompt": "执行每周缺陷模式聚类分析。汇总近4周内所有产品缺陷类反馈数据，使用DBSCAN算法对缺陷描述文本进行语义聚类，识别缺陷模式簇。对每个簇进行多维度特征分析（产品型号/时间趋势/客户分布/严重程度）。按影响度（频率×严重度×客户数）综合排序，生成TOP5高影响缺陷模式。对比上期聚类结果判定趋势（新增/恶化/稳定/改善）。识别孤立点作为新缺陷类型的潜在信号。",
+      "agentRef": "defect-pattern-analyst",
+      "dependentTasks": ["task-2"],
+      "requiredIntegrations": ["反馈数据库"]
+    },
+    {
+      "id": "task-7",
+      "title": "批次与工艺参数关联分析",
+      "type": "agent",
+      "prompt": "对识别出的缺陷模式执行批次和工艺参数关联分析。通过产品批次号在MES系统中查询生产记录（产线/班次/操作员/原材料批次），获取生产期间的工艺参数数据（与标准值对比），查询设备健康度和告警记录。构建缺陷-因素关联矩阵，使用卡方检验/Fisher检验判断统计显著性（p<0.05）。输出显著关联的因素列表和根因方向假设（1-3个），评估影响范围（同因素的其他批次）。关联准确率目标>=85%。",
+      "agentRef": "defect-pattern-analyst",
+      "dependentTasks": ["task-6"],
+      "requiredIntegrations": ["MES系统", "SCADA/IoT数据平台", "ERP原材料批次"]
+    },
+    {
+      "id": "task-8",
+      "title": "高频缺陷阈值检查",
+      "type": "condition",
+      "prompt": "检查每个缺陷模式是否达到高频阈值。判定条件：同类投诉>=5次/月视为高频缺陷，需触发8D改进流程。同时检查是否为新出现的缺陷类型（历史上未曾出现），即使未达频率阈值也需标记重点关注。对于趋势连续3周恶化的缺陷也考虑提前触发。",
+      "agentRef": "defect-pattern-analyst",
+      "dependentTasks": ["task-7"],
+      "requiredIntegrations": []
+    },
+    {
+      "id": "task-9",
+      "title": "触发8D改进流程",
+      "type": "agent",
+      "prompt": "对达到高频阈值的缺陷模式触发8D改进流程。准备完整数据包：D0问题概述（缺陷描述/影响范围/客户列表/数量趋势）、D1团队建议（涉及部门/建议leader）、D2问题描述（5W2H格式）、附件（聚类分析数据/关联分析结果/原始反馈清单）。在质量管理系统中创建8D工单，设定各阶段截止时间（D3:48h/D4:7d/D5:14d/D6:21d/D7:25d/D8:30d）。推送给质量管理Scope的质量异常处理专家。确保48小时内完成触发。",
+      "agentRef": "defect-pattern-analyst",
+      "dependentTasks": ["task-8"],
+      "requiredIntegrations": ["质量管理系统（8D模块）", "通知系统"]
+    },
+    {
+      "id": "task-10",
+      "title": "改进措施登记与分配",
+      "type": "agent",
+      "prompt": "接收8D团队确定的改进措施（纠正措施和预防措施），创建改进跟踪任务。为每项措施登记：具体描述、责任人、计划开始日期、计划完成日期、3-5个关键里程碑、量化完成标准、所需资源。确认改进措施描述的具体性和可验证性（拒绝'加强管理'类模糊描述）。将改进任务发布到改进看板，设定观察期基线数据记录。整体反馈到改进落地周期目标<=45天。",
+      "agentRef": "improvement-tracker",
+      "dependentTasks": ["task-9"],
+      "requiredIntegrations": ["改进措施管理系统", "项目管理系统"]
+    },
+    {
+      "id": "task-11",
+      "title": "改进进度日常监控",
+      "type": "agent",
+      "prompt": "每日执行改进措施进度检查。扫描所有'进行中'状态的改进任务，检查进度更新情况。对比计划进度与实际进度：提前/按时标记为正常；延迟1-7天发送提醒给责任人；延迟7-14天发送预警给责任人和上级领导；延迟>14天正式升级到部门经理。维护改进看板实时数据（状态分布/按时率/平均周期）。对完成的改进措施验证交付物完整性后标记为'待验证'状态。",
+      "agentRef": "improvement-tracker",
+      "dependentTasks": ["task-10"],
+      "requiredIntegrations": ["改进措施管理系统", "通知系统"]
+    },
+    {
+      "id": "task-12",
+      "title": "改进进度状态判定",
+      "type": "condition",
+      "prompt": "判断改进措施的当前进度状态。如果进度正常（按计划推进），继续常规跟踪。如果进度延迟7天以上，触发提醒升级流程。如果措施已完成落地并提交了完成证据，转入效果验证环节。",
+      "agentRef": "improvement-tracker",
+      "dependentTasks": ["task-11"],
+      "requiredIntegrations": []
+    },
+    {
+      "id": "task-13",
+      "title": "改善效果观察与验证",
+      "type": "agent",
+      "prompt": "对已落地的改进措施启动3个月效果观察期。确认基线数据（改进前3个月月均投诉数/率）。每月统计同类投诉数量，计算投诉率（投诉数/产量，消除产量波动），对比基线计算下降幅度。观察期结束时执行统计显著性检验（泊松/比例检验，α=0.05）。判定标准：下降>=50%且统计显著且无回弹=达标；30-50%=部分有效；<30%=未达标。达标则通知30天内完成标准化并关闭；未达标则输出原因分析和后续建议。",
+      "agentRef": "improvement-tracker",
+      "dependentTasks": ["task-12"],
+      "requiredIntegrations": ["反馈数据库", "生产数据（产量）"]
+    },
+    {
+      "id": "task-14",
+      "title": "效果验证结果判定",
+      "type": "condition",
+      "prompt": "判断改善效果验证结果。如果同类投诉下降>=50%且统计检验显著，改善达标，进入标准化固化流程。如果下降30-50%，部分有效，需制定加强措施并重新观察。如果下降<30%或无效，需重新分析根因并启动新一轮改善。",
+      "agentRef": "improvement-tracker",
+      "dependentTasks": ["task-13"],
+      "requiredIntegrations": []
+    },
+    {
+      "id": "task-15",
+      "title": "改善标准化固化",
+      "type": "action",
+      "prompt": "对验证达标的改善措施执行标准化固化。通知责任部门在30天内完成以下标准化工作：更新相关SOP/作业指导书/检验标准、更新FMEA（如适用）、更新培训教材和进行培训、更新设备维护标准（如涉及设备）。确认标准化文件变更已通过文控审批并发布。设置6个月后的回访检查点（监控是否有效果回弹）。正式关闭改善任务。",
+      "agentRef": "improvement-tracker",
+      "dependentTasks": ["task-14"],
+      "requiredIntegrations": ["文档管理系统", "培训管理系统"]
+    },
+    {
+      "id": "task-16",
+      "title": "月度VOC分析报告生成",
+      "type": "document",
+      "prompt": "每月自动生成月度VOC综合分析报告。汇总数据：当月反馈总量及同环比、各渠道和分类分布、TOP缺陷模式及分析进展、改进措施执行状态（新增/关闭/逾期）、效果验证结果及达标率。组织报告结构：执行摘要（1页，含3个核心发现+需决策事项）→反馈概况→TOP缺陷分析→改进进展→效果验证→下月展望。准备可视化图表数据（帕累托图/趋势图/雷达图/热力图）。在次月第5个工作日前完成发布。",
+      "agentRef": "improvement-tracker",
+      "dependentTasks": ["task-6", "task-11", "task-13"],
+      "requiredIntegrations": ["报告生成系统", "数据可视化平台"]
+    }
+  ],
+  "variables": [
+    {
+      "variableId": "var-1",
+      "name": "feedbackChannels",
+      "variableType": "array",
+      "description": "配置的反馈采集渠道列表及其API连接信息",
+      "required": true
+    },
+    {
+      "variableId": "var-2",
+      "name": "highFrequencyThreshold",
+      "variableType": "number",
+      "description": "高频缺陷触发阈值，默认为5次/月",
+      "required": true
+    },
+    {
+      "variableId": "var-3",
+      "name": "improvementTargetDays",
+      "variableType": "number",
+      "description": "反馈到改进落地的目标周期天数，默认45天",
+      "required": true
+    },
+    {
+      "variableId": "var-4",
+      "name": "effectivenessThreshold",
+      "variableType": "number",
+      "description": "改善效果达标阈值（投诉下降百分比），默认50%",
+      "required": true
+    },
+    {
+      "variableId": "var-5",
+      "name": "observationPeriodMonths",
+      "variableType": "number",
+      "description": "改善效果观察期月数，默认3个月",
+      "required": true
+    },
+    {
+      "variableId": "var-6",
+      "name": "escalationContacts",
+      "variableType": "object",
+      "description": "各级别升级联系人配置（P1→质量总监，P2→质量经理，逾期→部门经理）",
+      "required": true
+    },
+    {
+      "variableId": "var-7",
+      "name": "productMasterDataSource",
+      "variableType": "string",
+      "description": "产品主数据源连接信息（用于型号匹配和批次追溯）",
+      "required": true
+    },
+    {
+      "variableId": "var-8",
+      "name": "mesDataSource",
+      "variableType": "string",
+      "description": "MES制造执行系统数据源连接信息（用于工艺参数关联分析）",
+      "required": true
+    }
+  ]
+}

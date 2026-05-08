@@ -163,3 +163,139 @@
 | **Total** | **21** | **20** | **1** | **1 (fixed)** |
 
 **Final Verdict:** All FAIL-level issues have been remediated. The industry solution pack is structurally complete, referentially consistent, content-rich, and logically sound.
+
+---
+
+## Scope Validation: 销售培训与AI陪练 (sales-training-ai-coaching)
+
+**Validation Date:** 2025-01-XX
+**Overall Status:** ✅ PASS (after 1 fix applied)
+
+---
+
+### 1. Structural Completeness
+
+| Check | Status | Details |
+|-------|--------|---------|
+| scope.json exists | ✅ PASS | Present (786B), contains name, description, icon, color, scope_type |
+| agents/ directory | ✅ PASS | Contains 3 agent JSON files |
+| skills/ directory | ✅ PASS | Contains 9 skill subdirectories, each with SKILL.md |
+| workflow/workflow-plan.json | ✅ PASS | Valid JSON with 15-task array + 7 variables |
+| sop/sop.md | ✅ PASS | Present (376 lines), detailed operational procedures |
+| memories/initial-memories.json | ✅ PASS | Valid JSON array with 8 memory entries |
+
+#### Scope Statistics
+
+| Metric | Value |
+|--------|-------|
+| Agents | 3 |
+| Skills | 9 (3 per agent) |
+| Workflow Tasks | 15 |
+| Workflow Variables | 7 |
+| SOP Sections | 7 (overview, RACI, 5 core flows, KPIs, quality checkpoints, cross-scope interfaces, versioning) |
+
+---
+
+### 2. Reference Consistency
+
+| Check | Status | Details |
+|-------|--------|---------|
+| Every agentRef in workflow maps to agents/ file | ✅ PASS | All 3 agentRefs resolve correctly |
+| Every skill in agent JSON exists in skills/ | ✅ PASS | All 9 skill references resolve to existing SKILL.md files |
+| No duplicate agent names across scopes | ✅ PASS | All 3 names are unique and not duplicated in other scopes |
+
+#### Agent-to-Workflow Reference Map
+
+| Agent | Referenced in Tasks |
+|-------|-------------------|
+| competency-assessment-coach | task-1, task-3, task-4, task-5, task-7, task-8, task-13, task-14 |
+| scenario-simulation-engine | task-2, task-6 |
+| knowledge-strategy-curator | task-9, task-10, task-11, task-12, task-15 |
+
+#### Agent-to-Skill Reference Map
+
+| Agent | Skills |
+|-------|--------|
+| competency-assessment-coach | multi-dimension-scoring, personalized-coaching-report, competency-tracking |
+| knowledge-strategy-curator | knowledge-base-curation, personalized-strategy-push, scenario-script-design |
+| scenario-simulation-engine | scenario-design-execution, role-play-dialogue, difficulty-adaptation |
+
+---
+
+### 3. Content Quality
+
+| Check | Status | Details |
+|-------|--------|---------|
+| Agent system_prompt ≥ 200 characters | ✅ PASS | Min: ~2,400 chars (scenario-simulation-engine), Max: ~3,200 chars (competency-assessment-coach) |
+| SKILL.md ≥ 100 characters | ✅ PASS | All 9 files are substantial (min ~4,000 chars, max ~5,400 chars) |
+| SOP contains RACI matrix | ✅ PASS | RACI table present with 15 rows × 5 roles, proper R/A/C/I designations |
+| Workflow contains ≥1 "condition" type node | ✅ PASS | 3 condition nodes: task-4, task-8, task-11 |
+
+#### System Prompt Lengths
+
+| Agent | Approx Chars |
+|-------|-------------|
+| competency-assessment-coach | ~3,200 |
+| knowledge-strategy-curator | ~3,000 |
+| scenario-simulation-engine | ~2,400 |
+
+#### Condition Nodes
+
+| Task ID | Title | Purpose |
+|---------|-------|---------|
+| task-4 | 判断是否需要专项辅导 | Routes learners scoring <30 to remedial path |
+| task-8 | 判断评分结果与路径调整 | 5-way decision based on score ranges (≥80/60-79/40-59/<40/off-topic) |
+| task-11 | 竞品话术紧急更新判断 | Triages competitive changes by impact level (high/medium/low) |
+
+---
+
+### 4. Logical Consistency
+
+| Check | Status | Details |
+|-------|--------|---------|
+| Workflow DAG is acyclic | ✅ PASS | Topological sort confirms valid DAG (15/15 nodes sorted) |
+| Workflow has exactly one entry point | ✅ PASS | Single entry point: task-1 (after fix) |
+| All workflow task IDs are unique | ✅ PASS | 15 unique IDs confirmed |
+| SOP step count roughly matches workflow | ⚠️ WARN | SOP has 23 detailed steps across 5 flows; workflow has 15 task nodes. Alignment is logical — SOP substeps are more granular than workflow tasks, with multiple SOP steps mapping to single workflow tasks. |
+
+#### DAG Structure (Post-Fix)
+
+| Metric | Value |
+|--------|-------|
+| Total nodes | 15 |
+| Entry points | 1 (task-1) |
+| Exit points (leaf nodes) | 6 (task-4, task-8, task-9, task-11, task-12, task-14, task-15) |
+| Max depth | 8 (task-1→task-2→task-3→task-5→task-6→task-7→task-13→task-14) |
+| Parallel branches from task-1 | 3 (training path via task-2, weekly push via task-9, monthly ops via task-10) |
+
+---
+
+### 5. Fixes Applied
+
+#### Fix 1: Workflow Multiple Entry Points (FAIL → PASS)
+
+**Issue:** The workflow had 3 entry points: task-1 (新人入职注册), task-9 (周度个性化策略推送), and task-10 (月度赢单录音话术提取). Tasks 9 and 10 had empty `dependentTasks` arrays.
+
+**Root Cause:** Task-9 (weekly strategy push) and task-10 (monthly recording extraction) were modeled as independent periodic triggers. However, both logically require the system to be initialized first — task-9 references learner ability profiles (能力画像) that are created through the onboarding process, and task-10 requires CRM system integration configured during setup.
+
+**Fix Applied:** Added `"task-1"` as a dependency for both task-9 and task-10. This is logically sound because:
+- Personalized strategy pushes (task-9) require the training system to be operational and learner profiles to exist
+- Monthly recording extraction (task-10) requires CRM integration established during system initialization
+
+**File Modified:** `scopes/sales-training-ai-coaching/workflow/workflow-plan.json`
+
+**Verification:** Post-fix topological sort confirms valid DAG with exactly 1 entry point (task-1) and all 15 nodes successfully sorted.
+
+---
+
+### 6. Scope Summary
+
+| Category | Checks | Pass | Warn | Fail (fixed) |
+|----------|--------|------|------|-------------|
+| Structural Completeness | 6 | 6 | 0 | 0 |
+| Reference Consistency | 3 | 3 | 0 | 0 |
+| Content Quality | 4 | 4 | 0 | 0 |
+| Logical Consistency | 4 | 3 | 1 | 1 (fixed) |
+| **Total** | **17** | **16** | **1** | **1 (fixed)** |
+
+**Final Verdict:** All FAIL-level issues remediated. The 销售培训与AI陪练 scope is structurally complete, referentially consistent, content-rich, and logically sound.

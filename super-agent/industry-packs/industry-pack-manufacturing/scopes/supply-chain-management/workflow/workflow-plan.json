@@ -1,0 +1,231 @@
+{
+  "title": "供应链管理端到端工作流",
+  "description": "从物料需求触发到采购执行闭环的完整供应链管理工作流，涵盖采购计划、供应商管理、库存优化和风险管控四大核心流程的智能化协作",
+  "tasks": [
+    {
+      "id": "task-1",
+      "title": "物料需求分析与采购建议生成",
+      "type": "agent",
+      "prompt": "接收MRP运算结果和安全库存补货信号，执行净需求计算（毛需求-可用库存-在途+安全库存），合并同一物料在时间窗口内的多次需求，标注紧急程度。根据物料Kraljic分类确定采购策略（战略型/杠杆型/瓶颈型/常规型），从AVL中匹配合格供应商并按绩效评分排序推荐。检查关键物料多源要求。输出完整的采购建议单，包含物料编码、需求数量、需求日期、建议供应商、预估金额和采购策略依据。",
+      "agentRef": "procurement-planner",
+      "dependentTasks": [],
+      "requiredIntegrations": ["ERP-MRP模块", "WMS库存系统"]
+    },
+    {
+      "id": "task-2",
+      "title": "库存水位检查与补货信号生成",
+      "type": "agent",
+      "prompt": "执行全品类库存水位巡检：获取每个SKU的在手库存、在途库存、预留库存，计算可用库存。与安全库存、再订货点、最高库存对比，标记状态（断料风险/补货信号/正常/超储/严重过量）。对触发补货信号的物料计算建议补货量（最高库存-可用库存，校对MOQ和包装整数倍）。对超储物料发出预警。将补货需求信号传递给采购计划节点。",
+      "agentRef": "inventory-optimization-agent",
+      "dependentTasks": [],
+      "requiredIntegrations": ["WMS仓储系统", "ERP库存模块"]
+    },
+    {
+      "id": "task-3",
+      "title": "供应商可用性与风险预检",
+      "type": "agent",
+      "prompt": "在采购建议生成前，检查涉及供应商的当前风险状态：查看风险监控系统中是否有未解除的高/中风险预警，评估供应商产能是否能支撑本次需求量，检查是否有在途的重大风险事件（价格大幅波动/物流中断/供应商经营异常）。如果存在高风险供应商被推荐，标注风险提示并建议替代方案或增加安全库存缓冲。",
+      "agentRef": "supply-chain-risk-analyst",
+      "dependentTasks": [],
+      "requiredIntegrations": ["供应商风险监控平台", "大宗商品价格数据源"]
+    },
+    {
+      "id": "task-4",
+      "title": "采购金额审批层级判定",
+      "type": "condition",
+      "prompt": "根据采购建议单的总金额判定审批层级：金额<10万元走采购员直接下单通道；金额在10-50万元需采购经理审批；金额>=50万元需供应链总监审批。对杠杆型物料确认是否已完成≥3家比价。输出审批路由决定和审批所需材料清单。",
+      "agentRef": "procurement-planner",
+      "dependentTasks": ["task-1", "task-2", "task-3"],
+      "requiredIntegrations": ["审批流系统"]
+    },
+    {
+      "id": "task-5",
+      "title": "AVL供应商可用性判定",
+      "type": "condition",
+      "prompt": "检查采购需求对应的物料在AVL中是否有合格供应商：如果AVL中有≥1家合格供应商，流程进入正常采购路径；如果AVL中无合格供应商，流程分支到供应商开发路径。同时检查关键物料是否满足≥2家多源要求，不满足则触发备选供应商开发。",
+      "agentRef": "supplier-relationship-manager",
+      "dependentTasks": ["task-1"],
+      "requiredIntegrations": ["AVL供应商名录系统"]
+    },
+    {
+      "id": "task-6",
+      "title": "新供应商寻源与开发",
+      "type": "agent",
+      "prompt": "当AVL中无合格供应商时启动寻源开发流程：1）明确物料技术要求和产能需求；2）通过行业数据库、展会信息、同行推荐等渠道搜索3-5家候选供应商；3）进行初步资质审查（营业执照/体系认证/设备能力/产能规模）；4）筛选出2-3家进入现场审核候选；5）制定QSA审核计划（审核日期/范围/团队/检查清单）。输出寻源报告和审核计划，目标全流程4-8周完成。",
+      "agentRef": "supplier-relationship-manager",
+      "dependentTasks": ["task-5"],
+      "requiredIntegrations": ["行业供应商数据库", "工商信息查询系统"]
+    },
+    {
+      "id": "task-7",
+      "title": "采购订单创建与下达",
+      "type": "agent",
+      "prompt": "审批通过后执行采购订单创建：在ERP中根据审批通过的采购建议创建PO（采购订单），填入物料、数量、单价、交期、供应商、付款条件等信息。将PO发送给供应商并要求3个工作日内确认交期。记录PO编号并进入执行跟踪状态。如果是框架协议自动补货类物料，按预设参数自动生成Release Order。",
+      "agentRef": "procurement-planner",
+      "dependentTasks": ["task-4"],
+      "requiredIntegrations": ["ERP采购模块", "供应商协同平台"]
+    },
+    {
+      "id": "task-8",
+      "title": "采购订单执行跟踪与交期监控",
+      "type": "agent",
+      "prompt": "每日执行活跃PO状态巡检：获取所有未关闭PO的当前状态（已下单/已确认/生产中/已发货/在途/到货），对比供应商确认交期与物料需求日期进行风险分级（绿色正常/黄色轻微风险/红色严重风险/灰色未确认）。对红色风险订单立即预警并提供应对建议（催货/调整排产/启动替代）。对超过3天未确认的订单触发催促。更新准时交付率OTD指标。",
+      "agentRef": "procurement-planner",
+      "dependentTasks": ["task-7"],
+      "requiredIntegrations": ["ERP采购模块", "供应商协同平台"]
+    },
+    {
+      "id": "task-9",
+      "title": "订单交期异常处理决策",
+      "type": "condition",
+      "prompt": "当检测到订单交期异常（供应商确认交期晚于需求日期）时进行影响评估和路径决策：1）延迟≤3天且安全库存可覆盖→催货+生产排产微调，继续监控；2）延迟>3天且有替代供应商→紧急下单替代供应商+原订单取消或缩量；3）延迟>3天无替代→调整生产计划+通知客户+升级供应链总监决策；4）供应商持续延迟（同一供应商月内≥3次）→标记为交期高风险供应商，影响下季度评分。",
+      "agentRef": "procurement-planner",
+      "dependentTasks": ["task-8"],
+      "requiredIntegrations": ["ERP生产计划模块"]
+    },
+    {
+      "id": "task-10",
+      "title": "季度供应商绩效评分执行",
+      "type": "agent",
+      "prompt": "季度末执行供应商绩效评分：1）从IQC系统采集来料质量数据（批次合格率/SCAR响应天数/改善有效性）；2）从ERP采集交期数据（OTD/确认响应时间/承诺准确率）；3）汇总成本数据（降价配合/报价竞争力/隐性成本）；4）收集多方服务评价；5）按权重公式计算综合得分（质量40%+交期30%+成本20%+服务10%）；6）判定等级（A≥80/B:60-79/C:40-59/D<40）；7）生成评分卡和趋势对比。",
+      "agentRef": "supplier-relationship-manager",
+      "dependentTasks": [],
+      "requiredIntegrations": ["QMS质量系统", "ERP系统", "供应商管理平台"]
+    },
+    {
+      "id": "task-11",
+      "title": "低分供应商整改与淘汰决策",
+      "type": "condition",
+      "prompt": "根据季度评分结果处理低分供应商：对评分<60分（C级）的供应商，15个工作日内生成正式整改通知（明确问题点、改善目标、60天整改期限），安排整改辅导。对评分<40分（D级）或连续两季度<60分的供应商，先确认其所供物料是否在AVL中有替代供应商——有替代则启动3个月过渡期淘汰流程，无替代则加速开发替代并加强监管（增加巡检/减少订单份额）。",
+      "agentRef": "supplier-relationship-manager",
+      "dependentTasks": ["task-10"],
+      "requiredIntegrations": ["供应商管理平台", "AVL系统"]
+    },
+    {
+      "id": "task-12",
+      "title": "库存ABC-XYZ分类与策略更新",
+      "type": "agent",
+      "prompt": "执行年度/季度物料分类更新：1）提取12个月物料消耗数据计算ABC分类（A类累计金额前70%/B类70-90%/C类后10%）；2）计算每个物料消耗量的变异系数CV得到XYZ分类（X:CV<0.5/Y:0.5-1.0/Z:CV≥1.0）；3）生成9宫格交叉分类矩阵；4）为每个类别制定差异化库存策略（AX精准控制+JIT，AZ高安全库存+多源，CZ评估必要性）；5）对比上期分类变化并标注升降级物料；6）检查当前库存策略与分类是否匹配，标注不一致项。",
+      "agentRef": "inventory-optimization-agent",
+      "dependentTasks": [],
+      "requiredIntegrations": ["ERP物料主数据", "WMS消耗数据"]
+    },
+    {
+      "id": "task-13",
+      "title": "呆滞物料识别与处置方案",
+      "type": "agent",
+      "prompt": "执行月度呆滞物料管理：1）扫描全部库存，筛选最后出库日期距今≥180天的物料；2）按库龄分层（180-270天/270-365天/>365天）；3）分析每个呆滞物料的原因（需求消失/过量采购/工程变更/质量封锁/预测偏差）；4）制定差异化处置方案（内部消化/退供应商/对外销售/报废）并评估预期回收金额；5）进行经济性对比（继续持有成本vs处置损失）；6）输出处置方案提交审批并建立跟踪台账。",
+      "agentRef": "inventory-optimization-agent",
+      "dependentTasks": ["task-12"],
+      "requiredIntegrations": ["WMS库存系统", "ERP物料主数据"]
+    },
+    {
+      "id": "task-14",
+      "title": "供应链风险持续监控与预警",
+      "type": "agent",
+      "prompt": "执行每日供应链风险信号扫描：1）监控关键原材料大宗商品价格变动（波动>5%标注关注，>10%标注行动）；2）扫描供应商相关负面舆情和工商变更信息；3）检查物流通道状态（港口/运输/海运费率）；4）监控汇率变动对采购成本的影响；5）对检测到的风险信号进行分级评估（影响×概率）；6）一级风险4小时内推送预警，二级风险24小时内报告，三级风险纳入周报。评估风险对当前在途订单和未来采购计划的影响。",
+      "agentRef": "supply-chain-risk-analyst",
+      "dependentTasks": [],
+      "requiredIntegrations": ["大宗商品价格API", "企业征信平台", "物流信息平台"]
+    },
+    {
+      "id": "task-15",
+      "title": "应急预案维护与有效性验证",
+      "type": "agent",
+      "prompt": "半年度执行应急预案review和验证：1）遍历所有关键物料的应急预案文档；2）验证替代供应商是否仍在AVL中且状态正常；3）确认替代供应商产能是否仍可支持应急需求；4）重新评估安全库存覆盖天数是否充足（覆盖天数应>替代切换时间）；5）验证联系人信息有效性；6）对预案有效性不足的物料（覆盖gap>0）标红并提出调整建议（增加安全库存/加速替代供应商开发）；7）更新预案文档版本。",
+      "agentRef": "supply-chain-risk-analyst",
+      "dependentTasks": ["task-14"],
+      "requiredIntegrations": ["AVL系统", "WMS库存系统"]
+    },
+    {
+      "id": "task-16",
+      "title": "季度供应链压力测试执行",
+      "type": "agent",
+      "prompt": "执行季度供应链压力测试：1）设定本季度测试情景（TOP供应商断供/区域性中断/需求突增30%/关键原材料价格上涨20%/复合情景）；2）对每个情景模拟影响（受影响物料/库存覆盖天数/替代切换时间/停产风险天数/成本影响/客户影响）；3）计算供应链韧性评分（替代性30%+缓冲性25%+恢复性25%+适应性20%）；4）识别TOP3薄弱环节（单点故障/风险集中区域）；5）制定改善路线图（3/6/12个月里程碑）并排列优先级。输出压力测试报告和管理层摘要。",
+      "agentRef": "supply-chain-risk-analyst",
+      "dependentTasks": ["task-15"],
+      "requiredIntegrations": ["供应链数据平台", "ERP系统"]
+    },
+    {
+      "id": "task-17",
+      "title": "采购成本分析与降本机会识别",
+      "type": "agent",
+      "prompt": "执行季度采购成本分析：1）提取本季度采购明细数据按物料类别做Pareto分析（识别TOP20物料占80%金额）；2）对高金额物料分析价格趋势（12个月走势/同一物料不同供应商价差）；3）计算EOQ优化空间（当前批量vs经济批量）；4）识别集中采购机会（可合并的同类物料采购量）；5）评估规格标准化降本潜力；6）对每项降本机会量化预估节省金额并评估实施风险；7）按ROI排序输出降本优先级清单，汇总年度降本目标达成预测（目标≥3%/年）。",
+      "agentRef": "procurement-planner",
+      "dependentTasks": [],
+      "requiredIntegrations": ["ERP采购数据", "市场价格数据源"]
+    }
+  ],
+  "variables": [
+    {
+      "variableId": "var-1",
+      "name": "mrpPlanOutput",
+      "variableType": "object",
+      "description": "MRP运算输出的计划订单数据，包含物料编码、需求数量、需求日期",
+      "required": true
+    },
+    {
+      "variableId": "var-2",
+      "name": "currentInventorySnapshot",
+      "variableType": "object",
+      "description": "当前库存快照数据，包含在手库存、在途库存、预留库存",
+      "required": true
+    },
+    {
+      "variableId": "var-3",
+      "name": "avlSupplierList",
+      "variableType": "array",
+      "description": "合格供应商名录(AVL)，包含供应商编码、物料映射、评分等级",
+      "required": true
+    },
+    {
+      "variableId": "var-4",
+      "name": "kraljicClassification",
+      "variableType": "object",
+      "description": "物料Kraljic矩阵分类数据，标注每个物料的类型（战略/杠杆/瓶颈/常规）",
+      "required": true
+    },
+    {
+      "variableId": "var-5",
+      "name": "supplierPerformanceScores",
+      "variableType": "object",
+      "description": "供应商绩效评分数据，包含质量、交期、成本、服务四维度得分",
+      "required": false
+    },
+    {
+      "variableId": "var-6",
+      "name": "purchaseApprovalThresholds",
+      "variableType": "object",
+      "description": "采购审批金额阈值配置：10万采购经理、50万供应链总监",
+      "required": true
+    },
+    {
+      "variableId": "var-7",
+      "name": "safetyStockParameters",
+      "variableType": "object",
+      "description": "安全库存参数（平均日用量、采购提前期、安全天数、供应商OTD）",
+      "required": true
+    },
+    {
+      "variableId": "var-8",
+      "name": "riskMonitoringSignals",
+      "variableType": "array",
+      "description": "供应链风险监控信号数据，包含价格波动、供应商舆情、物流状态等",
+      "required": false
+    },
+    {
+      "variableId": "var-9",
+      "name": "productionSchedule",
+      "variableType": "object",
+      "description": "生产排程计划，包含各物料的需求日期和数量，用于交期校验",
+      "required": true
+    },
+    {
+      "variableId": "var-10",
+      "name": "contingencyPlans",
+      "variableType": "array",
+      "description": "关键物料供应中断应急预案，包含替代供应商、替代物料、覆盖天数评估",
+      "required": false
+    }
+  ]
+}

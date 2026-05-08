@@ -183,6 +183,19 @@ export function WorkspaceExplorer({
   sessionId, businessScopeId, refreshKey, isGenerating = false, onFileOpen, width, onWidthChange, minWidth = 200, maxWidth = 600,
 }: WorkspaceExplorerProps) {
   const [collapsed, setCollapsed] = useState(false)
+  const prevWidthRef = useRef(width)
+
+  // Sync width with parent when collapsing/expanding
+  const handleCollapse = useCallback(() => {
+    prevWidthRef.current = width
+    onWidthChange(48)
+    setCollapsed(true)
+  }, [width, onWidthChange])
+
+  const handleExpand = useCallback(() => {
+    onWidthChange(prevWidthRef.current || 288)
+    setCollapsed(false)
+  }, [onWidthChange])
   const [files, setFiles] = useState<FileNode[]>([])
   const [loading, setLoading] = useState(false)
   const [workspacePath, setWorkspacePath] = useState<string | null>(null)
@@ -267,47 +280,6 @@ export function WorkspaceExplorer({
     onFileOpen?.(path, name)
   }, [onFileOpen])
 
-  // Collapsed state — thin strip with expand button
-  if (collapsed) {
-    return (
-      <div className="flex h-full">
-        <div className="flex flex-col items-center py-3 px-1 border-l border-gray-800 bg-gray-900/50 gap-1">
-          <button
-            onClick={() => setCollapsed(false)}
-            className="p-1.5 rounded-lg hover:bg-gray-700 text-gray-400 hover:text-white transition-colors"
-            title="Expand workspace"
-          >
-            <PanelRightOpen className="w-4 h-4" />
-          </button>
-          <button
-            onClick={() => setSkillsPanelOpen(true)}
-            className="p-1.5 rounded-lg hover:bg-gray-700 text-gray-400 hover:text-yellow-400 transition-colors"
-            title="Skills"
-          >
-            <Zap className="w-4 h-4" />
-          </button>
-          <button
-            onClick={() => setPluginsPanelOpen(true)}
-            className="p-1.5 rounded-lg hover:bg-gray-700 text-gray-400 hover:text-violet-400 transition-colors"
-            title="Plugins"
-          >
-            <Puzzle className="w-4 h-4" />
-          </button>
-          <button
-            onClick={() => setMcpPanelOpen(true)}
-            className="p-1.5 rounded-lg hover:bg-gray-700 text-gray-400 hover:text-cyan-400 transition-colors"
-            title="MCP Servers"
-          >
-            <Server className="w-4 h-4" />
-          </button>
-        </div>
-        <SkillsPanel open={skillsPanelOpen} onClose={() => setSkillsPanelOpen(false)} sessionId={sessionId} />
-        <PluginsPanel open={pluginsPanelOpen} onClose={() => setPluginsPanelOpen(false)} businessScopeId={businessScopeId ?? null} />
-        <MCPServersPanel open={mcpPanelOpen} onClose={() => setMcpPanelOpen(false)} sessionId={sessionId} />
-      </div>
-    )
-  }
-
   // No session — show placeholder
   if (!sessionId) {
     return (
@@ -319,13 +291,6 @@ export function WorkspaceExplorer({
               <FolderTree className="w-4 h-4 text-gray-400" />
               <span className="text-sm font-medium text-gray-300">Workspace</span>
             </div>
-            <button
-              onClick={() => setCollapsed(true)}
-              className="p-1.5 rounded-lg hover:bg-gray-700 text-gray-400 hover:text-white transition-colors"
-              title="Collapse panel"
-            >
-              <PanelRightClose className="w-4 h-4" />
-            </button>
           </div>
           <div className="flex-1 flex items-center justify-center">
             <div className="text-center px-4">
@@ -378,13 +343,6 @@ export function WorkspaceExplorer({
               title="MCP Servers"
             >
               <Server className="w-3.5 h-3.5" />
-            </button>
-            <button
-              onClick={() => setCollapsed(true)}
-              className="p-1.5 rounded-lg hover:bg-gray-700 text-gray-400 hover:text-white transition-colors"
-              title="Collapse panel"
-            >
-              <PanelRightClose className="w-4 h-4" />
             </button>
           </div>
         </div>

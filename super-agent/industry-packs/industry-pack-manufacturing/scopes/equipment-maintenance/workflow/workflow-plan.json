@@ -1,0 +1,231 @@
+{
+  "title": "设备维护管理全流程工作流",
+  "description": "覆盖预防性维护（PM）计划与执行、故障维修（CM）快速响应与根因分析、备件库存管理与优化、以及OEE分析驱动改善的全流程自动化工作流。支持计划性维护和故障维修两条主路径的并行执行。",
+  "tasks": [
+    {
+      "id": "task-1",
+      "title": "维护需求触发判定",
+      "type": "condition",
+      "prompt": "判断当前维护需求的触发类型。如果是日历到期（月初/季初）或设备健康度低于70分的预警触发，进入计划性维护（PM）路径。如果是设备故障报修或IoT异常告警触发，进入故障维修（CM）路径。如果是月度OEE数据低于目标值触发，进入OEE分析路径。根据触发类型标识分支方向。",
+      "agentRef": "maintenance-planner",
+      "dependentTasks": [],
+      "requiredIntegrations": ["CMMS", "IoT平台"]
+    },
+    {
+      "id": "task-2",
+      "title": "生成月度PM计划",
+      "type": "agent",
+      "prompt": "基于当月需执行PM的设备清单（A类设备每月、B类设备每季度），为每台设备匹配对应的PM标准作业清单（checklist），估算每项PM的预计工时和所需备件，生成完整的月度预防性维护计划表。计划表需包含：设备编号、PM项目、计划执行日期、预计工时、所需备件清单、建议责任技工。优先安排设备健康度低于70分的设备和上次PM已逾期的设备。A类设备应优先排入月前半段。",
+      "agentRef": "maintenance-planner",
+      "dependentTasks": ["task-1"],
+      "requiredIntegrations": ["CMMS", "设备台账系统"]
+    },
+    {
+      "id": "task-3",
+      "title": "确认PM备件可用性",
+      "type": "agent",
+      "prompt": "接收PM计划中的备件需求清单，逐项核对当前备件库存是否满足需求。对于库存充足的备件标记为'已确认'；对于库存不足的备件，计算缺口数量并评估采购提前期是否能在PM计划日期前到位。输出备件确认报告，包括：全部到位的备件清单、缺件清单及预计到位时间、需要紧急采购的备件、建议调整PM排期的设备（因备件无法按时到位）。对于A类设备关键备件缺失，立即启动紧急采购流程。",
+      "agentRef": "spare-parts-manager",
+      "dependentTasks": ["task-2"],
+      "requiredIntegrations": ["库存管理系统", "采购系统"]
+    },
+    {
+      "id": "task-4",
+      "title": "备件可用性判定",
+      "type": "condition",
+      "prompt": "根据备件确认报告判定PM计划是否可以按原定排程执行。如果所有备件已到位或可在PM日期前到位，进入排程优化步骤。如果存在关键备件缺失且无法按时到位的情况，触发采购协调和PM排期调整流程。判定标准：关键备件100%到位为'可执行'，否则为'需调整'。",
+      "agentRef": "spare-parts-manager",
+      "dependentTasks": ["task-3"],
+      "requiredIntegrations": []
+    },
+    {
+      "id": "task-5",
+      "title": "紧急备件采购协调",
+      "type": "agent",
+      "prompt": "对于PM计划中缺失且无法按时到位的备件，启动紧急采购协调流程。确定采购类型（紧急采购走快速通道），核实是否有可用替代件，编制采购请求单并提交至供应链管理Scope的采购计划专员。同时评估：如果紧急采购仍无法满足时间要求，建议维护计划调度员调整该设备的PM排期（A类设备延期不超过3天，B类不超过2周）。跟踪采购订单直至备件到位。",
+      "agentRef": "spare-parts-manager",
+      "dependentTasks": ["task-4"],
+      "requiredIntegrations": ["采购系统", "供应商系统"]
+    },
+    {
+      "id": "task-6",
+      "title": "维护排程优化",
+      "type": "agent",
+      "prompt": "综合考虑以下约束条件对PM计划进行排程优化：1）生产排程信息（计划停线时间、换线窗口、周末安排）；2）维修技工排班和技能矩阵；3）备件确认到位时间；4）设备优先级（A类优先，健康度低的优先）。输出优化后的排程表（甘特图格式），标注每日维护任务分配、资源利用率。对排程冲突提供解决方案建议。确保：同一技工单日工时不超8小时；A类设备排在白班执行；预留15%弹性工时。排程确认后提前1周通知生产部门协调停机窗口。",
+      "agentRef": "maintenance-planner",
+      "dependentTasks": ["task-4"],
+      "requiredIntegrations": ["MES系统", "人员排班系统"]
+    },
+    {
+      "id": "task-7",
+      "title": "PM执行进度跟踪",
+      "type": "agent",
+      "prompt": "实时跟踪当月PM计划的执行进度。每日检查PM工单状态更新，计算当前PM完成率和按时率。对逾期未执行的PM任务（超过计划日期1天）发出预警通知给责任技工和班组长；逾期3天升级到维护主管。对距计划日期<3天但未开始的任务标记为'风险项'。当月度PM执行率<90%时，分析原因（资源不足/生产冲突/备件缺失/其他）并预警给维护经理。输出PM执行周报包含：完成率、按时率、逾期任务清单、风险项、偏差原因分析和改善建议。",
+      "agentRef": "maintenance-planner",
+      "dependentTasks": ["task-6"],
+      "requiredIntegrations": ["CMMS", "通知系统"]
+    },
+    {
+      "id": "task-8",
+      "title": "故障报修接收与响应",
+      "type": "agent",
+      "prompt": "接收设备故障报修信息（来源：操作工报修或IoT异常告警），立即判定设备关键程度（A类/B类）并启动响应时间计时。获取故障描述信息（故障现象、报警代码、发生工况），查询该设备的历史故障记录和近期维护情况。在故障知识库中检索相似故障案例，基于故障现象和设备历史提供初步诊断方向（最可能的3个故障原因及验证步骤）。同步通知当班维修技工前往现场，确保A类设备30分钟内、B类设备2小时内到场响应。",
+      "agentRef": "fault-diagnosis-agent",
+      "dependentTasks": ["task-1"],
+      "requiredIntegrations": ["CMMS", "IoT平台", "故障知识库"]
+    },
+    {
+      "id": "task-9",
+      "title": "故障诊断与维修方案",
+      "type": "agent",
+      "prompt": "基于维修技工现场反馈的故障现象确认信息、设备传感器历史数据、以及故障知识库的匹配案例，提供系统化的故障诊断决策树。决策树按可能性从高到低排列故障原因，每个原因配有：验证步骤、所需测量工具、预计排查时间。当维修技工反馈诊断结果后，确定最终故障原因并推荐维修方案（临时修复方案和彻底修复方案）。评估维修所需备件并查询库存可用性，如果缺件则立即通知备件管理专员。评估维修难度，判断是否需要外部技术支援（设备厂家/专业服务公司）。",
+      "agentRef": "fault-diagnosis-agent",
+      "dependentTasks": ["task-8"],
+      "requiredIntegrations": ["故障知识库", "IoT平台", "库存管理系统"]
+    },
+    {
+      "id": "task-10",
+      "title": "维修备件可用性判定",
+      "type": "condition",
+      "prompt": "判断故障维修所需备件是否在库可用。如果备件库存充足可直接领用，进入维修执行步骤。如果备件库存不足或无货，需要触发紧急备件调配流程。判定标准：所需备件当前库存>=需求数量为'可用'，否则为'需紧急调配'。",
+      "agentRef": "spare-parts-manager",
+      "dependentTasks": ["task-9"],
+      "requiredIntegrations": ["库存管理系统"]
+    },
+    {
+      "id": "task-11",
+      "title": "紧急备件调配",
+      "type": "agent",
+      "prompt": "故障维修所需备件库存不足时，启动紧急调配流程。按优先级依次评估：1）是否有可用替代件（规格兼容的备选型号）；2）集团内其他工厂是否有该备件库存可调拨（24小时内到位）；3）供应商是否可紧急发货（评估最快到货时间）。同时评估是否有临时修复方案（不更换备件能否先恢复部分功能）。对于A类设备，紧急采购必须在2小时内提交请求。更新备件管理记录，此次紧急采购纳入后续原因分析（安全库存设置是否合理）。",
+      "agentRef": "spare-parts-manager",
+      "dependentTasks": ["task-10"],
+      "requiredIntegrations": ["采购系统", "集团备件共享平台"]
+    },
+    {
+      "id": "task-12",
+      "title": "5Why根因分析",
+      "type": "agent",
+      "prompt": "在设备故障维修完成并恢复生产后72小时内，对本次故障执行5Why根因分析。分析步骤：1）准确描述故障问题（What/When/Where/Impact）；2）从直接物理原因逐层追问到系统/流程层面的根本原因，每层Why必须有事实或数据支撑；3）验证根因逻辑性（正推和反推）；4）制定纠正措施（消除根因）和预防措施（防止复发），每项措施明确责任人和完成日期；5）评估是否需要调整该设备的PM计划（增加检查项/缩短PM周期）；6）将本次诊断经验更新到故障知识库。检查30天内该设备故障次数，如果>=3次则触发设备改造/更换评审建议。",
+      "agentRef": "fault-diagnosis-agent",
+      "dependentTasks": ["task-9"],
+      "requiredIntegrations": ["CMMS", "故障知识库"]
+    },
+    {
+      "id": "task-13",
+      "title": "设备故障频率评估",
+      "type": "condition",
+      "prompt": "检查该设备近30天内的故障次数。如果故障次数>=3次，判定为'频繁故障设备'，需要触发设备改造或更换评审流程。如果故障次数<3次但MTBF呈下降趋势，标记为'关注设备'建议缩短PM周期。如果故障次数<3次且MTBF稳定，按常规流程关闭工单。",
+      "agentRef": "fault-diagnosis-agent",
+      "dependentTasks": ["task-12"],
+      "requiredIntegrations": ["CMMS"]
+    },
+    {
+      "id": "task-14",
+      "title": "设备故障模式分析报告",
+      "type": "agent",
+      "prompt": "对识别为频繁故障或MTBF持续下降的设备，执行详细的故障模式分析。汇总该设备近12个月的所有故障记录，计算MTBF和MTTR趋势，进行Pareto分析识别TOP3故障模式。评估设备是否处于'浴盆曲线'的耗损期。综合分析后给出建议：1）调整PM策略（增加检测项/缩短周期/更换维护方式）；2）局部改造（更换易损件设计/加装监测传感器）；3）整机更换（附经济性分析：剩余维修成本预测 vs 新设备投资）。输出设备改造/更换评审报告供管理层决策。",
+      "agentRef": "fault-diagnosis-agent",
+      "dependentTasks": ["task-13"],
+      "requiredIntegrations": ["CMMS", "设备台账系统"]
+    },
+    {
+      "id": "task-15",
+      "title": "OEE分析与改善",
+      "type": "agent",
+      "prompt": "每日自动计算各设备的OEE（可用率×性能率×良品率），标注低于目标值（A类<85%、B类<75%）的设备。对低OEE设备分解六大损失类型：1）故障停机损失；2）换型调整损失；3）空转暂停损失；4）速度降低损失；5）不良品损失；6）启动损失。识别最大损失类型并分析原因，制定针对性改善措施建议。每周汇总OEE趋势报告，标注改善和恶化的设备。将设备可用率损失数据反馈给维护计划调度员用于PM策略调整。",
+      "agentRef": "maintenance-planner",
+      "dependentTasks": ["task-1"],
+      "requiredIntegrations": ["MES系统", "IoT平台"]
+    },
+    {
+      "id": "task-16",
+      "title": "备件库存优化分析",
+      "type": "agent",
+      "prompt": "每季度执行一次备件库存系统性优化分析。步骤：1）对全部备件执行ABC-XYZ分类（按价值和需求波动性）；2）计算整体和分品类库存周转率（目标>=2次/年）；3）识别呆滞备件（180天无出库）并分析原因（设备淘汰/需求减少/过度采购）；4）对需求稳定的备件重新计算EOQ和安全库存参数；5）输出优化建议：库存参数调整清单、呆滞件处置方案（调拨/变卖/报废）、预期释放库存金额、风险评估。确保优化方案不会增加A类设备备件缺件风险。",
+      "agentRef": "spare-parts-manager",
+      "dependentTasks": [],
+      "requiredIntegrations": ["库存管理系统", "CMMS"]
+    },
+    {
+      "id": "task-17",
+      "title": "备件需求预测更新",
+      "type": "agent",
+      "prompt": "在月度PM计划发布后5天内，更新下月备件需求预测。综合两个维度：1）计划性需求——从PM计划中提取各设备PM所需备件清单并汇总；2）非计划性需求——基于历史12个月故障消耗数据计算月均消耗量，结合设备老化趋势系数和季节系数预测。输出：综合需求预测表（备件/需求量/需求时间/确定性级别）、采购建议（对比当前库存计算应采购量）、紧急项标识（采购提前期>剩余时间的备件）。追踪上月预测准确度（预测vs实际），持续优化预测模型。",
+      "agentRef": "spare-parts-manager",
+      "dependentTasks": ["task-2"],
+      "requiredIntegrations": ["库存管理系统", "CMMS"]
+    }
+  ],
+  "variables": [
+    {
+      "variableId": "var-1",
+      "name": "triggerType",
+      "variableType": "string",
+      "description": "维护需求触发类型：pm_scheduled（计划PM）、cm_fault（故障维修）、oee_alert（OEE预警）、health_alert（健康度预警）",
+      "required": true
+    },
+    {
+      "variableId": "var-2",
+      "name": "equipmentId",
+      "variableType": "string",
+      "description": "设备编号，用于关联设备台账、历史记录和维护计划",
+      "required": true
+    },
+    {
+      "variableId": "var-3",
+      "name": "equipmentCriticality",
+      "variableType": "string",
+      "description": "设备关键程度分类：A（关键设备/瓶颈工序）或B（一般设备），决定响应时间和维护频率",
+      "required": true
+    },
+    {
+      "variableId": "var-4",
+      "name": "planningPeriod",
+      "variableType": "string",
+      "description": "计划周期，格式为YYYY-MM，用于PM计划生成和备件需求预测",
+      "required": true
+    },
+    {
+      "variableId": "var-5",
+      "name": "faultDescription",
+      "variableType": "string",
+      "description": "故障现象描述，包括异常表现、报警代码、运行工况等信息",
+      "required": false
+    },
+    {
+      "variableId": "var-6",
+      "name": "workOrderId",
+      "variableType": "string",
+      "description": "维修工单编号（PM工单或CM工单），用于备件出库关联和过程追溯",
+      "required": false
+    },
+    {
+      "variableId": "var-7",
+      "name": "partsAvailability",
+      "variableType": "boolean",
+      "description": "备件可用性状态：true表示所有所需备件已到位，false表示存在缺件",
+      "required": false
+    },
+    {
+      "variableId": "var-8",
+      "name": "responseTimeLimit",
+      "variableType": "number",
+      "description": "故障响应时间限制（分钟）：A类设备30分钟，B类设备120分钟",
+      "required": false
+    },
+    {
+      "variableId": "var-9",
+      "name": "oeeTarget",
+      "variableType": "number",
+      "description": "设备OEE目标值（百分比）：A类设备85%，B类设备75%",
+      "required": false
+    },
+    {
+      "variableId": "var-10",
+      "name": "faultCountIn30Days",
+      "variableType": "number",
+      "description": "设备近30天内故障次数，用于判断是否触发设备改造/更换评审（阈值>=3次）",
+      "required": false
+    }
+  ]
+}

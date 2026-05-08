@@ -1,0 +1,222 @@
+{
+  "title": "诊疗辅助全流程工作流",
+  "description": "覆盖从病史预采集、鉴别诊断、处方审核到临床路径管理的完整诊疗辅助流程，通过多Agent协同为临床医生提供全方位的循证医学决策支持",
+  "tasks": [
+    {
+      "id": "task-1",
+      "title": "病史信息预采集",
+      "type": "agent",
+      "prompt": "当患者签到或候诊状态变更时，启动结构化病史预采集流程。通过智能问卷按OPQRST框架引导患者描述主诉和现病史，采集既往史、过敏史、家族史、个人史和当前用药信息。必填项包括主诉、现病史和过敏史。对患者口语化描述进行医学术语标准化处理。同时自动检索患者近6个月的历史就诊记录和检查检验结果进行关联。对所有采集信息标注来源（患者自述/系统导入/历史记录）。输出结构化JSON格式病史数据。",
+      "agentRef": "history-collector",
+      "dependentTasks": [],
+      "requiredIntegrations": ["HIS系统", "LIS系统", "PACS系统", "患者App/小程序"]
+    },
+    {
+      "id": "task-2",
+      "title": "风险标识与分级",
+      "type": "agent",
+      "prompt": "对采集到的病史信息执行全面的风险扫描。识别以下风险类别：药物过敏（含交叉过敏评估）、重大既往病史（恶性肿瘤、器官移植、心脑血管事件等）、传染病史（乙肝/丙肝/HIV/结核等）、特殊人群状态（妊娠/哺乳/儿童/老年/肝肾功能不全）。对每个风险项按红色（高危：严重过敏史、传染病）、黄色（中危：重大病史、特殊人群）、蓝色（低危：轻微过敏反应）分级标注。对关键安全信息缺失（如过敏史空白）也作为风险项标注。将过敏信息同步推送至用药审核Agent的禁忌数据库。",
+      "agentRef": "history-collector",
+      "dependentTasks": ["task-1"],
+      "requiredIntegrations": ["过敏信息数据库", "传染病报告系统"]
+    },
+    {
+      "id": "task-3",
+      "title": "就诊摘要生成与推送",
+      "type": "agent",
+      "prompt": "基于结构化病史数据和风险标识结果，生成不超过300字的就诊摘要。摘要结构包括：风险标识区（红色置顶）、主诉概要、近期异常检查结果（标注日期和趋势）、当前用药情况、与本次就诊相关的既往信息。使用标准医学缩写节省空间。标注预采集完成度评分。将摘要推送至医生工作站的就诊队列中对应患者卡片，确保在医生接诊前完成推送。",
+      "agentRef": "history-collector",
+      "dependentTasks": ["task-2"],
+      "requiredIntegrations": ["医生工作站"]
+    },
+    {
+      "id": "task-4",
+      "title": "鉴别诊断分析",
+      "type": "agent",
+      "prompt": "当医生开始接诊且系统已有≥3项临床特征时触发。综合患者症状、体征、既往史和已有检查结果，使用贝叶斯推理框架计算各鉴别诊断的后验概率。基于流行病学数据确定先验概率，通过各临床特征的似然比更新后验概率。生成按概率降序排列的鉴别诊断列表（Top5），每个诊断包含：诊断名称+ICD-10编码、概率区间、证据等级(A/B/C/D)、关键支持/排除证据。当最高概率诊断置信度<60%时标注仅供参考提示。若识别到急危重症特征（如急性心梗、脑卒中、肺栓塞）无论概率排序如何都置顶预警。在输出显著位置标注免责声明。",
+      "agentRef": "diagnosis-assistant",
+      "dependentTasks": ["task-3"],
+      "requiredIntegrations": ["临床知识图谱", "循证医学数据库", "医生工作站"]
+    },
+    {
+      "id": "task-5",
+      "title": "判断是否需要进一步检查",
+      "type": "condition",
+      "prompt": "评估当前鉴别诊断列表的确定性：如果最高概率诊断的置信度≥80%且无需排除的危险诊断，则进入医生确认诊断流程；如果存在多个高概率候选诊断需要鉴别，或需要排除虽概率低但后果严重的危险诊断，或医生主动要求补充检查，则进入检查推荐流程。",
+      "agentRef": "diagnosis-assistant",
+      "dependentTasks": ["task-4"],
+      "requiredIntegrations": []
+    },
+    {
+      "id": "task-6",
+      "title": "检查检验项目推荐",
+      "type": "agent",
+      "prompt": "基于当前鉴别诊断列表，推荐具有最高鉴别价值的检查检验项目。对每项推荐计算信息增益（阳性/阴性似然比），综合考虑临床紧急程度、检查可及性、费用效益比和侵入性进行优先级排序。分组输出：立即执行/24小时内/择期安排。每项推荐包含：检查名称+项目编码、推荐理由（确认或排除哪个诊断）、紧急程度、预期费用、注意事项（空腹/造影剂风险等）。避免推荐近7天内已完成的同一检查。优先推荐能同时鉴别多个诊断的检查。",
+      "agentRef": "diagnosis-assistant",
+      "dependentTasks": ["task-5"],
+      "requiredIntegrations": ["LIS系统", "PACS系统", "费用目录"]
+    },
+    {
+      "id": "task-7",
+      "title": "检验结果危急值监测",
+      "type": "agent",
+      "prompt": "实时监测检验检查结果数据流，对比危急值阈值列表（血钾<2.5/>6.5、血糖<2.8/>33.3、WBC<2.0/>30.0等）。发现危急值后立即触发分级通知：一级通知（即时）推送主管医生系统弹窗+短信；二级通知（15分钟未确认）升级通知科主任+电话通知；三级通知（30分钟未确认）通知医务部+记录超时事件。确认后记录：确认时间、确认人、初步处理措施。全程记录完整通知时间线供质控审计。同时将结果传递给鉴别诊断模块更新诊断概率。",
+      "agentRef": "diagnosis-assistant",
+      "dependentTasks": ["task-6"],
+      "requiredIntegrations": ["LIS系统", "短信平台", "院内通讯系统", "通知提醒Agent"]
+    },
+    {
+      "id": "task-8",
+      "title": "处方实时审核",
+      "type": "agent",
+      "prompt": "当医生提交处方时立即触发全维度审核，总响应时间≤2秒。审核维度依次执行：1)过敏史交叉核查（含交叉过敏）2)药物相互作用DDI检测（按X/D/C/B分级）3)剂量合理性校验（结合年龄/体重/eGFR/Child-Pugh）4)禁忌症排查（绝对/相对禁忌）5)重复用药检测。综合生成审核结论：强制拦截（过敏/禁忌级DDI/超极量10倍）时退回处方并提供≥1个替代方案；警示提醒（中度DDI/剂量偏差/相对禁忌）时弹窗提示医生确认；审核通过时放行。所有审核结果记入日志。",
+      "agentRef": "medication-reviewer",
+      "dependentTasks": ["task-4"],
+      "requiredIntegrations": ["HIS处方系统", "药品知识库", "DDI数据库"]
+    },
+    {
+      "id": "task-9",
+      "title": "判断处方审核结果",
+      "type": "condition",
+      "prompt": "根据用药审核Agent返回的审核结论进行分流：如果审核通过则处方进入药房调配流程；如果为强制拦截则处方退回要求医生修改后重新提交；如果为警示提醒则弹窗呈现警示详情，等待医生选择修改处方或确认继续（需填写理由）。",
+      "agentRef": "medication-reviewer",
+      "dependentTasks": ["task-8"],
+      "requiredIntegrations": ["医生工作站"]
+    },
+    {
+      "id": "task-10",
+      "title": "抗菌药物专项审核",
+      "type": "agent",
+      "prompt": "当处方中包含抗菌药物时触发专项审核。执行以下审核流程：1)确定药物管理级别（非限制/限制/特殊使用级）2)校验开方医生职称是否符合权限要求（非限制级-全体执业医师/限制级-主治及以上/特殊使用级-副高以上+会诊）3)验证是否有感染相关诊断4)检查限制级以上是否已进行微生物标本送检5)评估给药方案是否符合PK/PD原则（时间依赖型vs浓度依赖型）6)围术期预防用药检查术前0.5-1h给药时机和≤24-48h疗程。权限不足时强制拦截；未送检/适应症不匹配时警示提醒。统计更新科室抗菌药物使用率和DDD值。",
+      "agentRef": "medication-reviewer",
+      "dependentTasks": ["task-8"],
+      "requiredIntegrations": ["医生职称权限库", "微生物检验系统", "手术排程系统"]
+    },
+    {
+      "id": "task-11",
+      "title": "临床路径匹配推荐",
+      "type": "agent",
+      "prompt": "住院患者确认主诊断后触发。根据患者主诊断ICD-10编码在路径库中匹配适用路径，逐项核对纳入/排除标准（诊断匹配度、年龄范围、排除条件），计算适用性评分(0-100分)。生成路径推荐摘要卡片：路径名称+版本、预计住院天数、关键诊疗节点时间线、预估费用区间、DRG分组信息和支付标准、历史入径患者的完成率。适用性≥80%推荐入径；60-80%可选入径需医生确认；<60%不建议入径说明原因。无匹配时标注进入常规诊疗模式。入径匹配准确率目标≥90%。",
+      "agentRef": "clinical-pathway",
+      "dependentTasks": ["task-4"],
+      "requiredIntegrations": ["临床路径库", "DRG分组系统", "HIS系统"]
+    },
+    {
+      "id": "task-12",
+      "title": "判断是否有适用临床路径",
+      "type": "condition",
+      "prompt": "根据路径匹配结果判断：如果存在适用性评分≥60%的候选路径且医生确认入径，则进入路径执行监控流程；如果无适用路径或适用性评分<60%或医生选择不入径，则进入常规诊疗模式，本流程结束。",
+      "agentRef": "clinical-pathway",
+      "dependentTasks": ["task-11"],
+      "requiredIntegrations": []
+    },
+    {
+      "id": "task-13",
+      "title": "路径每日执行监控",
+      "type": "agent",
+      "prompt": "患者入径后，每日早8:00前生成当日路径任务清单。从路径模板中提取当前路径Day N的全部任务项，分为：医嘱类（检查、检验、治疗、手术、药物）、护理类（评估、干预、观察）、宣教类（术前/术后宣教、出院指导）。每个任务包含预计执行时间和责任角色。持续追踪任务执行状态（已完成/进行中/待执行/延迟/未执行）。任务超计划时间2小时未执行时提醒经治医生；关键节点延迟提醒上级医师。每日18:00生成执行报告（完成率、延迟项、明日预告）。路径最后1-2天提醒评估出径条件。",
+      "agentRef": "clinical-pathway",
+      "dependentTasks": ["task-12"],
+      "requiredIntegrations": ["HIS医嘱系统", "护理信息系统", "医生工作站"]
+    },
+    {
+      "id": "task-14",
+      "title": "判断路径是否出现偏差",
+      "type": "condition",
+      "prompt": "持续监控路径执行与计划的偏离。偏差判定条件：住院日延长超计划天数、增加非计划检查或治疗、取消计划项目、更换药物方案、非计划转ICU或再手术、提前非计划出院。如果检测到上述任何偏差事件，进入偏差管理流程；如果路径正常执行，继续每日监控直到出径。",
+      "agentRef": "clinical-pathway",
+      "dependentTasks": ["task-13"],
+      "requiredIntegrations": []
+    },
+    {
+      "id": "task-15",
+      "title": "路径偏差记录与审核",
+      "type": "agent",
+      "prompt": "偏差事件发生后自动生成偏差记录工单。自动预填信息：偏差时间、偏差类型（时间/活动/药物/出径）、涉及的路径节点、当前路径进度。按原因分类（患者因素/医疗因素/系统因素）和影响分级（重大：住院日≥3天或费用增加≥50%/一般：住院日1-2天/轻微：不影响住院日）。触发审核流程：轻微偏差经治医生记录即可；一般偏差需上级医师24h内审核签字；重大偏差需科主任12h内审核并报医务部备案。汇总偏差统计用于路径优化分析。偏差记录完整率目标≥95%。",
+      "agentRef": "clinical-pathway",
+      "dependentTasks": ["task-14"],
+      "requiredIntegrations": ["HIS系统", "电子签名系统", "质控模块"]
+    },
+    {
+      "id": "task-16",
+      "title": "DRG费用实时监控与预警",
+      "type": "agent",
+      "prompt": "入径后持续监控费用累计。关联患者DRG/DIP分组信息获取支付标准，实时从费用系统获取已发生费用并按类别归集（药品/耗材/检查/检验/治疗/护理床位）。计算费用消耗指数（实际/标准）和时间消耗指数。分级预警：累计费用超过均值1.2倍黄色预警推送经治医生；超过1.5倍红色预警推送科主任；超过2.0倍通知医务部。预警时标注主要超支类别和同DRG组对标数据。提供费用仪表盘数据（进度条、构成饼图、趋势折线、同组排位）。",
+      "agentRef": "clinical-pathway",
+      "dependentTasks": ["task-12"],
+      "requiredIntegrations": ["费用结算系统", "DRG分组系统", "医保接口"]
+    }
+  ],
+  "variables": [
+    {
+      "variableId": "var-1",
+      "name": "patientId",
+      "variableType": "string",
+      "description": "患者唯一标识ID",
+      "required": true
+    },
+    {
+      "variableId": "var-2",
+      "name": "visitType",
+      "variableType": "string",
+      "description": "就诊类型（门诊初诊/门诊复诊/急诊/住院）",
+      "required": true
+    },
+    {
+      "variableId": "var-3",
+      "name": "attendingPhysician",
+      "variableType": "string",
+      "description": "主管医生/经治医生标识",
+      "required": true
+    },
+    {
+      "variableId": "var-4",
+      "name": "department",
+      "variableType": "string",
+      "description": "就诊科室",
+      "required": true
+    },
+    {
+      "variableId": "var-5",
+      "name": "primaryDiagnosis",
+      "variableType": "object",
+      "description": "主诊断信息（诊断名称+ICD-10编码）",
+      "required": false
+    },
+    {
+      "variableId": "var-6",
+      "name": "prescriptionData",
+      "variableType": "object",
+      "description": "处方/医嘱数据（药品、剂量、频次、给药途径）",
+      "required": false
+    },
+    {
+      "variableId": "var-7",
+      "name": "allergyHistory",
+      "variableType": "array",
+      "description": "患者过敏史列表（过敏原、反应类型、严重程度）",
+      "required": false
+    },
+    {
+      "variableId": "var-8",
+      "name": "labResults",
+      "variableType": "array",
+      "description": "检验检查结果数据",
+      "required": false
+    },
+    {
+      "variableId": "var-9",
+      "name": "currentMedications",
+      "variableType": "array",
+      "description": "当前用药清单",
+      "required": false
+    },
+    {
+      "variableId": "var-10",
+      "name": "drgGroupInfo",
+      "variableType": "object",
+      "description": "DRG/DIP分组信息和支付标准",
+      "required": false
+    }
+  ]
+}

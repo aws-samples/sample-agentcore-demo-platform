@@ -1,0 +1,181 @@
+{
+  "title": "多语种视频分发工作流",
+  "description": "将源语种视频转化为多语种版本并适配多平台分发的端到端自动化工作流，覆盖内容提取、翻译本地化、配音合成、口型匹配、去水印、平台适配和批量输出的完整链路。",
+  "tasks": [
+    {
+      "id": "task-1",
+      "title": "任务接收与输入验证",
+      "type": "action",
+      "prompt": "接收视频分发任务请求，对输入视频文件进行可处理性验证。具体检查项包括：视频编码格式是否支持（H.264/H.265/VP9/AV1）、视频时长是否在处理范围内（<=60分钟）、画质是否满足最低要求（>=720p）、音频轨道是否完整。同时验证任务配置的合法性：目标语种列表中的每种语言是否在系统支持范围内、目标平台列表是否有效、批量数量是否在系统承载范围内。对原始视频执行初步语种识别。输出任务验证报告和资源预估报告。不支持的编码格式自动转码后重新验证，不支持的语种跳过并告警。",
+      "agentRef": "distribution-adapter",
+      "dependentTasks": [],
+      "requiredIntegrations": ["video-codec-analyzer", "storage-service"]
+    },
+    {
+      "id": "task-2",
+      "title": "ASR语音转文字与OCR画面文字提取",
+      "type": "action",
+      "prompt": "对通过验证的视频执行多模态内容提取：1) ASR语音转文字——执行全文语音识别，支持多说话人分离，生成带时间戳的转写文本，标注每段的情感（喜/怒/哀/乐/中性），计算每段的置信度。2) OCR画面文字识别——逐帧扫描视频画面中的文字区域，识别字幕/标题/画中文字，记录文字出现的帧范围和位置坐标。3) 语种混合检测——分析ASR结果中的语种分布，标记语种切换边界。ASR置信度低于95%的段落标记为需人工校验。输出结构化的ASR转写文件、OCR识别文件和语种分布报告。",
+      "agentRef": "distribution-adapter",
+      "dependentTasks": ["task-1"],
+      "requiredIntegrations": ["asr-engine", "ocr-engine"]
+    },
+    {
+      "id": "task-3",
+      "title": "语种混合内容判断",
+      "type": "condition",
+      "prompt": "基于ASR内容提取结果的语种分布报告，判断视频是否包含语种混合内容（如中英混杂对白）。如果检测到两种或以上语种的内容占比均超过10%，则判定为语种混合内容，需进入混合语种分段处理模式；否则按单语种标准处理模式进行。此判断影响后续翻译策略的选择。",
+      "agentRef": "translation-localizer",
+      "dependentTasks": ["task-2"],
+      "requiredIntegrations": []
+    },
+    {
+      "id": "task-4",
+      "title": "多语种翻译与术语匹配",
+      "type": "agent",
+      "prompt": "对ASR转写文本和OCR识别文本执行多语种翻译。处理流程：加载项目自定义术语表 → 按目标语种列表逐一执行翻译 → 翻译中强制应用术语表确保品牌名/专有名词一致性 → 为翻译文本添加情感标注和断句标记 → 计算各语种翻译文本与源文本的长度比率。若检测为语种混合内容，则按语种边界分段处理，各段使用对应的源语种翻译模型。术语准确率目标>=90%。输出每种目标语种的翻译文件（含时间轴映射、情感标注、断句标记）和术语匹配报告。",
+      "agentRef": "translation-localizer",
+      "dependentTasks": ["task-3"],
+      "requiredIntegrations": ["translation-api", "terminology-database"]
+    },
+    {
+      "id": "task-5",
+      "title": "文化禁忌检测与本地化适配",
+      "type": "agent",
+      "prompt": "对翻译完成的多语种文本执行文化适配处理：1) 加载各目标市场的文化禁忌词库（按地区细分：中东/南亚/东南亚/东亚/欧美/拉美）。2) 对所有翻译文本执行全量文化禁忌扫描（覆盖率要求100%）。3) 对命中项进行风险分级（高危/中危/低危）。4) 为命中项生成替代表达建议。5) 高危命中项必须阻断流程等待确认。6) 执行俚语/梗的目标市场本地化转换。7) 适配数字/日期/货币的本地格式。输出适配后的翻译文本和文化合规报告。",
+      "agentRef": "translation-localizer",
+      "dependentTasks": ["task-4"],
+      "requiredIntegrations": ["cultural-taboo-database"]
+    },
+    {
+      "id": "task-6",
+      "title": "文化禁忌处理决策",
+      "type": "condition",
+      "prompt": "检查文化禁忌检测结果：如果存在高危文化禁忌命中项且未被成功替代（即替代表达建议未获确认），则阻断流程，将问题上报给人工审核。如果所有禁忌已被成功处理（替代或确认安全），则继续进入配音合成阶段。中低危禁忌在应用替代表达后可自动通过。",
+      "agentRef": "translation-localizer",
+      "dependentTasks": ["task-5"],
+      "requiredIntegrations": []
+    },
+    {
+      "id": "task-7",
+      "title": "多语种配音合成",
+      "type": "agent",
+      "prompt": "基于文化适配后的翻译文本，为每种目标语种生成AI配音音频。处理流程：为每种语种选择最优TTS引擎和合适音色（根据角色性别/年龄/风格） → 设置情感参数（基于文本中的情感标注） → 执行语音合成 → 测量合成音频实际时长 → 计算与原始片段时长的偏差百分比。对每段合成音频执行MOS评分评估（目标>=3.8）。若某语种TTS模型不可用，跳过该语种并生成告警。输出各语种的配音音频文件和配音质量报告。",
+      "agentRef": "dubbing-synthesizer",
+      "dependentTasks": ["task-6"],
+      "requiredIntegrations": ["tts-engine", "voice-library"]
+    },
+    {
+      "id": "task-8",
+      "title": "语速匹配检查与调节",
+      "type": "condition",
+      "prompt": "检查每段配音音频的时长与原始片段时长的偏差。如果偏差<=15%，通过微调rate参数进行语速校正后直接进入口型匹配阶段。如果偏差>15%且无法通过参数调节解决，需要生成文本精简反馈（包含具体超标百分比和建议缩减字数），将反馈发送给翻译本地化师进行文本长度调整，调整完成后重新进入配音合成。",
+      "agentRef": "dubbing-synthesizer",
+      "dependentTasks": ["task-7"],
+      "requiredIntegrations": []
+    },
+    {
+      "id": "task-9",
+      "title": "口型匹配对齐处理",
+      "type": "agent",
+      "prompt": "将通过语速检查的配音音频与视频画面中人物口型进行对齐。处理流程：提取视频中的人脸关键点数据（口部区域20个关键点） → 对配音音频进行音素分解 → 将音素序列映射为Viseme序列 → 使用DTW算法将Viseme时间序列与视频口型关键点时间序列对齐 → 对配音音频执行微时移（<200ms）以优化匹配。评估口型自然度（目标>=0.8）。无人脸的片段跳过口型匹配。口型自然度<0.8时调整配音韵律参数重试（最多3次），仍不达标则标记为需人工审核。",
+      "agentRef": "dubbing-synthesizer",
+      "dependentTasks": ["task-8"],
+      "requiredIntegrations": ["face-detection-model", "phoneme-analyzer"]
+    },
+    {
+      "id": "task-10",
+      "title": "口型匹配质量判定",
+      "type": "condition",
+      "prompt": "评估口型匹配结果：如果整体口型自然度>=0.8且音画延迟<200ms，则口型匹配通过，进入下一阶段。如果自然度在0.6-0.8之间且重试次数未达上限（3次），调整韵律参数后重试口型匹配。如果自然度<0.6或重试3次仍不达标，标记该片段为需人工审核但不阻塞整体流程，继续处理其他片段。",
+      "agentRef": "dubbing-synthesizer",
+      "dependentTasks": ["task-9"],
+      "requiredIntegrations": []
+    },
+    {
+      "id": "task-11",
+      "title": "视频去水印处理",
+      "type": "agent",
+      "prompt": "对原始视频执行水印检测与去除处理。处理流程：对视频首帧执行静态水印检测 → 对全视频执行动态水印检测 → 对检测到的水印进行分类（文字/Logo/半透明/动画） → 根据水印类型和背景复杂度选择修复策略（颜色插值/AI Inpainting/视频修复） → 执行修复并确保帧间一致性 → 评估修复自然度。水印检测召回率目标>=95%，修复自然度目标>=0.9。面积超过画面20%的水印标记为建议人工处理。修复自然度<0.7时保留原始水印区域。此任务可与翻译/配音步骤并行执行。",
+      "agentRef": "distribution-adapter",
+      "dependentTasks": ["task-1"],
+      "requiredIntegrations": ["inpainting-model", "watermark-detector"]
+    },
+    {
+      "id": "task-12",
+      "title": "多平台规格适配与合成",
+      "type": "agent",
+      "prompt": "将去水印后的视频、配音音频和翻译字幕进行最终合成，并按各目标平台的规格要求生成多版本输出。处理流程：查询各平台规格数据库 → 音视频合成（将配音音轨与视频合并） → 按需执行画幅智能裁切（使用人脸/主体检测确定ROI） → 分辨率/码率/编码格式转换 → 字幕烧制（根据平台样式规范，处理RTL语种排版） → 封面图生成。确保每个输出文件100%符合目标平台规格（分辨率/时长/文件大小/编码）。文件大小超限时降低码率重新编码。",
+      "agentRef": "distribution-adapter",
+      "dependentTasks": ["task-10", "task-11"],
+      "requiredIntegrations": ["video-encoder", "platform-specs-database"]
+    },
+    {
+      "id": "task-13",
+      "title": "批量任务汇总与分发包生成",
+      "type": "agent",
+      "prompt": "汇总所有视频×语种×平台的处理结果，生成最终分发包。处理流程：收集所有完成的输出文件 → 按标准命名规范组织文件结构（{video_id}_{lang}_{platform}.{ext}） → 生成完整的元数据清单（每个文件的规格/质量/状态） → 统计批量任务的成功率/失败项/质量分布 → 对失败任务生成详细错误报告 → 打包生成分发包。批量任务中单视频失败不阻塞整体。超时（24小时）后强制汇总当前已完成结果。最终输出结构化分发包和批量任务报告。",
+      "agentRef": "distribution-adapter",
+      "dependentTasks": ["task-12"],
+      "requiredIntegrations": ["storage-service", "notification-service"]
+    }
+  ],
+  "variables": [
+    {
+      "variableId": "var-1",
+      "name": "sourceVideoFiles",
+      "variableType": "string",
+      "description": "源视频文件路径列表（支持批量输入50+视频）",
+      "required": true
+    },
+    {
+      "variableId": "var-2",
+      "name": "targetLanguages",
+      "variableType": "string",
+      "description": "目标语种列表，如 ['en','es','ar','ja','ko']，支持15+种语言",
+      "required": true
+    },
+    {
+      "variableId": "var-3",
+      "name": "targetPlatforms",
+      "variableType": "string",
+      "description": "目标分发平台列表，如 ['youtube','tiktok','instagram_reels','bilibili']",
+      "required": true
+    },
+    {
+      "variableId": "var-4",
+      "name": "terminologyTableId",
+      "variableType": "string",
+      "description": "自定义术语表ID（可选），用于确保专业术语和品牌名翻译一致性",
+      "required": false
+    },
+    {
+      "variableId": "var-5",
+      "name": "batchPriority",
+      "variableType": "string",
+      "description": "批量任务优先级排序策略：video_first | language_first | platform_first",
+      "required": false
+    },
+    {
+      "variableId": "var-6",
+      "name": "watermarkRemovalEnabled",
+      "variableType": "string",
+      "description": "是否启用去水印功能：true | false，默认true",
+      "required": false
+    },
+    {
+      "variableId": "var-7",
+      "name": "subtitleBurnMode",
+      "variableType": "string",
+      "description": "字幕烧制模式：hard（硬字幕烧录到画面）| soft（软字幕轨道）| both",
+      "required": false
+    },
+    {
+      "variableId": "var-8",
+      "name": "qualityPreset",
+      "variableType": "string",
+      "description": "质量预设等级：high（严格质量标准）| standard（标准质量）| fast（速度优先，适当放宽标准）",
+      "required": false
+    }
+  ]
+}

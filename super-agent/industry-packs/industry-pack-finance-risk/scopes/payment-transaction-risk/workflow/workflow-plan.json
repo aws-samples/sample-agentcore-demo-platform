@@ -1,0 +1,231 @@
+{
+  "title": "支付与交易风控全流程工作流",
+  "description": "覆盖支付授权、AML监测、跨境合规和策略调优的全业务流程，实现从支付请求接收到风控决策、合规报送和策略优化的端到端自动化处理。",
+  "tasks": [
+    {
+      "id": "task-1",
+      "title": "支付请求接收与解析",
+      "type": "action",
+      "prompt": "接收来自支付网关的交易请求，解析交易类型（境内支付/跨境支付）、交易要素（金额、币种、渠道、商户信息、设备信息）、客户标识。根据交易类型路由至不同处理通道：境内支付进入实时风险评分流程，跨境支付进入跨境合规审核流程。确保所有请求字段完整，缺失关键字段的请求返回错误响应。",
+      "agentRef": "payment-authorizer",
+      "dependentTasks": [],
+      "requiredIntegrations": ["payment-gateway", "transaction-router"]
+    },
+    {
+      "id": "task-2",
+      "title": "实时风险评分",
+      "type": "agent",
+      "prompt": "对境内支付交易执行实时风险评分：提取交易特征（金额偏离度、时间异常度、设备一致性、地理位置一致性、交易频次）和客户画像特征（历史模式、常用设备、常驻地），输入风险评分模型计算综合评分(0-100)。输出风险评分、风险等级（LOW/MEDIUM_LOW/MEDIUM_HIGH/HIGH）和Top 3风险因子。整体评分耗时控制在50ms内。如主模型超时则降级至备用规则引擎。",
+      "agentRef": "payment-authorizer",
+      "dependentTasks": ["task-1"],
+      "requiredIntegrations": ["feature-store", "ml-model-service", "customer-profile-db"]
+    },
+    {
+      "id": "task-3",
+      "title": "支付授权决策判定",
+      "type": "condition",
+      "prompt": "根据实时风险评分结果执行授权决策分级：评分<30分路由至免验授权；30-50分路由至短信验证；50-75分路由至人脸识别验证；>75分路由至拦截处理。同时检查是否达到大额交易标准（个人现金≥5万/企业现金≥20万/个人转账≥50万/企业转账≥200万），大额交易在原验证基础上提升一级验证强度。",
+      "agentRef": "payment-authorizer",
+      "dependentTasks": ["task-2"],
+      "requiredIntegrations": []
+    },
+    {
+      "id": "task-4",
+      "title": "交易限额校验",
+      "type": "action",
+      "prompt": "对已确定授权策略的交易执行三级额度校验：查询客户当前单笔限额、日累计已用额度和月累计已用额度，判断本次交易是否超限。超限交易直接拒绝并返回超限类型和剩余额度信息。通过校验的交易继续执行验证流程。校验延迟≤5ms。",
+      "agentRef": "payment-authorizer",
+      "dependentTasks": ["task-3"],
+      "requiredIntegrations": ["limit-management-service"]
+    },
+    {
+      "id": "task-5",
+      "title": "验证执行与授权响应",
+      "type": "agent",
+      "prompt": "根据授权决策执行对应的验证流程：免验直接返回APPROVE；短信验证下发验证码等待客户输入，验证通过返回APPROVE，失败/超时返回DENY；人脸识别调用活体检测和人脸比对，通过返回APPROVE，失败返回DENY；拦截返回BLOCK并生成人工确认工单。所有决策生成完整决策日志（评分因子、命中规则、决策结果、时间戳）。对客户放弃验证的情况记录Drop-off事件。",
+      "agentRef": "payment-authorizer",
+      "dependentTasks": ["task-4"],
+      "requiredIntegrations": ["sms-service", "face-recognition-service", "decision-log-store"]
+    },
+    {
+      "id": "task-6",
+      "title": "大额交易标记与推送",
+      "type": "action",
+      "prompt": "对授权通过的交易检查是否达到大额交易报告标准。达标交易生成大额标记，将交易信息（含双方身份信息、金额、时间、用途）推送至AML监测Agent的大额交易报告队列。同时，将高风险拦截的交易（评分>75）推送至AML监测Agent进行深度可疑分析。确保推送覆盖率100%，不得遗漏。",
+      "agentRef": "payment-authorizer",
+      "dependentTasks": ["task-5"],
+      "requiredIntegrations": ["message-queue", "aml-interface"]
+    },
+    {
+      "id": "task-7",
+      "title": "可疑交易监测分析",
+      "type": "agent",
+      "prompt": "对接收到的高风险交易推送和T+1批量交易数据执行可疑交易检测：运行100+条AML规则（结构化交易检测、快进快出、高风险对手方、循环转账、现金异常等），同时调用ML模型计算可疑概率。综合评定可疑等级（高/中/低），对高可疑交易在4小时内生成完整分析报告，包含客户信息、交易链条、命中规则、可疑原因和处置建议。报告提交合规人员审核确认后，确认为可疑的在24小时内生成并提交STR至反洗钱监测中心。",
+      "agentRef": "aml-monitor",
+      "dependentTasks": ["task-6"],
+      "requiredIntegrations": ["aml-rule-engine", "aml-ml-model", "str-submission-system"]
+    },
+    {
+      "id": "task-8",
+      "title": "大额交易报告生成与报送",
+      "type": "agent",
+      "prompt": "从大额交易报告队列中获取达标交易数据，补全报告所需全部字段（付款人/收款人完整身份信息、账号、开户行、金额、币种、时间、用途），按照人民银行规定格式生成标准大额交易报告。校验报告数据完整性和准确性，加入报送队列。监控5个工作日报送时限，T+4日未报送的自动升级催办。确保报送率100%。",
+      "agentRef": "aml-monitor",
+      "dependentTasks": ["task-6"],
+      "requiredIntegrations": ["kyc-system", "ltr-submission-system", "report-queue"]
+    },
+    {
+      "id": "task-9",
+      "title": "制裁名单实时筛查",
+      "type": "agent",
+      "prompt": "对每笔交易的收付款方名称实时比对OFAC SDN、联合国、EU和中国冻结恐怖主义资产等制裁名单。使用精确匹配和模糊匹配（Jaro-Winkler≥0.85、Soundex编码、Levenshtein≤2）算法。精确匹配（得分≥95）立即冻结交易并通知合规官；模糊匹配（65-94分）暂挂交易等待人工确认；未命中（<65分）放行。制裁名单更新后30分钟内完成全量加载生效，24小时内完成存量客户回扫。",
+      "agentRef": "aml-monitor",
+      "dependentTasks": ["task-1"],
+      "requiredIntegrations": ["sanctions-database", "compliance-officer-notification"]
+    },
+    {
+      "id": "task-10",
+      "title": "跨境支付合规审核",
+      "type": "agent",
+      "prompt": "对跨境支付交易执行全面合规审核：（1）验证SWIFT报文中汇款人和收款人身份信息的完整性和合规性；（2）校验个人年度便利化额度（5万美元）使用情况，超额度交易要求提供真实用途证明；（3）核实交易背景材料真实性（贸易类核验合同/发票/报关单一致性，服务类核验合同/完税证明）；（4）分析跨境资金流向是否异常（多层中转、与制裁国关联、分拆购汇）。审核完成后输出综合判定：通过（执行支付+国际收支申报）、不通过（拒绝+告知原因）、需补材料（暂挂+通知客户48小时补件时限）。",
+      "agentRef": "cross-border-compliance",
+      "dependentTasks": ["task-1"],
+      "requiredIntegrations": ["swift-system", "forex-quota-system", "customs-verification", "safe-reporting"]
+    },
+    {
+      "id": "task-11",
+      "title": "增强尽职调查执行",
+      "type": "agent",
+      "prompt": "对触发EDD条件的跨境交易执行深度合规调查：穿透交易对手股权结构识别最终受益人（UBO），核实UBO是否涉及制裁名单或PEP身份；调查资金来源合法性和最终用途合理性；评估交易结构的商业合理性（是否存在无必要的复杂中间环节）。EDD触发条件包括：涉及FATF高风险国家、交易对手注册于避税天堂、PEP交易、首次大额交易（>100万美元）、多层嵌套结构。调查结论经合规官签批，通过则附加后续监控要求，不通过则拒绝交易并评估是否需要上报STR。5个工作日内完成。",
+      "agentRef": "cross-border-compliance",
+      "dependentTasks": ["task-10"],
+      "requiredIntegrations": ["ubo-registry", "world-check-database", "compliance-approval-system"]
+    },
+    {
+      "id": "task-12",
+      "title": "风控指标日度监控",
+      "type": "agent",
+      "prompt": "每日T+1汇总前日全维度风控核心指标：授权通过率、拦截率、欺诈漏放率、验证放弃率、误拦截投诉率、P99授权延迟、系统可用性、STR及时率、大额报告合规率。对每项指标与30天动态基线对比，执行异常检测（偏离2σ黄色告警、3σ红色告警、连续趋势告警、硬限突破告警）。发现异常后2小时内启动多维度根因分析（时间/客群/渠道/规则/系统维度下钻），输出根因结论和建议措施。日报在T+1上午10:00前产出。",
+      "agentRef": "risk-strategy-optimizer",
+      "dependentTasks": ["task-5", "task-7", "task-8", "task-10"],
+      "requiredIntegrations": ["data-warehouse", "metrics-platform", "alerting-system"]
+    },
+    {
+      "id": "task-13",
+      "title": "策略参数调优与A/B测试",
+      "type": "agent",
+      "prompt": "基于日度监控分析结果和业务需求，设计和执行风控策略优化方案。对需要验证的参数调整设计A/B测试：明确实验假设、确定主要/次要/护栏指标、计算所需样本量、配置分流策略（初始5%流量）。观察期≥72小时，期间实时监控护栏指标（欺诈率不可恶化）。观察期结束后执行统计检验（p<0.05），输出实验结论和决策建议（全量推广/继续观察/放弃/调整重试）。通过审批的策略变更在1小时内完成全量部署，灰度推进（5%→20%→50%→100%），每阶段≥24小时观测。",
+      "agentRef": "risk-strategy-optimizer",
+      "dependentTasks": ["task-12"],
+      "requiredIntegrations": ["ab-test-platform", "config-management", "approval-workflow"]
+    },
+    {
+      "id": "task-14",
+      "title": "模型健康度评估",
+      "type": "agent",
+      "prompt": "周度监控所有在用风控模型（风险评分模型、AML检测模型）的性能指标：AUC、KS值、PSI。判定模型健康状态：Green（AUC≥0.75，KS≥0.30，PSI<0.1正常）、Yellow（轻微退化，密切关注）、Orange（AUC下降>0.02或PSI>0.25，启动重训准备）、Red（严重失效，紧急切换备用）。当模型进入Yellow以下状态时执行退化诊断（数据漂移/概念漂移/特征质量/样本时效性）。Orange状态触发模型重训流程，Red状态紧急切换至备用模型或规则引擎。新模型上线前需通过回测和≥72小时A/B测试验证。",
+      "agentRef": "risk-strategy-optimizer",
+      "dependentTasks": ["task-12"],
+      "requiredIntegrations": ["model-registry", "model-training-platform", "feature-monitoring"]
+    },
+    {
+      "id": "task-15",
+      "title": "月度合规报告生成",
+      "type": "document",
+      "prompt": "每月T+5个工作日内产出两份核心报告：（1）月度AML合规报告——包含可疑交易监测统计（告警数/确认率/STR提交数/类型分布）、大额交易报告统计（报告数/及时率）、制裁名单筛查统计（筛查量/命中数/处置结果）、客户风险评级分布变动、规则有效性分析、合规指标达标情况；（2）月度风控运营报告——包含交易风控全景数据、拦截效能分析、客户体验指标、模型性能健康度、策略变更效果跟踪、异常事件回顾、下月优化计划。报告经合规负责人审核通过后分发至管理层和监管合规部门。",
+      "agentRef": "risk-strategy-optimizer",
+      "dependentTasks": ["task-12", "task-13", "task-14"],
+      "requiredIntegrations": ["report-generation-platform", "compliance-approval-system"]
+    },
+    {
+      "id": "task-16",
+      "title": "客户洗钱风险评级管理",
+      "type": "agent",
+      "prompt": "维护全量客户的洗钱风险评级（低/中/高）体系。新客户开户时执行初始评级；全量客户按季度重新评估（覆盖率100%）；重大事件（STR提交、制裁命中、异常交易）触发即时重评。评级因子包括：客户身份（国籍、PEP、职业/行业）、业务关系（开户渠道、产品复杂度）、交易行为（历史告警、大额/异常频率、跨境占比）。存在一票否决条件（PEP、STR记录、制裁匹配）直接定为高风险。评级上调立即生效，下调需合规审批。高风险客户全量交易进入实时增强监控。评级结果同步至支付授权Agent、信贷审批域和反欺诈中心。",
+      "agentRef": "aml-monitor",
+      "dependentTasks": ["task-7"],
+      "requiredIntegrations": ["kyc-system", "customer-database", "rating-sync-service"]
+    },
+    {
+      "id": "task-17",
+      "title": "应急降级与灾备切换",
+      "type": "action",
+      "prompt": "当支付授权系统出现异常时执行多级降级策略：L1降级（主模型超时>80ms）切换至备用规则引擎（预期20ms内完成评估）；L2降级（备用引擎也不可用）执行最保守策略（小额<1000元免验，其余短信验证，大额全部拦截）；L3降级（全系统故障）交易进入排队模式，5分钟内切换灾备系统。降级期间持续探测主服务健康状态（每5秒探活），恢复后渐进切回（10%→30%→50%→100%）。所有降级事件100%记录日志和告警，降级期间的误拦截在主服务恢复后4小时内完成复核。",
+      "agentRef": "payment-authorizer",
+      "dependentTasks": [],
+      "requiredIntegrations": ["health-check-service", "disaster-recovery-system", "ops-alerting"]
+    }
+  ],
+  "variables": [
+    {
+      "variableId": "var-1",
+      "name": "transactionData",
+      "variableType": "object",
+      "description": "支付交易请求的完整数据对象，包含金额、币种、渠道、商户、设备、客户标识等",
+      "required": true
+    },
+    {
+      "variableId": "var-2",
+      "name": "riskScore",
+      "variableType": "number",
+      "description": "实时风险评分结果(0-100)，由风险评分模型输出",
+      "required": true
+    },
+    {
+      "variableId": "var-3",
+      "name": "authorizationDecision",
+      "variableType": "string",
+      "description": "授权决策结果：APPROVE/CHALLENGE/DENY/BLOCK",
+      "required": true
+    },
+    {
+      "variableId": "var-4",
+      "name": "largeTransactionFlag",
+      "variableType": "boolean",
+      "description": "是否为大额交易（达到法定报告标准）",
+      "required": true
+    },
+    {
+      "variableId": "var-5",
+      "name": "sanctionsScreeningResult",
+      "variableType": "string",
+      "description": "制裁名单筛查结果：CLEAR/EXACT_MATCH/FUZZY_MATCH",
+      "required": true
+    },
+    {
+      "variableId": "var-6",
+      "name": "crossBorderComplianceResult",
+      "variableType": "string",
+      "description": "跨境合规审核结果：PASS/REJECT/PENDING_SUPPLEMENT/EDD_REQUIRED",
+      "required": false
+    },
+    {
+      "variableId": "var-7",
+      "name": "suspicionLevel",
+      "variableType": "string",
+      "description": "可疑交易分析结论等级：HIGH/MEDIUM/LOW/CLEAR",
+      "required": false
+    },
+    {
+      "variableId": "var-8",
+      "name": "customerRiskRating",
+      "variableType": "string",
+      "description": "客户洗钱风险评级：LOW/MEDIUM/HIGH",
+      "required": true
+    },
+    {
+      "variableId": "var-9",
+      "name": "modelHealthStatus",
+      "variableType": "string",
+      "description": "风控模型健康状态：GREEN/YELLOW/ORANGE/RED",
+      "required": true
+    },
+    {
+      "variableId": "var-10",
+      "name": "strategyChangeId",
+      "variableType": "string",
+      "description": "策略变更工单编号，用于跟踪参数调优的审批和部署状态",
+      "required": false
+    }
+  ]
+}

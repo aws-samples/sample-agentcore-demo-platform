@@ -1,0 +1,181 @@
+{
+  "title": "智能视频剪辑工作流",
+  "description": "基于多模态视频理解的智能剪辑全流程，从视频输入验证到最终渲染输出，实现语义级精准分割、高光自动提取和智能编排剪辑",
+  "tasks": [
+    {
+      "id": "task-1",
+      "title": "视频输入验证",
+      "type": "agent",
+      "prompt": "接收并验证输入视频文件。执行以下检查：1）确认视频格式为支持的类型（MP4/MOV/AVI/MKV/WebM）；2）验证文件完整性（无损坏帧、文件头尾标记正常）；3）提取视频元数据（时长、分辨率、帧率、编码格式、音轨数量）；4）根据视频时长和分辨率预估处理所需的计算资源和时间；5）确认任务参数（目标时长、用途类型、输出平台规格、需要产出的素材数量）。如果视频格式不支持，尝试自动转码为MP4；如果文件损坏则拒绝处理并返回错误详情；如果时长超过4小时则自动标记为分片处理模式。输出视频验证报告和任务配置确认单。",
+      "agentRef": "multimodal-analyzer",
+      "dependentTasks": [],
+      "requiredIntegrations": ["video-codec-library", "file-system"]
+    },
+    {
+      "id": "task-2",
+      "title": "多模态信息提取与语义图谱构建",
+      "type": "agent",
+      "prompt": "对通过验证的视频执行全维度多模态信息提取。并行启动四条分析管线：1）ASR语音转文字管线——执行高精度语音识别（目标准确率>=95%），完成说话人分离和情感标注（6维情感向量）；2）OCR视频帧文字识别管线——以每秒2帧+转场帧的策略采样，识别字幕/标题/画面内嵌文字；3）视觉内容分析管线——执行场景识别、人物检测与跨帧追踪（ReID）、动作识别、表情分析；4）音频分析管线——检测背景音乐段落和情绪类型、识别关键音效、标记静音段落。完成后将所有管线输出按毫秒精度对齐到统一时间轴，组装为结构化视频语义图谱。输出语义图谱JSON和分析质量报告（含各管线置信度统计和低置信度段落清单）。",
+      "agentRef": "multimodal-analyzer",
+      "dependentTasks": ["task-1"],
+      "requiredIntegrations": ["asr-engine", "ocr-engine", "visual-ai-model", "audio-analysis-engine"]
+    },
+    {
+      "id": "task-3",
+      "title": "ASR质量决策",
+      "type": "condition",
+      "prompt": "检查ASR转写的批次平均置信度是否>=95%。如果达标则直接继续后续处理；如果未达标，检查低置信度段落的占比：若占比<10%则标记这些段落为需人工校验但不阻塞流程继续；若占比>=10%则需要检查是否为语种识别错误导致，如果是则切换对应语种ASR模型对低置信度段落重新处理。",
+      "agentRef": "multimodal-analyzer",
+      "dependentTasks": ["task-2"],
+      "requiredIntegrations": []
+    },
+    {
+      "id": "task-4",
+      "title": "语义边界检测与内容分割",
+      "type": "agent",
+      "prompt": "基于多模态分析师输出的视频语义图谱，执行内容语义级别的视频精准分割。步骤：1）内容类型自动判定——分析视频特征确定其为短剧/演讲/直播/综艺等类型；2）根据内容类型加载对应的分割策略模板（短剧用起承转合模板、演讲用论述逻辑模板、直播用功能段落模板）；3）融合文本主题变化(权重0.35)、视觉场景切换(0.25)、说话人变更(0.15)、音频变化(0.15)、情绪转折(0.10)五维信号检测语义边界候选点；4）对候选边界进行精修——确保分割点位于语义自然断点处（句子结束、动作完成、音乐节拍）；5）执行去冗余处理（相邻过近的候选合并，确保最小分段>=3秒）。输出带时间戳的分割边界列表及各边界的置信度分数。",
+      "agentRef": "semantic-segmenter",
+      "dependentTasks": ["task-3"],
+      "requiredIntegrations": []
+    },
+    {
+      "id": "task-5",
+      "title": "叙事结构分析与分段评分",
+      "type": "agent",
+      "prompt": "在语义边界检测基础上，执行宏观叙事结构分析和分段重要性评分。1）叙事结构识别：对于短剧识别起承转合四幕结构及各幕起止时间；对于演讲识别引言、论点、论据、总结的逻辑结构；2）绘制叙事张力曲线（tension curve），标记张力峰值和谷值点；3）对每个分段执行三维评分：内容丰富度(0.3权重)+叙事重要性(0.4权重)+情感强度(0.3权重)，综合得出1-5星重要性评级；4）为每个分段生成主题摘要和情绪基调标签；5）标记不可删除的关键段落（叙事因果链中的必要环节）。输出完整的分段列表（含评分、摘要、标签）和叙事结构概览报告。",
+      "agentRef": "semantic-segmenter",
+      "dependentTasks": ["task-4"],
+      "requiredIntegrations": []
+    },
+    {
+      "id": "task-6",
+      "title": "内容类型分割策略决策",
+      "type": "condition",
+      "prompt": "根据内容类型判定结果决定下游高光提取的策略配置。如果是短剧类型：启用钩子片段专项识别模式，情感强度权重提高到0.35，设置高光目标数量为每10分钟视频至少3-5个高光；如果是演讲/教程类型：启用知识点提取模式，叙事重要性权重提高到0.40，关注论点金句和精彩论述；如果是直播类型：启用互动高潮检测模式，关注弹幕密度突增、观众情绪反应和主播高能时刻；如果是其他类型：使用均衡策略，各维度等权重。将策略配置传递给高光提取阶段。",
+      "agentRef": "semantic-segmenter",
+      "dependentTasks": ["task-5"],
+      "requiredIntegrations": []
+    },
+    {
+      "id": "task-7",
+      "title": "高光时刻检测与评分",
+      "type": "agent",
+      "prompt": "综合多模态分析结果和语义分段信息，自动识别视频中的高光时刻。执行四大类高光信号检测：1）情绪高潮——扫描情感曲线局部最大值点，验证多模态一致性（语音情感+表情+音乐是否同步达到高峰），情感强度>0.7且持续>2秒的确认为情绪高潮；2）关键转折——检测前后5秒窗口语义相似度<0.3的时刻，识别剧情反转/意外揭示；3）精彩对白——通过ASR文本的语义分析检测修辞手法/情感浓度/观点锐度突出的语句；4）视觉冲击——视觉复杂度突增>50%或运动幅度>0.8的片段。对每个高光片段计算综合评分：情感强度(0.30)+叙事重要性(0.25)+视觉吸引力(0.20)+传播潜力(0.15)+钩子效果(0.10)，标准化为0-100分。按评分降序输出高光清单。",
+      "agentRef": "highlight-extractor",
+      "dependentTasks": ["task-6"],
+      "requiredIntegrations": []
+    },
+    {
+      "id": "task-8",
+      "title": "钩子片段专项识别",
+      "type": "agent",
+      "prompt": "针对短剧投放素材场景，从高光片段和全视频中专门识别能在前3秒内抓住观众注意力的钩子片段。筛选策略：1）从高光列表中筛选评分>=60的候选；2）额外扫描全视频中的视觉冲击开头、悬念对白开头、情感爆发开头、动作起始点等冷启动吸引力片段；3）对每个候选截取前3秒执行4维独立评估——视觉冲击分(0.25)、信息悬念分(0.30)、情感共鸣分(0.25)、认知冲突分(0.20)；4）验证片段独立可理解性和内容合规性；5）按综合钩子效果分降序排列，去除高度相似候选后输出Top-N推荐列表。每个钩子标注主要吸引力机制和使用建议。",
+      "agentRef": "highlight-extractor",
+      "dependentTasks": ["task-7"],
+      "requiredIntegrations": []
+    },
+    {
+      "id": "task-9",
+      "title": "高光数量充足性决策",
+      "type": "condition",
+      "prompt": "检查识别出的高光片段数量是否满足剪辑任务需求。判断逻辑：如果任务需要产出N条投放素材，高光数量应>=N*1.5（确保选择余量）；如果任务是精华集锦，高光总时长应>=目标时长*1.2。如果数量/时长充足则继续进入剪辑编排阶段；如果不足则逐步降低评分阈值重新筛选（从80降到70再到60），同时在输出中说明降档原因和质量风险。如果降到60仍不足，则标记为源内容高光密度低，建议人工介入确认是否继续。",
+      "agentRef": "highlight-extractor",
+      "dependentTasks": ["task-8"],
+      "requiredIntegrations": []
+    },
+    {
+      "id": "task-10",
+      "title": "智能内容选择与编排",
+      "type": "agent",
+      "prompt": "根据剪辑任务参数（目标时长、用途、平台规格、产出数量），从分段评分和高光评分中选择最优内容组合并编排叙事结构。执行步骤：1）智能内容选择——分析目标时长约束，使用贪心+动态规划混合策略从高光池中选择最优子集，当内容过剩时基于重要性权重智能取舍（而非截断），当不足时扩展候选范围；2）叙事节奏编排——根据用途选择节奏模板（投放素材：钩子3s+冲突升级60%+高潮截断；精华集锦：片段交替+递进高潮），确定片段排列顺序；3）开头钩子确定——为每条素材匹配最强钩子片段；4）转场设计——为每个拼接点选择转场方式（硬切/溶解/闪白/J-Cut等），确保转场点在语义自然断点；5）批量差异化——当需产出多条素材时，确保任意两条之间内容差异度>=0.6。输出剪辑决策文档（EDL）和时间戳映射表。",
+      "agentRef": "edit-composer",
+      "dependentTasks": ["task-9"],
+      "requiredIntegrations": []
+    },
+    {
+      "id": "task-11",
+      "title": "编排时长合规性决策",
+      "type": "condition",
+      "prompt": "验证编排后的内容是否符合目标时长约束（允许正负5%误差）。如果时长在目标范围内且上下文连贯性评分>=0.85，则通过验证进入渲染阶段；如果时长超出目标+5%，则回到剪辑编排师删除最低评分片段或压缩过渡段落后重新计算；如果时长不足目标-5%，则扩展候选片段范围或降低高光阈值纳入更多内容；如果连贯性评分<0.85，则调整片段顺序或插入过渡片段修复连贯性。",
+      "agentRef": "edit-composer",
+      "dependentTasks": ["task-10"],
+      "requiredIntegrations": []
+    },
+    {
+      "id": "task-12",
+      "title": "视频渲染与成片输出",
+      "type": "agent",
+      "prompt": "将剪辑决策方案转化为最终视频成片。执行步骤：1）解析EDL剪辑决策文档，确定输出规格矩阵（分辨率x画幅比x格式x码率）；2）按EDL精确到帧地裁切源视频片段并按指定顺序拼接；3）渲染所有转场特效（硬切/溶解/闪白/J-Cut等，按转场设计参数执行）；4）音频处理——裁切对应音频段、执行转场交叉淡入淡出、音量标准化至-14 LUFS；5）按目标平台规格编码输出（抖音：9:16/1080x1920/H.264/8-15Mbps；YouTube：16:9/1920x1080/H.264/10-20Mbps等）；6）生成时间戳映射表（成片每一帧对应原始视频的精确位置）；7）执行输出质量校验——检测黑帧/花屏/音频爆裂/文件完整性。如检测到质量问题则定位问题帧并局部重新渲染。输出成片文件、技术质量报告和封面缩略图。",
+      "agentRef": "edit-composer",
+      "dependentTasks": ["task-11"],
+      "requiredIntegrations": ["video-rendering-engine", "video-codec-library", "file-system"]
+    },
+    {
+      "id": "task-13",
+      "title": "输出质量最终验证",
+      "type": "condition",
+      "prompt": "对渲染输出的成片执行最终质量验证。检查项：1）无黑帧/花屏/音频爆裂——逐帧扫描异常；2）文件格式/分辨率/码率100%符合目标平台规格；3）音量标准化在-14正负1 LUFS范围内；4）时间戳映射表完整且双向可查；5）文件首尾可正常播放无异常。如果所有检查通过，标记任务完成并输出最终交付包（成片+映射表+质量报告）；如果发现问题，记录问题类型和位置，回退到渲染阶段进行局部修复后重新验证。",
+      "agentRef": "edit-composer",
+      "dependentTasks": ["task-12"],
+      "requiredIntegrations": ["quality-inspection-engine"]
+    }
+  ],
+  "variables": [
+    {
+      "variableId": "var-1",
+      "name": "sourceVideoFile",
+      "variableType": "string",
+      "description": "输入的源视频文件路径",
+      "required": true
+    },
+    {
+      "variableId": "var-2",
+      "name": "targetDurationMs",
+      "variableType": "number",
+      "description": "目标输出时长（毫秒）",
+      "required": true
+    },
+    {
+      "variableId": "var-3",
+      "name": "outputPurpose",
+      "variableType": "string",
+      "description": "输出用途类型：investment_material（投放素材）/ highlight_reel（精华集锦）/ trailer（预告片）/ full_clip（完整拆条）",
+      "required": true
+    },
+    {
+      "variableId": "var-4",
+      "name": "targetPlatform",
+      "variableType": "string",
+      "description": "目标发布平台：douyin / kuaishou / youtube_shorts / bilibili / instagram_reels",
+      "required": true
+    },
+    {
+      "variableId": "var-5",
+      "name": "outputCount",
+      "variableType": "number",
+      "description": "需要产出的素材条数（批量任务时>1）",
+      "required": false
+    },
+    {
+      "variableId": "var-6",
+      "name": "outputFormat",
+      "variableType": "string",
+      "description": "输出视频格式：mp4 / mov / webm",
+      "required": false
+    },
+    {
+      "variableId": "var-7",
+      "name": "languageHint",
+      "variableType": "string",
+      "description": "视频内容的预期语种（zh/en/ja/ko等），用于优化ASR识别",
+      "required": false
+    },
+    {
+      "variableId": "var-8",
+      "name": "contentTypeHint",
+      "variableType": "string",
+      "description": "内容类型提示：short_drama / speech / livestream / variety_show / other",
+      "required": false
+    }
+  ]
+}

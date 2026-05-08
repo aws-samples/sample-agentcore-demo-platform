@@ -1,0 +1,208 @@
+{
+  "title": "基因组与精准医疗全流程工作流",
+  "description": "覆盖从基因测序数据接收、变异解读、罕见病辅助诊断到药物基因组学用药指导的端到端精准医疗流程，包含药物再利用分析和报告生成",
+  "tasks": [
+    {
+      "id": "task-1",
+      "title": "接收测序数据与质量评估",
+      "type": "agent",
+      "prompt": "接收来自生物信息分析流水线的测序数据（VCF文件），执行数据质量评估：检查测序深度（WES≥100x、WGS≥30x）、覆盖度（≥95%目标区域≥20x）、变异质量评分分布。记录样本信息（患者ID、样本类型、送检单位、检测项目、紧急程度标记）。对不达标样本生成质量不合格报告并通知送检方。启动报告时限计时器（紧急7工作日/常规21工作日）。",
+      "agentRef": "variant-interpreter",
+      "dependentTasks": [],
+      "requiredIntegrations": ["LIMS系统", "生信分析流水线"]
+    },
+    {
+      "id": "task-2",
+      "title": "群体频率与数据库注释",
+      "type": "agent",
+      "prompt": "对所有通过质量过滤的变异执行多数据库注释：查询gnomAD v4群体频率（全球和东亚亚群体）、ClinVar临床意义注释（记录review status和分类日期）、HGMD Professional致病变异记录。执行初步频率过滤：MAF>5%的变异标记BA1（独立良性）快速排除；MAF>1%标记为可能良性候选。保留所有罕见变异（MAF<1%或数据库中不存在）进入后续分析。",
+      "agentRef": "variant-interpreter",
+      "dependentTasks": ["task-1"],
+      "requiredIntegrations": ["gnomAD数据库", "ClinVar", "HGMD"]
+    },
+    {
+      "id": "task-3",
+      "title": "计算预测与功能注释",
+      "type": "agent",
+      "prompt": "对通过频率过滤的罕见变异执行多维度计算预测：REVEL评分（missense变异致病性综合预测）、CADD评分（变异删害性综合评估）、SpliceAI评分（剪接影响预测）。对LoF变异（nonsense、frameshift、canonical splice site）评估目标基因的突变不耐受性（pLI/LOEUF），确认PVS1适用性。整合所有预测结果生成变异功能影响摘要。",
+      "agentRef": "variant-interpreter",
+      "dependentTasks": ["task-2"],
+      "requiredIntegrations": ["预测工具数据库", "基因约束数据库"]
+    },
+    {
+      "id": "task-4",
+      "title": "判断是否有家系数据可用",
+      "type": "condition",
+      "prompt": "检查当前病例是否有家系成员的基因检测数据可用于分离分析。判定条件：父母双方或至少2名其他家系成员（受累/未受累）已完成基因检测。如有家系数据，进入家系分离分析流程；如无家系数据，跳过分离分析直接进入ACMG证据汇总。对于de novo疑似病例但无父母样本的，标记为需补充检测。",
+      "agentRef": "variant-interpreter",
+      "dependentTasks": ["task-3"],
+      "requiredIntegrations": []
+    },
+    {
+      "id": "task-5",
+      "title": "执行家系共分离分析",
+      "type": "agent",
+      "prompt": "对有家系数据的病例执行变异-疾病共分离分析。验证亲缘关系真实性（IBD分析），对目标变异计算LOD评分。De novo变异：确认父母双方均不携带→PS2证据；复合杂合变异：通过父母基因型确认反式相位。LOD≥3为强分离证据（PP1_Strong），1.5-3为中等（PP1_Moderate），0.6-1.5为支持性（PP1_Supporting）。记录分析局限性（家系规模、未检测成员影响）。",
+      "agentRef": "variant-interpreter",
+      "dependentTasks": ["task-4"],
+      "requiredIntegrations": ["家系数据库"]
+    },
+    {
+      "id": "task-6",
+      "title": "ACMG证据汇总与变异分类",
+      "type": "agent",
+      "prompt": "对每个候选变异汇总所有ACMG证据条目：PVS（非常强致病）、PS（强致病）、PM（中等致病）、PP（支持致病）、BA（独立良性）、BS（强良性）、BP（支持良性）。按ACMG规则组合执行最终分类判定，输出五级分类结论。对每个分类结论提供完整推理路径和证据链。与ClinVar现有注释进行一致性比对，不一致时标记需人工复核。生成结构化分类结果供后续报告使用。",
+      "agentRef": "variant-interpreter",
+      "dependentTasks": ["task-5"],
+      "requiredIntegrations": ["ClinVar"]
+    },
+    {
+      "id": "task-7",
+      "title": "判断是否为罕见病诊断病例",
+      "type": "condition",
+      "prompt": "判断当前病例是否需要罕见病辅助诊断分析。判定条件：送检指征为疑似遗传病/发育异常/不明原因多系统受累、临床医生明确标注罕见病筛查、或变异分类中发现P/LP变异关联已知罕见病。满足任一条件进入罕见病诊断流程。若为单纯药物基因组学检测或已明确诊断仅需变异验证的病例，跳过罕见病诊断。",
+      "agentRef": "rare-disease-diagnostician",
+      "dependentTasks": ["task-6"],
+      "requiredIntegrations": []
+    },
+    {
+      "id": "task-8",
+      "title": "临床表型HPO标准化",
+      "type": "agent",
+      "prompt": "将临床医生提供的症状和体征描述转化为HPO标准术语。使用NLP解析自然语言描述，映射到最精确的HPO叶节点术语。区分核心表型（主要就诊原因，高权重）和伴随表型（标准权重）。记录表型出现时间线和阴性表型（排除性诊断价值）。评估表型信息完整度，不足时向临床医生反馈建议补充的表型评估项目。",
+      "agentRef": "rare-disease-diagnostician",
+      "dependentTasks": ["task-7"],
+      "requiredIntegrations": ["HPO数据库", "临床信息系统"]
+    },
+    {
+      "id": "task-9",
+      "title": "候选基因优先级排序",
+      "type": "agent",
+      "prompt": "基于标准化表型和变异分类结果执行候选基因综合评分与排序。评分维度：表型-基因关联度（OMIM/Orphanet数据，权重0.4）、变异致病性（ACMG分类，权重0.3）、遗传模式一致性（AD/AR/XL验证，权重0.2）、文献证据支持（PubMed病例报告，权重0.1）。输出Top10候选基因排序列表，每个基因附带评分明细、关联疾病和建议验证方案。特别标注AR疾病需双等位基因变异支持。",
+      "agentRef": "rare-disease-diagnostician",
+      "dependentTasks": ["task-8"],
+      "requiredIntegrations": ["OMIM", "Orphanet", "PubMed"]
+    },
+    {
+      "id": "task-10",
+      "title": "罕见病诊断建议生成",
+      "type": "agent",
+      "prompt": "基于候选基因排序结果和表型匹配分析，生成罕见病诊断建议。输出内容：候选诊断列表（标注证据强度：确定/可能/待验证）、鉴别诊断至少3个、下一步建议（Sanger验证/功能实验/家系扩展检测/多学科会诊/定期随访）。对于高置信度候选（Top1-3），详细描述疾病特征与患者表型的匹配度和不匹配点。VUS支持的候选标注'待随访-新证据可能改变结论'。",
+      "agentRef": "rare-disease-diagnostician",
+      "dependentTasks": ["task-9"],
+      "requiredIntegrations": ["OMIM", "GeneReviews"]
+    },
+    {
+      "id": "task-11",
+      "title": "判断是否需要药物基因组学分析",
+      "type": "condition",
+      "prompt": "判断当前病例是否需要药物基因组学分析。判定条件：送检项目包含药物基因组学检测、已确诊疾病需要精准用药指导、检测基因包含药物代谢相关基因（CYP2C19/CYP2D6/DPYD/UGT1A1/HLA-B等）、或罕见病确诊后需要评估治疗药物选择。满足任一条件进入药物基因组学流程。",
+      "agentRef": "pharmacogenomics-advisor",
+      "dependentTasks": ["task-6"],
+      "requiredIntegrations": []
+    },
+    {
+      "id": "task-12",
+      "title": "药物代谢基因型判定与用药建议",
+      "type": "agent",
+      "prompt": "接收药物代谢相关基因的检测结果，判定代谢表型（超快/正常/中间/慢代谢）。查询CPIC/DPWG/PharmGKB指南，针对患者当前或计划用药生成个体化建议。所有建议标注PharmGKB证据等级：Level 1A（CPIC/DPWG指南推荐）→临床行动建议；Level 1B（经验证关联）→临床行动建议；Level 2A/2B→仅供参考。高风险基因型（如HLA-B*5801+别嘌醇）立即触发禁忌预警通知主管医生。",
+      "agentRef": "pharmacogenomics-advisor",
+      "dependentTasks": ["task-11"],
+      "requiredIntegrations": ["PharmGKB", "CPIC指南库", "用药审核系统"]
+    },
+    {
+      "id": "task-13",
+      "title": "判断是否需要药物再利用分析",
+      "type": "condition",
+      "prompt": "判断当前病例是否需要药物再利用分析。判定条件：已确诊罕见病但无已批准治疗药物、现有治疗方案疗效不佳且有明确分子靶点、临床研究团队主动请求药物再利用候选评估。药物再利用分析为研究性质，仅在有明确科研需求时启动。",
+      "agentRef": "pharmacogenomics-advisor",
+      "dependentTasks": ["task-12"],
+      "requiredIntegrations": []
+    },
+    {
+      "id": "task-14",
+      "title": "执行药物再利用候选筛选",
+      "type": "agent",
+      "prompt": "对目标疾病/靶点执行药物再利用分析。流程：1)构建疾病基因PPI网络和通路富集分析；2)识别hub基因和关键靶点；3)查询DrugBank/ChEMBL对已批准药物进行初步筛选；4)对候选药物执行分子对接评分；5)PubMed文献验证和ClinicalTrials.gov检索。双重筛选标准：对接得分前5% AND 有≥1篇支持性文献。输出TOP5候选药物清单，每个附带作用机制假说、对接得分、文献证据、安全性信号。标注'研究性建议，非临床推荐'。",
+      "agentRef": "pharmacogenomics-advisor",
+      "dependentTasks": ["task-13"],
+      "requiredIntegrations": ["DrugBank", "PDB", "PubMed", "ClinicalTrials.gov"]
+    },
+    {
+      "id": "task-15",
+      "title": "整合报告生成与质量审核",
+      "type": "agent",
+      "prompt": "整合所有分析结果生成基因检测报告。报告结构：患者/样本信息→检测方法与范围→结果摘要（阳性/阴性结论）→变异详情表（ACMG分类+证据链）→临床意义解读→药物基因组学建议（如有）→罕见病诊断建议（如有）→局限性声明→遗传咨询建议。执行自动质量审核：必填字段完整性、HGVS命名规范性、分类-证据一致性。致病/可能致病变异报告必须提交分子遗传学专家审核。检查时限合规性（紧急≤7工作日、常规≤21工作日）。",
+      "agentRef": "variant-interpreter",
+      "dependentTasks": ["task-6", "task-10", "task-12"],
+      "requiredIntegrations": ["报告系统", "专家审核平台"]
+    },
+    {
+      "id": "task-16",
+      "title": "专家审核与报告签发",
+      "type": "agent",
+      "prompt": "将报告草稿提交分子遗传学专家审核。生成审核摘要便于专家快速审阅：关键变异数量、分类结论、与ClinVar不一致项、建议关注点。记录专家审核意见和修改痕迹。审核通过后生成最终版本，由专家电子签名签发。签发后通知送检单位/临床医生报告已出具，推送报告获取链接。更新患者基因组档案。对VUS变异设定重评估提醒（每6个月检查新证据）。",
+      "agentRef": "variant-interpreter",
+      "dependentTasks": ["task-15"],
+      "requiredIntegrations": ["专家审核平台", "电子签名系统", "通知系统"]
+    }
+  ],
+  "variables": [
+    {
+      "variableId": "var-1",
+      "name": "patientId",
+      "variableType": "string",
+      "description": "患者唯一标识符",
+      "required": true
+    },
+    {
+      "variableId": "var-2",
+      "name": "sampleId",
+      "variableType": "string",
+      "description": "检测样本编号",
+      "required": true
+    },
+    {
+      "variableId": "var-3",
+      "name": "testType",
+      "variableType": "string",
+      "description": "检测类型（WES/WGS/Panel/Pharmacogenomics）",
+      "required": true
+    },
+    {
+      "variableId": "var-4",
+      "name": "urgencyLevel",
+      "variableType": "string",
+      "description": "紧急程度（urgent/routine）",
+      "required": true
+    },
+    {
+      "variableId": "var-5",
+      "name": "clinicalIndication",
+      "variableType": "string",
+      "description": "送检临床指征/疑诊疾病",
+      "required": true
+    },
+    {
+      "variableId": "var-6",
+      "name": "phenotypeHPO",
+      "variableType": "array",
+      "description": "患者表型HPO术语列表",
+      "required": false
+    },
+    {
+      "variableId": "var-7",
+      "name": "familyDataAvailable",
+      "variableType": "boolean",
+      "description": "是否有家系检测数据可用",
+      "required": false
+    },
+    {
+      "variableId": "var-8",
+      "name": "reportDeadline",
+      "variableType": "string",
+      "description": "报告出具截止日期",
+      "required": true
+    }
+  ]
+}

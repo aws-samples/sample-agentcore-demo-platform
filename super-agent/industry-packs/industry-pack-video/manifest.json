@@ -1,0 +1,67 @@
+{
+  "version": "1.0.0",
+  "generatedAt": "2025-01-21T12:00:00.000Z",
+  "generator": "super-agent-batch-v2",
+  "industry": {
+    "id": "video",
+    "name": "视频Agent",
+    "icon": "🎬",
+    "color": "#EF4444"
+  },
+  "stats": {
+    "scopeCount": 3,
+    "agentCount": 12,
+    "skillCount": 5,
+    "workflowCount": 3,
+    "twinCount": 1,
+    "sopCount": 3
+  },
+  "scopes": [
+    {
+      "dirName": "end-to-end-video-generation",
+      "name": "端到端视频生成",
+      "agents": [
+        "script-architect",
+        "storyboard-director",
+        "asset-generator",
+        "quality-inspector",
+        "composition-renderer"
+      ],
+      "skills": [],
+      "hasWorkflow": true,
+      "hasSop": true
+    },
+    {
+      "dirName": "intelligent-video-editing",
+      "name": "智能视频剪辑",
+      "agents": [
+        "multimodal-analyzer",
+        "semantic-segmenter",
+        "highlight-extractor",
+        "edit-composer"
+      ],
+      "skills": [],
+      "hasWorkflow": true,
+      "hasSop": true
+    },
+    {
+      "dirName": "multilingual-video-distribution",
+      "name": "多语种视频分发",
+      "agents": [
+        "translation-localizer",
+        "dubbing-synthesizer",
+        "distribution-adapter"
+      ],
+      "skills": [],
+      "hasWorkflow": true,
+      "hasSop": true
+    }
+  ],
+  "digitalTwins": [
+    {
+      "dirName": "视频制作总监",
+      "name": "视频制作总监",
+      "role": "Head of Video Production / 视频内容总监"
+    }
+  ]
+}

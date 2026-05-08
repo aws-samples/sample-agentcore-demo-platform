@@ -1,0 +1,101 @@
+{
+  "version": "1.0.0",
+  "generatedAt": "2025-01-15T10:00:00.000Z",
+  "generator": "super-agent-batch-v2",
+  "industry": {
+    "id": "content",
+    "name": "内容生成与审核",
+    "icon": "📄",
+    "color": "#EC4899"
+  },
+  "stats": {
+    "scopeCount": 3,
+    "agentCount": 11,
+    "skillCount": 32,
+    "workflowCount": 3,
+    "twinCount": 1,
+    "sopCount": 3
+  },
+  "scopes": [
+    {
+      "dirName": "creative-asset-generation",
+      "name": "创意素材生成",
+      "agents": [
+        "creative-planner",
+        "prompt-engineer",
+        "asset-synthesizer",
+        "quality-inspector"
+      ],
+      "skills": [
+        "requirement-analysis",
+        "task-decomposition",
+        "model-routing-strategy",
+        "prompt-optimization",
+        "ab-testing-design",
+        "batch-generation-execution",
+        "post-processing-pipeline",
+        "quality-scoring-assessment",
+        "safety-compliance-check",
+        "quality-trend-analysis"
+      ],
+      "hasWorkflow": true,
+      "hasSop": true
+    },
+    {
+      "dirName": "content-compliance-review",
+      "name": "内容合规审核",
+      "agents": [
+        "pre-generation-guard",
+        "review-strategy-hub",
+        "multimodal-review-engine",
+        "human-ai-reviewer"
+      ],
+      "skills": [
+        "prompt-injection-detection",
+        "sensitive-content-filter",
+        "input-sanitization",
+        "rule-lifecycle-management",
+        "grayscale-release-control",
+        "review-metrics-analysis",
+        "multimodal-content-analysis",
+        "confidence-scoring",
+        "violation-classification",
+        "confidence-based-routing",
+        "review-queue-management",
+        "audit-trail-management"
+      ],
+      "hasWorkflow": true,
+      "hasSop": true
+    },
+    {
+      "dirName": "multimodal-content-creation",
+      "name": "多模态内容创作",
+      "agents": [
+        "brand-content-strategist",
+        "multimodal-creator",
+        "localization-adapter"
+      ],
+      "skills": [
+        "brand-asset-management",
+        "content-brief-creation",
+        "brand-consistency-review",
+        "copywriting-execution",
+        "visual-content-creation",
+        "video-content-production",
+        "brand-compliance-self-check",
+        "multilingual-localization",
+        "cross-channel-adaptation",
+        "cultural-compliance-check"
+      ],
+      "hasWorkflow": true,
+      "hasSop": true
+    }
+  ],
+  "digitalTwins": [
+    {
+      "dirName": "内容总监",
+      "name": "内容总监",
+      "role": "Head of Content / 内容与创意总监"
+    }
+  ]
+}

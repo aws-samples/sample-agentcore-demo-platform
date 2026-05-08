@@ -142,7 +142,7 @@ const envSchema = z.object({
   INSFORGE_PG_PASSWORD: z.string().optional().default('postgres'),
   INSFORGE_PG_DB: z.string().optional().default('insforge'),
   INSFORGE_ENABLED: z.string().optional().default('false'),
-  INSFORGE_JWT_SECRET: z.string().optional().default(''),
+  INSFORGE_JWT_SECRET: z.string().optional().default('spike-test-secret-key-must-be-32-chars-long'),
 });
 
 function loadConfig(): z.infer<typeof envSchema> {

@@ -1,0 +1,226 @@
+{
+  "title": "端到端视频生成全流程工作流",
+  "description": "从文本素材输入到多平台成片输出的完整生产工作流，覆盖编剧、分镜、AI素材生成、质检和合成输出五大环节，支持质量反馈闭环和自动重试机制。",
+  "tasks": [
+    {
+      "id": "task-1",
+      "title": "输入接收与任务解析",
+      "type": "action",
+      "prompt": "接收文本素材（小说章节/IP素材/创意brief）和生产任务单。执行以下操作：1) 识别输入文本类型（novel/screenplay/brief/ip_material）；2) 解析任务配置（目标平台、目标时长、集数、风格偏好）；3) 评估文本体量和复杂度；4) 验证输入完整性（文本不为空、平台有效、时长合理）。输出标准化的任务配置对象，包含source_text、source_type、target_platform、target_duration、style_preference等字段。",
+      "agentRef": "script-architect",
+      "dependentTasks": [],
+      "requiredIntegrations": []
+    },
+    {
+      "id": "task-2",
+      "title": "结构化剧本生成",
+      "type": "agent",
+      "prompt": "基于已解析的输入文本和任务配置，执行完整的剧本生成流程：1) 提取核心故事元素（人物/冲突/情节）；2) 按目标时长进行内容拆分和场次设计；3) 为每个场次编写对白并标注情绪；4) 设计钩子体系（开场3秒钩子+每15秒次级钩子+片尾悬念）；5) 规划情绪曲线确保有起伏。输出标准JSON格式的结构化剧本，包含title、platform、total_duration、character_list、scenes数组（每scene含scene_id/duration/location/characters/emotion/dialogues/hook_point）。确保对白密度8-15句/2分钟，角色数2-4个。",
+      "agentRef": "script-architect",
+      "dependentTasks": ["task-1"],
+      "requiredIntegrations": []
+    },
+    {
+      "id": "task-3",
+      "title": "平台合规审核",
+      "type": "agent",
+      "prompt": "对生成的剧本进行目标平台合规审核。执行以下检测：1) 内容安全扫描（政治/暴力/色情/未成年人保护/违法行为）；2) 平台特有规则检查（抖音：无竞品品牌/无站外引导；快手：正能量导向；YouTube Shorts：COPPA合规）；3) 结构合规验证（时长限制/声明要求）。为每个问题标注严重级别（critical/high/medium/low）并提供修改建议。输出合规报告JSON，含compliance_result(pass/conditional_pass/fail)、issues数组、recommendation。高危问题零容忍。",
+      "agentRef": "script-architect",
+      "dependentTasks": ["task-2"],
+      "requiredIntegrations": []
+    },
+    {
+      "id": "task-4",
+      "title": "剧本合规决策",
+      "type": "condition",
+      "prompt": "判断剧本是否通过合规审核。检查合规报告中的compliance_result字段：如果为'pass'则流程继续进入分镜拆解；如果为'conditional_pass'则根据issues的severity决定是否需要修改（有high级别则需修改）；如果为'fail'则必须返回修订。同时检查修订次数是否已达到3次上限——如果是则标记人工介入而非继续循环。",
+      "agentRef": "script-architect",
+      "dependentTasks": ["task-3"],
+      "requiredIntegrations": []
+    },
+    {
+      "id": "task-5",
+      "title": "分镜脚本拆解",
+      "type": "agent",
+      "prompt": "将通过合规审核的结构化剧本拆解为可执行的分镜脚本。逐场次进行镜头设计：1) 确定每个镜头的时长（3-8秒）、景别（CU/MS/WS/LS）、运镜（static/dolly/pan/track）、角度（eye_level/high/low）；2) 编写详细的环境描述（location/time/lighting/color_tone/key_props）；3) 设计人物在画面中的布局和表情；4) 确保相邻镜头的视觉连贯性；5) 规划转场类型。输出分镜脚本JSON，含shots数组（每个shot有完整的视觉参数定义）。总镜头时长应等于目标时长±5%。",
+      "agentRef": "storyboard-director",
+      "dependentTasks": ["task-4"],
+      "requiredIntegrations": []
+    },
+    {
+      "id": "task-6",
+      "title": "人物一致性参数库建立",
+      "type": "agent",
+      "prompt": "为剧本中的每个角色建立完整的视觉一致性参数库。对每个角色执行：1) 定义面部特征（脸型/五官/标志性特征）、发型发色、肤色、体型、默认服装；2) 选择>=5个一致性锚点（最具辨识度的特征）；3) 构建Prompt模板（正面base/负面base/特写补充/全身补充）；4) 区分固定参数（面部/体型）和可变参数（服装/配饰）。所有描述使用英文以获得AI模型最佳理解。确保不同角色的锚点特征有明显差异化。输出character_profiles数组。",
+      "agentRef": "storyboard-director",
+      "dependentTasks": ["task-5"],
+      "requiredIntegrations": []
+    },
+    {
+      "id": "task-7",
+      "title": "AI生成Prompt编写",
+      "type": "agent",
+      "prompt": "基于分镜脚本和人物参数库，为每个镜头编写高质量的AI生成Prompt。遵循标准结构：[主体描述]+[动作姿态]+[环境描述]+[光影描述]+[风格描述]+[质量标签]。要求：1) 主体描述必须严格引用角色参数库的固定描述；2) 包含完整的负面Prompt（排除与角色矛盾的特征+通用质量排除项）；3) 根据目标模型适配Prompt格式和长度；4) 确保同一场景的不同镜头使用相同的环境/光影描述基底；5) 标注每个Prompt中包含的一致性锚点。输出每个shot的prompt_positive和prompt_negative。",
+      "agentRef": "storyboard-director",
+      "dependentTasks": ["task-6"],
+      "requiredIntegrations": []
+    },
+    {
+      "id": "task-8",
+      "title": "批量素材生成任务调度",
+      "type": "agent",
+      "prompt": "根据分镜脚本和Prompt清单构建并执行批量生成任务。执行以下操作：1) 解析所有生成任务（参考图+融合图+视频片段+TTS语音）；2) 构建任务依赖图（参考图→融合图→视频，语音与图像并行）；3) 按优先级分配任务到API端点（前序镜头优先、主角镜头优先）；4) 启动180视频+360图像的并发生成；5) 监控进度和错误率；6) 对失败任务执行指数退避重试（5s→30s→120s）；7) 主模型故障时切换备选模型。实时将完成的素材提交给质检环节，不等整批完成。",
+      "agentRef": "asset-generator",
+      "dependentTasks": ["task-7"],
+      "requiredIntegrations": ["runway-api", "kling-api", "sdxl-api", "pika-api", "tts-api"]
+    },
+    {
+      "id": "task-9",
+      "title": "素材质量检测",
+      "type": "agent",
+      "prompt": "对每个生成的素材执行多维度自动质检。检测流程：1) 内容合规检测（一票否决制：暴力/色情/政治/未成年人保护）；2) 人物一致性评分（与角色参数库对比，权重：面部50%+发型20%+服装15%+体型15%，阈值>=0.85）；3) 画面质量评分（清晰度/构图/光影/色彩，阈值>=0.8）；4) 情绪匹配度（画面情绪与剧本标注一致性）。对每个素材输出质检报告：overall_verdict(pass/marginal/fail)、各维度评分、issues数组、recommendation(accept/regenerate/escalate)。不合格素材附带可操作的改进建议。",
+      "agentRef": "quality-inspector",
+      "dependentTasks": ["task-8"],
+      "requiredIntegrations": []
+    },
+    {
+      "id": "task-10",
+      "title": "质检结果决策与重试",
+      "type": "condition",
+      "prompt": "基于质检结果执行决策逻辑：1) 合规不通过→立即触发重新生成（修改Prompt排除违规元素）；2) 一致性/质量不通过且重试<3次→返回素材生成引擎重新生成（附问题描述）；3) 重试>=3次仍不通过→标记人工介入；4) 同角色连续3+次一致性不达标→向分镜导演发送Prompt优化反馈；5) 所有维度通过→素材标记为合格。同时计算批次抽卡合格率：如果<80%则触发预警，建议暂停生成并等待Prompt优化。",
+      "agentRef": "quality-inspector",
+      "dependentTasks": ["task-9"],
+      "requiredIntegrations": []
+    },
+    {
+      "id": "task-11",
+      "title": "抽卡合格率评估",
+      "type": "agent",
+      "prompt": "对当前批次的质量数据进行统计分析。计算：1) 总体抽卡合格率（首次通过数/总生成数）；2) 分角色合格率（识别一致性持续偏低的角色）；3) 分场景合格率（识别问题场景类型）；4) 分模型合格率（比较不同API的质量表现）。如果总体合格率>=80%且所有shot都有合格素材，则批次通过可进入合成阶段。如果合格率<80%，进行根因分析并生成针对性的Prompt优化建议推送给分镜导演。输出批次质量报告和优化建议。",
+      "agentRef": "quality-inspector",
+      "dependentTasks": ["task-10"],
+      "requiredIntegrations": []
+    },
+    {
+      "id": "task-12",
+      "title": "批次合格率决策",
+      "type": "condition",
+      "prompt": "判断批次是否满足进入合成阶段的条件。检查两个条件必须同时满足：1) 批次抽卡合格率>=80%；2) 所有shot都至少有一个合格素材。如果两个条件都满足则进入合成阶段。如果合格率<80%，则需要分镜导演根据反馈优化Prompt后重新生成不合格的素材。如果个别shot仍缺合格素材但整体合格率达标，仅对缺失的shot进行定向重新生成。",
+      "agentRef": "quality-inspector",
+      "dependentTasks": ["task-11"],
+      "requiredIntegrations": []
+    },
+    {
+      "id": "task-13",
+      "title": "时间线组装与转场设计",
+      "type": "agent",
+      "prompt": "将所有通过质检的合格素材按照分镜脚本时序进行组装。执行：1) 验证素材完整性（每个shot有对应的视频/图像+音频）；2) 按shot顺序在时间线上排列素材，设定精确的入点和出点；3) 根据相邻镜头的情绪关系选择转场效果（同情绪硬切、情绪反转闪白、时间跳跃黑场、平缓过渡叠化）；4) 设定转场时长（0.3-0.8秒）；5) 处理图像素材的静帧展示（Ken Burns效果）；6) 验证总时长=目标±5%。输出完整的时间线描述文件，含所有轨道的素材排列和转场参数。",
+      "agentRef": "composition-renderer",
+      "dependentTasks": ["task-12"],
+      "requiredIntegrations": []
+    },
+    {
+      "id": "task-14",
+      "title": "音画同步与音频混缩",
+      "type": "agent",
+      "prompt": "执行音画同步对齐和音频混缩处理。操作步骤：1) 将每段AI配音精确放置到时间线对应位置（参考分镜脚本的audio_sync标注）；2) 验证口型匹配度（配音音素节奏与画面人物嘴部动作对齐）；3) 选择并添加背景音乐（根据情绪基调匹配）；4) 设置音量层级（对白-6dB/音乐-18dB/音效-12dB）；5) 配置自动ducking（对白出现时音乐降至-24dB）；6) 标准化整体响度到-14 LUFS。确保所有对白段落的音画同步误差<100ms。输出同步报告和混缩后的音频主轨。",
+      "agentRef": "composition-renderer",
+      "dependentTasks": ["task-13"],
+      "requiredIntegrations": []
+    },
+    {
+      "id": "task-15",
+      "title": "多平台格式渲染",
+      "type": "agent",
+      "prompt": "按目标平台规格进行多版本最终渲染。为每个目标平台配置渲染参数：1) 抖音：1080x1920/9:16/H.264/15Mbps/128MB上限；2) 快手：1080x1920/9:16/H.264/12Mbps/100MB上限；3) YouTube Shorts：1080x1920/9:16/H.264或H.265/20Mbps/60秒上限。同时输出720p备用版本。执行渲染并进行质量校验：无黑帧/花屏/音频爆裂、文件完整可播放、规格100%合规。生成封面帧。输出所有版本的成片文件和渲染报告。文件命名格式：项目名_平台_分辨率_版本号.mp4。",
+      "agentRef": "composition-renderer",
+      "dependentTasks": ["task-14"],
+      "requiredIntegrations": ["ffmpeg", "render-engine"]
+    },
+    {
+      "id": "task-16",
+      "title": "成片质量终检",
+      "type": "agent",
+      "prompt": "对所有渲染输出的成片进行最终质量检测。检查项：1) 文件技术合规（分辨率/码率/时长/文件大小是否符合各平台要求）；2) 画面质量（逐帧扫描无黑帧>2帧/花屏/绿屏）；3) 音频质量（无爆裂/削波/异常静音段）；4) 音画同步（抽检关键对白段偏差<100ms）；5) 内容完整性（首帧和末帧正常、总时长与预期一致）。所有平台版本均需通过检测。输出终检报告，标注每个版本的通过/不通过状态及具体问题。通过的版本标记为可发布。",
+      "agentRef": "quality-inspector",
+      "dependentTasks": ["task-15"],
+      "requiredIntegrations": []
+    },
+    {
+      "id": "task-17",
+      "title": "成片终检决策",
+      "type": "condition",
+      "prompt": "判断成片是否通过最终质量检测。如果所有目标平台版本均通过终检，则流程完成，输出发布包。如果有版本不通过：1) 技术规格问题（码率/文件大小）→调整渲染参数重渲；2) 画面缺陷（黑帧/花屏）→定位问题帧对应的原始素材，请求重新生成该素材后重新合成；3) 音频问题→重新执行音画同步和混缩。标记具体问题和处理路径。",
+      "agentRef": "composition-renderer",
+      "dependentTasks": ["task-16"],
+      "requiredIntegrations": []
+    },
+    {
+      "id": "task-18",
+      "title": "输出发布包",
+      "type": "document",
+      "prompt": "汇总所有通过终检的成片版本，生成最终发布包。包含：1) 各平台版本的成片视频文件；2) 封面图（从视觉冲击力最强的帧中选取）；3) 生产报告（总耗时、质量指标汇总、资源使用统计）；4) 元数据文件（标题、描述建议、标签建议、时长、技术参数）；5) 分镜脚本备份（便于后续修改和重渲）。将发布包按照标准目录结构组织并输出。通知下游系统（如多语种分发Scope）成片已就绪。",
+      "agentRef": "composition-renderer",
+      "dependentTasks": ["task-17"],
+      "requiredIntegrations": ["file-storage", "notification-service"]
+    }
+  ],
+  "variables": [
+    {
+      "variableId": "var-1",
+      "name": "sourceText",
+      "variableType": "string",
+      "description": "输入的原始文本素材内容（小说章节/IP素材/创意brief）",
+      "required": true
+    },
+    {
+      "variableId": "var-2",
+      "name": "targetPlatform",
+      "variableType": "string",
+      "description": "目标发布平台（douyin/kuaishou/youtube_shorts），支持多个",
+      "required": true
+    },
+    {
+      "variableId": "var-3",
+      "name": "targetDuration",
+      "variableType": "string",
+      "description": "目标视频时长（秒），默认120",
+      "required": true
+    },
+    {
+      "variableId": "var-4",
+      "name": "stylePreference",
+      "variableType": "string",
+      "description": "风格偏好（sweet_romance/suspense/urban/fantasy/comedy）",
+      "required": false
+    },
+    {
+      "variableId": "var-5",
+      "name": "sourceType",
+      "variableType": "string",
+      "description": "输入文本类型（novel/screenplay/brief/ip_material）",
+      "required": true
+    },
+    {
+      "variableId": "var-6",
+      "name": "visualStyle",
+      "variableType": "string",
+      "description": "视觉风格（photorealistic/anime/3d_render）",
+      "required": false
+    },
+    {
+      "variableId": "var-7",
+      "name": "aspectRatio",
+      "variableType": "string",
+      "description": "画面比例（9:16竖版/16:9横版），默认9:16",
+      "required": false
+    },
+    {
+      "variableId": "var-8",
+      "name": "maxConcurrency",
+      "variableType": "string",
+      "description": "最大并发数配置，默认180视频+360图像",
+      "required": false
+    }
+  ]
+}

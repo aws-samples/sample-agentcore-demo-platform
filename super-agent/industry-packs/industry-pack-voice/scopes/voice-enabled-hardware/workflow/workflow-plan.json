@@ -1,0 +1,199 @@
+{
+  "title": "语音赋能智能硬件控制全流程",
+  "description": "从用户语音唤醒到设备执行完成的端到端语音控制工作流，覆盖唤醒检测、语音处理、意图解析、设备编排执行、反馈生成和个性化学习记录的完整链路。",
+  "tasks": [
+    {
+      "id": "task-1",
+      "title": "唤醒检测与对话模式判断",
+      "type": "condition",
+      "prompt": "判断当前系统状态：如果用户已在连续对话模式中（30秒超时未到期），则跳过唤醒直接进入语音处理；如果不在对话模式中，则等待本地唤醒词模型检测到唤醒词（置信度>=0.85），播放唤醒确认音效后激活拾音链路。输出唤醒事件包含时间戳、唤醒置信度和声源方向角度。",
+      "agentRef": "intent-parser",
+      "dependentTasks": [],
+      "requiredIntegrations": ["local-wakeword-engine", "microphone-array"]
+    },
+    {
+      "id": "task-2",
+      "title": "远场语音采集与ASR转写",
+      "type": "action",
+      "prompt": "对用户语音进行远场处理：执行波束成形增强目标方向信号（信噪比提升>=15dB），进行AEC回声消除（消除率>=95%），执行噪声抑制，通过VAD检测语音端点。根据网络状态选择ASR路径：网络正常（延迟<100ms）使用云端高精度ASR，网络异常时切换到本地ASR处理基础命令集。输出ASR转写文本和识别置信度。",
+      "agentRef": "intent-parser",
+      "dependentTasks": ["task-1"],
+      "requiredIntegrations": ["cloud-asr-service", "local-asr-engine", "audio-processing-pipeline"]
+    },
+    {
+      "id": "task-3",
+      "title": "网络状态评估与ASR路径选择",
+      "type": "condition",
+      "prompt": "评估当前网络连接质量：测量到云端ASR服务的往返延迟。如果延迟<100ms且连接稳定，选择云端ASR路径获得高精度识别结果；如果延迟>500ms或网络不可达，选择本地ASR路径处理基础命令集（仅支持开/关/调节类指令）。记录当前网络模式供后续环节参考。",
+      "agentRef": "device-orchestrator",
+      "dependentTasks": ["task-1"],
+      "requiredIntegrations": ["network-monitor"]
+    },
+    {
+      "id": "task-4",
+      "title": "自然语言意图解析",
+      "type": "agent",
+      "prompt": "接收ASR转写文本，执行完整的意图解析流程：1）文本预处理（去语气词、ASR纠错）；2）意图分类（明确指令/指代指令/模糊意图/场景指令/无法理解）；3）实体抽取（目标设备、操作动作、参数值）；4）对于指代类指令，查询对话上下文栈进行指代消解；5）对于模糊意图，结合环境传感器数据和用户偏好进行推理；6）组装结构化控制命令{device_id, action, parameters}并评估解析置信度。置信度>=0.7直接输出，<0.7则生成追问话术。",
+      "agentRef": "intent-parser",
+      "dependentTasks": ["task-2"],
+      "requiredIntegrations": ["environment-sensors"]
+    },
+    {
+      "id": "task-5",
+      "title": "用户偏好参数查询",
+      "type": "agent",
+      "prompt": "当意图解析需要填充默认参数时（如用户只说'开灯'未指定亮度和色温），查询当前用户在当前时段、当前房间的偏好配置。返回推荐参数值和置信度。如果用户声纹未识别，返回家庭公共偏好。如果是新用户无历史数据，返回品类标准默认值。",
+      "agentRef": "personalization-learner",
+      "dependentTasks": ["task-4"],
+      "requiredIntegrations": ["user-profile-store", "voiceprint-service"]
+    },
+    {
+      "id": "task-6",
+      "title": "意图类型路由分发",
+      "type": "condition",
+      "prompt": "根据意图解析结果进行路由分发：如果是单设备明确控制指令，直接路由到单设备控制执行；如果是场景触发指令（匹配到场景模板），路由到多设备场景编排；如果解析置信度不足需要追问，路由到追问反馈生成；如果是设备状态查询类意图，路由到状态查询反馈。",
+      "agentRef": "intent-parser",
+      "dependentTasks": ["task-4", "task-5"],
+      "requiredIntegrations": []
+    },
+    {
+      "id": "task-7",
+      "title": "单设备控制指令执行",
+      "type": "agent",
+      "prompt": "接收结构化控制命令，执行单设备控制：1）查询目标设备在线状态；2）校验操作参数在设备允许范围内；3）检查是否存在指令冲突（如有自动化规则同时操作该设备）；4）将命令翻译为设备协议指令（Zigbee/WiFi/BLE等）；5）下发指令并等待设备执行确认（超时3秒）；6）执行成功则更新设备状态图谱。目标：指令下发到设备响应<500ms。",
+      "agentRef": "device-orchestrator",
+      "dependentTasks": ["task-6"],
+      "requiredIntegrations": ["device-gateway", "zigbee-hub", "wifi-controller", "ble-bridge"]
+    },
+    {
+      "id": "task-8",
+      "title": "多设备场景联动编排",
+      "type": "agent",
+      "prompt": "接收场景模板（包含多个设备操作），执行编排流程：1）加载场景定义（设备列表、目标状态、依赖关系）；2）检查所有涉及设备的在线状态；3）构建执行依赖DAG，确定并行组和串行顺序；4）逐组下发控制指令（同组内并行，组间串行）；5）等待每组设备执行确认（组超时5秒）；6）汇总执行结果。关键设备失败则终止场景，非关键设备失败则跳过继续。",
+      "agentRef": "device-orchestrator",
+      "dependentTasks": ["task-6"],
+      "requiredIntegrations": ["device-gateway", "scene-template-store"]
+    },
+    {
+      "id": "task-9",
+      "title": "指令冲突检测与仲裁",
+      "type": "agent",
+      "prompt": "当检测到同一设备存在矛盾指令时执行冲突仲裁：1）确认冲突类型（互斥操作/参数冲突/逻辑冲突）；2）按优先级排序（安全P0 > 用户主动P1 > 手动操作P2 > 场景执行P3 > 自动化P4 > 系统建议P5）；3）执行高优先级指令，取消低优先级指令；4）如低优先级已部分执行则评估回滚；5）生成用户通知（简要说明冲突情况和处理结果）。冲突检测和仲裁总耗时<50ms。",
+      "agentRef": "device-orchestrator",
+      "dependentTasks": ["task-7"],
+      "requiredIntegrations": []
+    },
+    {
+      "id": "task-10",
+      "title": "执行结果语音反馈生成",
+      "type": "agent",
+      "prompt": "根据设备执行结果生成语音反馈：执行成功→生成简短确认（如'好的，灯已关闭'或静默确认嘟声，由用户偏好决定）；执行失败→告知原因和建议操作（如'卧室灯未响应，请检查设备连接'）；部分成功（场景）→概述结果（如'睡眠模式已开启，但窗帘响应较慢'）。反馈话术要简洁（<10字优先），夜间模式自动降低音量或切换为静默确认。",
+      "agentRef": "intent-parser",
+      "dependentTasks": ["task-7", "task-8"],
+      "requiredIntegrations": ["tts-service"]
+    },
+    {
+      "id": "task-11",
+      "title": "操作行为记录与偏好更新",
+      "type": "agent",
+      "prompt": "每次设备操作完成后执行数据记录：1）将操作记录（用户ID、设备、动作、参数、时间、上下文环境数据）写入操作日志；2）如果用户修正了系统默认参数（如系统设80%亮度用户手动调到60%），以增大权重(α=0.5)立即更新偏好模型；3）评估本次操作是否符合已识别的行为模式，更新模式计数；4）检查是否触发主动推荐条件（如已有模式的首步被用户执行）。",
+      "agentRef": "personalization-learner",
+      "dependentTasks": ["task-10"],
+      "requiredIntegrations": ["operation-log-store", "preference-store"]
+    },
+    {
+      "id": "task-12",
+      "title": "连续对话模式管理",
+      "type": "condition",
+      "prompt": "设备控制完成并反馈后进入连续对话等待：1）重置30秒超时计时器；2）保持拾音链路激活，等待用户下一条指令；3）如果30秒内检测到新的语音输入→回到语音处理环节继续处理；4）如果30秒超时无输入→播放'已退出对话模式'提示→清空上下文栈→回到唤醒监听状态；5）如果用户说结束词（'没了'/'好了'/'就这样'）→立即退出对话模式。",
+      "agentRef": "intent-parser",
+      "dependentTasks": ["task-10"],
+      "requiredIntegrations": ["vad-service"]
+    },
+    {
+      "id": "task-13",
+      "title": "追问与澄清对话处理",
+      "type": "agent",
+      "prompt": "当意图解析置信度不足或指代消解失败时，生成追问话术引导用户澄清：1）根据缺失信息类型选择追问模板（设备不明→'请问您想控制哪个设备？'；操作不明→'您想开还是关？'；参数不明→'要调到多少？'）；2）追问最多2次；3）收到用户回复后与原始意图合并重新解析；4）连续2次追问仍无法理解→告知用户'抱歉没有理解，请换种说法试试'并记录到未识别日志。",
+      "agentRef": "intent-parser",
+      "dependentTasks": ["task-6"],
+      "requiredIntegrations": ["tts-service"]
+    },
+    {
+      "id": "task-14",
+      "title": "离线模式基础控制",
+      "type": "agent",
+      "prompt": "网络不可达时执行离线模式控制：1）使用本地ASR（仅支持预编译的100条高频命令）；2）使用规则匹配进行意图解析（不支持模糊推理和场景联动）；3）通过本地协议（Zigbee/BLE直连）下发控制指令；4）将操作记录到本地日志队列；5）如果用户尝试复杂指令，告知'当前为离线模式，仅支持基础控制'；6）网络恢复后自动同步本地操作日志到云端并刷新设备状态。",
+      "agentRef": "device-orchestrator",
+      "dependentTasks": ["task-3"],
+      "requiredIntegrations": ["local-asr-engine", "zigbee-hub", "ble-bridge", "local-storage"]
+    },
+    {
+      "id": "task-15",
+      "title": "主动场景推荐触发",
+      "type": "agent",
+      "prompt": "基于用户行为模式在合适时机发起主动推荐：1）监控推荐触发条件（时间接近日常模式触发点±5分钟、事件触发如用户到家、用户执行了模式首步操作）；2）评估推荐价值分数（模式可靠度×时效性×历史采纳率）>=0.7才发起；3）检查频率限制（当日<3次、该推荐未被拒绝、非深夜时段）；4）生成推荐话术（<20字疑问句）；5）等待用户响应5秒：采纳→执行、拒绝→记录负反馈+冷却7天、忽略→取消。",
+      "agentRef": "personalization-learner",
+      "dependentTasks": ["task-11"],
+      "requiredIntegrations": ["event-bus", "tts-service"]
+    }
+  ],
+  "variables": [
+    {
+      "variableId": "var-1",
+      "name": "asrTranscription",
+      "variableType": "string",
+      "description": "ASR语音识别转写文本结果",
+      "required": true
+    },
+    {
+      "variableId": "var-2",
+      "name": "intentParseResult",
+      "variableType": "object",
+      "description": "意图解析结构化结果，包含intent_type、commands数组、confidence等",
+      "required": true
+    },
+    {
+      "variableId": "var-3",
+      "name": "deviceStateMap",
+      "variableType": "object",
+      "description": "当前环境所有设备的状态图谱，包含设备ID、在线状态、当前参数值",
+      "required": true
+    },
+    {
+      "variableId": "var-4",
+      "name": "userPreferences",
+      "variableType": "object",
+      "description": "当前用户在当前上下文下的偏好参数配置",
+      "required": false
+    },
+    {
+      "variableId": "var-5",
+      "name": "networkStatus",
+      "variableType": "string",
+      "description": "当前网络连接状态：online（延迟<100ms）或offline（不可达或延迟>500ms）",
+      "required": true
+    },
+    {
+      "variableId": "var-6",
+      "name": "conversationContext",
+      "variableType": "object",
+      "description": "对话上下文栈，包含最近10轮对话的设备焦点、操作记录和时间戳",
+      "required": false
+    },
+    {
+      "variableId": "var-7",
+      "name": "environmentData",
+      "variableType": "object",
+      "description": "环境传感器数据，包含温度、湿度、光照度、噪声级别等",
+      "required": false
+    },
+    {
+      "variableId": "var-8",
+      "name": "voiceprintId",
+      "variableType": "string",
+      "description": "声纹识别结果，用于多用户偏好隔离",
+      "required": false
+    }
+  ]
+}

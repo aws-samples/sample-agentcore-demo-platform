@@ -1,0 +1,218 @@
+{
+  "title": "质量管理全流程工作流",
+  "description": "覆盖来料检验、过程监控、质量异常处理、供应商质量管理和持续改进的端到端质量管理工作流。从检验数据采集开始，经过判定、异常分类、根因分析、措施验证到改进闭环的完整业务流程。",
+  "tasks": [
+    {
+      "id": "task-1",
+      "title": "检验数据采集与判定",
+      "type": "agent",
+      "prompt": "接收来料/过程/成品检验通知，获取物料信息（料号、批次、数量、供应商编码）。根据GB/T 2828.1标准确定抽样方案：查询当前检验严格度（正常/加严/放宽），确定样本量字码和Ac/Re值。对关键物料执行全检方案。采集检验数据后，对比Ac/Re值做出PASS/FAIL判定。将判定结果录入系统，更新供应商来料合格率和SPC数据点。输出包括：批次判定结果、不合格率、处置建议、趋势标记。",
+      "agentRef": "quality-inspection-analyst",
+      "dependentTasks": [],
+      "requiredIntegrations": ["QMS系统", "ERP物料主数据"]
+    },
+    {
+      "id": "task-2",
+      "title": "SPC趋势监控与判异分析",
+      "type": "agent",
+      "prompt": "对检验数据进行SPC控制图分析。更新X-bar/R图或P图/C图（根据数据类型选择），执行八大判异准则检查（1点超3σ、连续9点同侧、连续6点递增递减等）。计算关键工序CPK值，低于1.33的工序标红预警。当检测到判异信号时，先排除测量系统误差（确认数据有效性），确认为真实工序变异后发出预警通知。输出包括：控制图状态（受控/预警/失控）、违反的判异准则编号、CPK值、趋势判断和建议措施。",
+      "agentRef": "quality-inspection-analyst",
+      "dependentTasks": ["task-1"],
+      "requiredIntegrations": ["SPC系统", "MES系统"]
+    },
+    {
+      "id": "task-3",
+      "title": "检验结果判定分支",
+      "type": "condition",
+      "prompt": "根据检验判定结果和SPC分析结果进行分支路由：1）判定合格且趋势正常→流程正常结束，数据归档；2）判定合格但SPC趋势异常（违反判异准则）→进入异常预警处理路径；3）判定不合格→进入异常分类处理路径。对于不合格批次，还需判断异常来源类型：来料不良、过程异常或成品不合格，以决定后续处理路由。",
+      "agentRef": "quality-inspection-analyst",
+      "dependentTasks": ["task-2"],
+      "requiredIntegrations": []
+    },
+    {
+      "id": "task-4",
+      "title": "来料不良供应商纠正措施",
+      "type": "agent",
+      "prompt": "当来料检验判定不合格时，在24小时内发起SCAR（供应商纠正措施要求）。编制SCAR文档包含：不合格品的5W1H描述、不良品照片和检测数据、对应的规格/标准要求、要求供应商在7个工作日内回复（含临时遏制、根因分析、纠正措施、预防措施）。发送SCAR给供应商并抄送采购。跟踪供应商回复时效，到期前2天催促。收到回复后评审质量：5Why是否到第3层以上、措施是否针对根因而非现象、是否有防错机制。评审不通过则退回重做。通过后跟踪措施落实，连续3批来料验证无复发后关闭SCAR。",
+      "agentRef": "supplier-quality-engineer",
+      "dependentTasks": ["task-3"],
+      "requiredIntegrations": ["供应商协作平台", "QMS系统"]
+    },
+    {
+      "id": "task-5",
+      "title": "过程/成品异常8D启动",
+      "type": "agent",
+      "prompt": "接收质量异常信号（过程不良、成品不合格、SPC失控、客诉），在48小时内启动8D流程。首先评估严重性和紧急程度（安全影响/功能影响/批量影响/客户影响），确定优先级。4小时内制定临时遏制措施（隔离可疑品、加严检验、追溯已发货产品）并验证遏制有效性。组建跨部门团队（质量+工艺+生产+设备/供应商代表）。按5W2H描述问题，用Is/Is Not分析缩小边界。客诉类问题进入快速通道，24小时内完成D1-D3并向客户反馈。",
+      "agentRef": "quality-issue-resolver",
+      "dependentTasks": ["task-3"],
+      "requiredIntegrations": ["QMS系统", "MES系统", "客诉系统"]
+    },
+    {
+      "id": "task-6",
+      "title": "根因分析与纠正措施",
+      "type": "agent",
+      "prompt": "使用至少2种根因分析工具（5Why+鱼骨图/FTA/DOE）进行交叉验证，深入分析到根本原因。关联查询近1年历史类似案例的8D记录以加速定位。区分直接原因、根本原因和系统原因。验证根因逻辑自洽性（能否解释Is和Is Not）。基于根因制定永久纠正措施，每项措施必须有：具体描述、责任人、完成时限、量化验证标准。评估措施副作用和风险。对于设备相关问题联动设备维护Scope，工艺相关问题联动IoT与产线优化Scope，人员方法问题制定培训和标准化措施。",
+      "agentRef": "quality-issue-resolver",
+      "dependentTasks": ["task-5"],
+      "requiredIntegrations": ["QMS系统", "知识库系统"]
+    },
+    {
+      "id": "task-7",
+      "title": "措施验证与8D关闭",
+      "type": "agent",
+      "prompt": "跟踪纠正措施的执行进度，对逾期未完成的措施发出提醒和升级通知。措施实施后进行三级验证：短期验证（连续5批/7天无同类不良）、中期验证（1个月内不良率降至目标值）、长期验证（3个月内无复发）。验证通过后确认可撤除遏制措施，更新相关文件（作业指导书/检验标准/FMEA/控制计划）。总结经验教训纳入知识库，正式关闭8D报告。若超30天未关闭，自动升级到质量经理审核。若验证不通过，返回根因分析步骤重新分析。",
+      "agentRef": "quality-issue-resolver",
+      "dependentTasks": ["task-6"],
+      "requiredIntegrations": ["QMS系统"]
+    },
+    {
+      "id": "task-8",
+      "title": "8D超期升级判断",
+      "type": "condition",
+      "prompt": "检查8D处理时间是否超过30天阈值。若超期，自动升级通知质量经理介入审核，要求说明延期原因和预计关闭时间。若为客诉类问题，检查是否在24小时内完成了响应和初步反馈。若3个月内同类问题复发，标记为措施无效并重新开启分析。",
+      "agentRef": "quality-issue-resolver",
+      "dependentTasks": ["task-7"],
+      "requiredIntegrations": ["QMS系统"]
+    },
+    {
+      "id": "task-9",
+      "title": "供应商质量绩效月度评分",
+      "type": "agent",
+      "prompt": "每月汇总供应商质量绩效数据：来料批次合格率(权重35%)、PPM不良率(权重25%)、SCAR回复及时率(权重15%)、SCAR首次通过率(权重10%)、问题复发率(权重10%)、特殊事件扣分(权重5%)。按评分模型计算综合质量得分（0-100分），确定等级（A≥90/B 75-89/C 60-74/D<60）。绘制趋势图，标注评分突变点。与上月对比分析升降原因。输出月度供应商质量绩效简报：TOP5优秀/TOP5待改善供应商、等级分布、变动情况。将质量维度评分（权重40%）输出给供应链管理Scope的综合评分。",
+      "agentRef": "supplier-quality-engineer",
+      "dependentTasks": ["task-4"],
+      "requiredIntegrations": ["QMS系统", "供应链管理系统"]
+    },
+    {
+      "id": "task-10",
+      "title": "供应商分级管理决策",
+      "type": "condition",
+      "prompt": "基于供应商质量绩效评分结果进行分级管理决策：A级供应商（≥90分）→维持优选状态，减少审核频次；B级供应商（75-89分）→正常管理；C级供应商（60-74分）→启动限期整改，制定SQDP改善计划，限制新产品导入，月度绩效面谈；D级供应商（<60分）→紧急约谈，启动替代供应商开发，减少订单份额，限期60天整改，连续2个季度D级触发淘汰流程。判断是否需要启动现场审核（新供应商/连续降级/重大事件）。",
+      "agentRef": "supplier-quality-engineer",
+      "dependentTasks": ["task-9"],
+      "requiredIntegrations": ["供应商管理系统"]
+    },
+    {
+      "id": "task-11",
+      "title": "系统性改进机会识别",
+      "type": "agent",
+      "prompt": "基于月度质量数据进行Pareto分析，识别TOP5缺陷类型和慢性质量问题（区分急性异常和慢性问题）。评估每个改进机会的优先级：影响范围(FPY影响量)×发生频率(月发生次数)×可行性(技术难度+资源需求)。按立项标准判断：月发生≥20次且影响FPY≥0.5%→六西格玛项目；月发生10-19次或客诉相关→快速改善项目；FMEA RPN≥120或S≥9→必须制定降险措施。对建议立项的改进机会编写项目提案（含问题陈述、目标、范围、ROI分析、资源需求、时间计划）。",
+      "agentRef": "quality-improvement-strategist",
+      "dependentTasks": ["task-7"],
+      "requiredIntegrations": ["QMS系统", "ERP系统"]
+    },
+    {
+      "id": "task-12",
+      "title": "FMEA文档更新",
+      "type": "agent",
+      "prompt": "8D报告关闭后7天内更新相关FMEA文档。根据8D识别的根因和失效模式：1）如为已有失效模式→更新SOD评分（O基于最新数据重新评估，D基于新增检测手段评估）；2）如为新发现的失效模式→新增条目（完整填写功能/失效模式/影响/原因/当前控制/SOD评分）。重新计算RPN，对RPN≥120或S≥9的高风险项制定改进措施（优先降低O-发生度）。将D7预防措施横展结果反映在相关产品/工序的FMEA中。确保FMEA与控制计划保持一致。",
+      "agentRef": "quality-improvement-strategist",
+      "dependentTasks": ["task-7"],
+      "requiredIntegrations": ["FMEA管理系统", "QMS系统"]
+    },
+    {
+      "id": "task-13",
+      "title": "月度质量管理评审报告",
+      "type": "document",
+      "prompt": "在次月5日前编制上月质量管理评审报告。内容包括：1）执行摘要（一页纸总览，绿/黄/红状态一目了然）；2）KPI仪表盘（直通率/客诉率/来料合格率/8D关闭率/CPK/质量成本，含12个月趋势线和目标对照）；3）Pareto分析（TOP5缺陷/TOP5不良工序/TOP5问题供应商）；4）8D和SCAR执行状况汇总；5）改进项目进展（各项目DMAIC阶段/本月进展/下月计划/收益跟踪）；6）风险预警（趋势性恶化指标、外部风险信号）；7）需管理层决策事项（附数据支撑和方案建议）；8）上次评审决策事项跟踪。确保结论先行、数据支撑、行动导向。",
+      "agentRef": "quality-improvement-strategist",
+      "dependentTasks": ["task-11", "task-12"],
+      "requiredIntegrations": ["QMS系统", "ERP系统", "BI看板"]
+    },
+    {
+      "id": "task-14",
+      "title": "质量报告生成与分发",
+      "type": "agent",
+      "prompt": "汇总当日/本周的检验数据，生成质量检验日报或周报。日报内容：当日检验总量（IQC/IPQC/OQC分类）、合格率、不合格明细（关联到供应商/工序/设备）、SPC状态汇总（受控/预警/失控工序清单）、CPK异常项。周报增加：本周趋势分析、与上周/目标的对比、TOP异常项汇总、下周风险预判。报告自动分发给相关人员（质量经理/生产经理/工艺工程师）。标注需要关注或行动的异常项，区分信息通报和需要行动的待办事项。",
+      "agentRef": "quality-inspection-analyst",
+      "dependentTasks": ["task-2"],
+      "requiredIntegrations": ["QMS系统", "邮件系统"]
+    }
+  ],
+  "variables": [
+    {
+      "variableId": "var-1",
+      "name": "inspectionBatchId",
+      "variableType": "string",
+      "description": "检验批次号，唯一标识一次检验任务",
+      "required": true
+    },
+    {
+      "variableId": "var-2",
+      "name": "materialCode",
+      "variableType": "string",
+      "description": "物料编号，关联物料主数据中的检验规范和AQL标准",
+      "required": true
+    },
+    {
+      "variableId": "var-3",
+      "name": "supplierCode",
+      "variableType": "string",
+      "description": "供应商编号，关联供应商质量档案和绩效评分",
+      "required": true
+    },
+    {
+      "variableId": "var-4",
+      "name": "inspectionType",
+      "variableType": "string",
+      "description": "检验类型：IQC（来料）、IPQC（过程）、OQC（成品）",
+      "required": true
+    },
+    {
+      "variableId": "var-5",
+      "name": "judgmentResult",
+      "variableType": "string",
+      "description": "检验判定结果：PASS（合格）、FAIL（不合格）、CONDITIONAL（有条件放行）",
+      "required": true
+    },
+    {
+      "variableId": "var-6",
+      "name": "defectSeverity",
+      "variableType": "string",
+      "description": "缺陷严重程度：CRITICAL（致命）、MAJOR（重要）、MINOR（次要）",
+      "required": false
+    },
+    {
+      "variableId": "var-7",
+      "name": "eightDId",
+      "variableType": "string",
+      "description": "8D报告编号，关联质量异常处理的完整生命周期记录",
+      "required": false
+    },
+    {
+      "variableId": "var-8",
+      "name": "scarId",
+      "variableType": "string",
+      "description": "SCAR编号，供应商纠正措施要求的唯一标识",
+      "required": false
+    },
+    {
+      "variableId": "var-9",
+      "name": "processStation",
+      "variableType": "string",
+      "description": "工序/工位编号，用于过程检验的工序定位和SPC关联",
+      "required": false
+    },
+    {
+      "variableId": "var-10",
+      "name": "cpkValue",
+      "variableType": "number",
+      "description": "过程能力指数CPK值，关键工序要求≥1.33",
+      "required": false
+    },
+    {
+      "variableId": "var-11",
+      "name": "qualityScore",
+      "variableType": "number",
+      "description": "供应商质量绩效评分（0-100分），用于分级管理决策",
+      "required": false
+    },
+    {
+      "variableId": "var-12",
+      "name": "reportPeriod",
+      "variableType": "string",
+      "description": "报告期间标识（如2024-03或2024-Q1），用于质量报告生成",
+      "required": false
+    }
+  ]
+}

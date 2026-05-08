@@ -1,0 +1,208 @@
+{
+  "title": "医疗财务与收入优化全流程工作流",
+  "description": "覆盖从病案编码审核、DRG分组验证、费用监控预警到医保结算和收入分析的端到端财务管理流程，包含收入漏洞检测和合规审计",
+  "tasks": [
+    {
+      "id": "task-1",
+      "title": "接收出院病例并提取病案首页",
+      "type": "agent",
+      "prompt": "接收出院病例通知，从HIS系统提取病案首页数据：主要诊断（ICD-10编码）、其他诊断列表、手术/操作编码（ICD-9-CM-3）、患者人口学信息（年龄/性别）、入院日期、出院日期、出院方式。验证数据完整性，必填字段缺失时退回至病案室补充。记录病例接收时间戳，启动编码审核时限计时（出院后48小时内完成）。",
+      "agentRef": "drg-coding-specialist",
+      "dependentTasks": [],
+      "requiredIntegrations": ["HIS系统", "病案管理系统"]
+    },
+    {
+      "id": "task-2",
+      "title": "执行病案首页编码质量审核",
+      "type": "agent",
+      "prompt": "对病案首页编码进行全面质量审核。检查项：1)主要诊断选择正确性——是否反映本次住院主要原因和最大资源消耗方向，与出院小结一致性验证；2)手术操作编码完整性——对比医嘱系统和手术记录，检测漏编的有编码意义的操作；3)合并症/并发症编码——与病程记录交叉验证，CC/MCC标记合理性；4)编码规范性——ICD版本、位数、性别/年龄逻辑一致性、互斥编码检测。输出编码质量评分和具体问题清单。",
+      "agentRef": "drg-coding-specialist",
+      "dependentTasks": ["task-1"],
+      "requiredIntegrations": ["编码知识库", "病历系统"]
+    },
+    {
+      "id": "task-3",
+      "title": "判断编码质量是否达标",
+      "type": "condition",
+      "prompt": "判断病案首页编码质量是否达到提交标准。判定条件：主要诊断选择正确、手术操作编码完整率≥95%、无互斥/矛盾编码、编码质量评分≥80分。达标则进入DRG分组流程。不达标则退回科室/编码员修改，标注具体问题点和修改建议。紧急情况（如医保结算截止日前2天）可允许minor问题通过但标记待完善。",
+      "agentRef": "drg-coding-specialist",
+      "dependentTasks": ["task-2"],
+      "requiredIntegrations": []
+    },
+    {
+      "id": "task-4",
+      "title": "执行DRG/DIP分组",
+      "type": "agent",
+      "prompt": "基于审核通过的病案首页编码执行DRG/DIP分组。流程：1)确定MDC（主要诊断类别）；2)按决策树执行分组——判断手术类型（大/中/小/非手术），纳入CC/MCC严重程度评估；3)输出DRG组别代码和对应权重值；4)获取该DRG组的支付标准金额；5)与历史同类病例的分组结果对比验证合理性。如分组结果异常（权重显著偏离预期），标记需人工复核。",
+      "agentRef": "drg-coding-specialist",
+      "dependentTasks": ["task-3"],
+      "requiredIntegrations": ["DRG分组引擎", "医保支付标准库"]
+    },
+    {
+      "id": "task-5",
+      "title": "计算费用与DRG支付标准偏差",
+      "type": "agent",
+      "prompt": "计算病例实际总费用与DRG支付标准的偏差。获取该病例的实际费用总额和费用构成明细（药品/耗材/检查/治疗/床位/护理），对比DRG支付标准金额。计算偏差比例=(实际费用-支付标准)/支付标准。分析费用构成与同DRG组标杆对比。判断盈亏状态：实际<标准为盈余，实际>标准为亏损。亏损病例需分析超支主要驱动因素。",
+      "agentRef": "revenue-optimizer",
+      "dependentTasks": ["task-4"],
+      "requiredIntegrations": ["费用系统", "DRG标杆数据库"]
+    },
+    {
+      "id": "task-6",
+      "title": "判断是否触发费用超标预警",
+      "type": "condition",
+      "prompt": "判断病例费用是否触发超标预警。预警规则：实际费用≥DRG支付标准的80%触发黄色预警；≥90%触发橙色预警；≥100%触发红色预警。对于在院病例，基于当前累积费用和预估剩余费用进行前瞻性判断。ICU病例和特殊病种可适当放宽阈值（×1.2系数）。未触发预警直接进入漏洞检测流程。",
+      "agentRef": "revenue-optimizer",
+      "dependentTasks": ["task-5"],
+      "requiredIntegrations": []
+    },
+    {
+      "id": "task-7",
+      "title": "生成费用超标预警通知",
+      "type": "agent",
+      "prompt": "对触发预警的病例生成分级预警通知。黄色预警：通知主管医生，提供费用结构分析和优化建议。橙色预警：升级通知科室负责人，附加同DRG组标杆对比分析。红色预警：通知科主任和医务部，建议启动费用管控措施，提供具体超支项目和可能的控制方案。通知内容含：当前费用/支付标准/比例/主要超支项/历史同类病例参考/建议措施。确保通知在工作时间发送。",
+      "agentRef": "revenue-optimizer",
+      "dependentTasks": ["task-6"],
+      "requiredIntegrations": ["通知系统", "费用分析系统"]
+    },
+    {
+      "id": "task-8",
+      "title": "执行收入漏洞检测",
+      "type": "agent",
+      "prompt": "对出院病例执行医嘱-执行-收费三方数据比对，识别漏收费项目。检测范围：1)已执行医嘱但无对应收费项（药品/检查/治疗）；2)手术记录中使用的耗材是否全部入账；3)护理操作记录（换药/导管/监护等）是否有对应护理费；4)检验检查报告是否有对应收费。按金额和确定性排序输出漏洞列表。在费用结清前（出院后3个工作日内）提醒科室补录。计算潜在漏收费总金额。",
+      "agentRef": "revenue-optimizer",
+      "dependentTasks": ["task-4"],
+      "requiredIntegrations": ["医嘱系统", "执行记录系统", "收费系统"]
+    },
+    {
+      "id": "task-9",
+      "title": "医保结算前合规预审",
+      "type": "agent",
+      "prompt": "在提交医保结算前执行全面合规性预审。审查项：1)诊断与治疗项目一致性（如骨折诊断+消化科药品需标记）；2)医保目录合规性（甲/乙/丙类分类正确性）；3)限价药品/耗材是否超标准价格；4)住院天数是否超过DRG限定值；5)分解住院嫌疑检测（30天内再入院同一诊断）；6)自费项目知情同意书完整性。输出预审结论（通过/有问题需处理/阻断）及具体问题清单。",
+      "agentRef": "compliance-auditor",
+      "dependentTasks": ["task-4", "task-8"],
+      "requiredIntegrations": ["医保政策规则库", "知情同意管理系统"]
+    },
+    {
+      "id": "task-10",
+      "title": "判断是否符合快速结算通道",
+      "type": "condition",
+      "prompt": "判断病例是否满足医保快速结算通道条件。快速通道条件：预审无问题+编码审核通过+费用在DRG支付标准±20%范围内+无分解住院嫌疑+住院天数在合理范围内。满足所有条件→自动提交结算；任一条件不满足→进入人工复核队列，标注需关注的具体问题点。",
+      "agentRef": "compliance-auditor",
+      "dependentTasks": ["task-9"],
+      "requiredIntegrations": []
+    },
+    {
+      "id": "task-11",
+      "title": "提交医保结算",
+      "type": "agent",
+      "prompt": "对通过预审的病例提交医保结算。操作：1)按医保中心要求格式打包结算数据（病案首页+费用清单+辅助材料）；2)提交并记录提交时间和批次号；3)跟踪结算状态（已提交→审核中→已支付/已拒付）；4)支付到账后确认并更新财务系统。对人工复核队列中的病例：标注问题点→科室确认/修正→重新预审→通过后提交。结算提交批次管理：每日批量提交，月末集中清理遗留病例。",
+      "agentRef": "compliance-auditor",
+      "dependentTasks": ["task-10"],
+      "requiredIntegrations": ["医保结算接口", "财务系统"]
+    },
+    {
+      "id": "task-12",
+      "title": "判断是否发生拒付",
+      "type": "condition",
+      "prompt": "监控已提交结算病例的反馈结果，判断是否发生拒付。拒付判定：医保中心返回拒付通知，包含拒付原因代码和拒付金额。部分拒付（仅部分费用项被拒）也需纳入分析。如无拒付则结案，数据纳入月度统计。如发生拒付则进入拒付分析和申诉流程。",
+      "agentRef": "compliance-auditor",
+      "dependentTasks": ["task-11"],
+      "requiredIntegrations": ["医保结算接口"]
+    },
+    {
+      "id": "task-13",
+      "title": "拒付原因分析与申诉处理",
+      "type": "agent",
+      "prompt": "对拒付病例进行原因分析和申诉评估。步骤：1)解析拒付原因代码并分类（编码问题/费用问题/政策违规/材料缺失）；2)评估是否可申诉（如确属合理医疗行为但被误拒）；3)可申诉案例：自动准备申诉材料（补充病历摘要、手术必要性说明、特殊情况说明等），7个工作日内完成；4)不可申诉案例：记录教训并更新预防规则库；5)跟踪申诉结果直至最终裁定。将拒付原因反馈至科室并纳入拒付统计分析。",
+      "agentRef": "compliance-auditor",
+      "dependentTasks": ["task-12"],
+      "requiredIntegrations": ["医保申诉系统", "病历系统"]
+    },
+    {
+      "id": "task-14",
+      "title": "CMI值计算与追踪分析",
+      "type": "agent",
+      "prompt": "月度汇总所有出院病例的DRG权重，计算全院和各科室CMI值。执行分析：1)月度CMI值计算并与上月/去年同期对比；2)CMI变化驱动因素分解（收治结构变化vs编码质量变化）；3)各科室CMI排名和环比变化；4)异常识别（单科室CMI突变>10%需分析原因）；5)与费用消耗指数/时间消耗指数交叉验证。输出CMI追踪报告含趋势图和管理建议。",
+      "agentRef": "drg-coding-specialist",
+      "dependentTasks": ["task-4"],
+      "requiredIntegrations": ["数据分析平台"]
+    },
+    {
+      "id": "task-15",
+      "title": "生成月度科室收入分析报告",
+      "type": "document",
+      "prompt": "每月10日前自动生成各科室维度的医疗收入分析报告。报告内容：1)科室收入总额和构成分析（药品/耗材/检查/手术/其他各占比）；2)DRG盈亏分析（盈余组/亏损组分布，亏损组超支原因）；3)效率指标（费用消耗指数FCI、时间消耗指数TCI、CMI值）；4)收入漏洞月度统计（漏收费总额和类型分布）；5)拒付金额和原因分布；6)收支平衡分析（含固定/变动成本分拆和盈亏平衡点）；7)同比/环比趋势和管理建议。按权限推送至科室负责人和财务管理层。",
+      "agentRef": "revenue-optimizer",
+      "dependentTasks": ["task-5", "task-8", "task-13", "task-14"],
+      "requiredIntegrations": ["数据分析平台", "报告系统"]
+    },
+    {
+      "id": "task-16",
+      "title": "住院期间实时费用监控",
+      "type": "agent",
+      "prompt": "对在院病例执行实时费用监控（每日批次处理）。操作：1)每日汇总各在院病例已发生费用和费用增长趋势；2)基于入院DRG预分组结果和支付标准设定预警线；3)计算当前费用占支付标准的比例并预估出院总费用；4)达到预警阈值时触发通知流程；5)对长住院日病例（超过DRG标准住院日150%）单独标记监控。此任务与出院流程并行执行，为在院病例提供前瞻性费用管理支持。",
+      "agentRef": "revenue-optimizer",
+      "dependentTasks": [],
+      "requiredIntegrations": ["HIS系统", "费用系统", "DRG预分组引擎"]
+    }
+  ],
+  "variables": [
+    {
+      "variableId": "var-1",
+      "name": "caseId",
+      "variableType": "string",
+      "description": "住院病例唯一标识",
+      "required": true
+    },
+    {
+      "variableId": "var-2",
+      "name": "patientId",
+      "variableType": "string",
+      "description": "患者标识",
+      "required": true
+    },
+    {
+      "variableId": "var-3",
+      "name": "departmentId",
+      "variableType": "string",
+      "description": "科室代码",
+      "required": true
+    },
+    {
+      "variableId": "var-4",
+      "name": "drgCode",
+      "variableType": "string",
+      "description": "DRG分组代码",
+      "required": false
+    },
+    {
+      "variableId": "var-5",
+      "name": "paymentStandard",
+      "variableType": "number",
+      "description": "DRG支付标准金额（元）",
+      "required": false
+    },
+    {
+      "variableId": "var-6",
+      "name": "actualCost",
+      "variableType": "number",
+      "description": "实际发生费用总额（元）",
+      "required": false
+    },
+    {
+      "variableId": "var-7",
+      "name": "insuranceType",
+      "variableType": "string",
+      "description": "医保类型（城镇职工/居民/新农合/自费）",
+      "required": true
+    },
+    {
+      "variableId": "var-8",
+      "name": "alertLevel",
+      "variableType": "string",
+      "description": "费用预警级别（none/yellow/orange/red）",
+      "required": false
+    }
+  ]
+}

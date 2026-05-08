@@ -1,0 +1,199 @@
+{
+  "title": "创意素材全链路生成工作流",
+  "description": "从需求接入到素材交付的完整创意素材生成流程，覆盖需求解析、任务拆解、提示词优化、批量生成、质量评估、安全检查和最终交付七大环节，支持质量闭环重生成和人工介入升级机制。",
+  "tasks": [
+    {
+      "id": "task-1",
+      "title": "需求接入与结构化解析",
+      "type": "agent",
+      "prompt": "接收用户提交的原始创意素材需求（文字描述、参考图片、品牌Brief等），执行四要素完整度检查（目标受众、使用场景、品牌规范、输出规格）。如果缺失超过1项，生成结构化澄清问题清单并暂停等待补充；如果信息完整或仅缺失1项，进行意图理解和约束条件提取，输出标准化的结构化需求文档（JSON格式），包含意图摘要、创意方向、品牌约束和输出规格。",
+      "agentRef": "creative-planner",
+      "dependentTasks": [],
+      "requiredIntegrations": ["brand-asset-library"]
+    },
+    {
+      "id": "task-2",
+      "title": "需求完整度判定",
+      "type": "condition",
+      "prompt": "判断需求完整度检查结果：如果四要素中缺失超过1项，流程进入等待人工补充分支；如果需求完整（缺失≤1项），流程继续到任务拆解环节。判定依据为结构化需求文档中的completeness_score字段，≥75分视为完整可继续。",
+      "agentRef": "creative-planner",
+      "dependentTasks": ["task-1"],
+      "requiredIntegrations": []
+    },
+    {
+      "id": "task-3",
+      "title": "任务拆解与生产计划制定",
+      "type": "agent",
+      "prompt": "基于已完成的结构化需求文档，执行任务拆解：识别任务类型（单图/系列/Campaign/批量），将需求分解为可独立执行的子任务，每个子任务明确描述、优先级、推荐模型、预期规格和验收标准。制定生产计划包括时间线编排、并发策略、成本预估和风险预案。识别需要人工确认的关键创意决策点（品牌主KV/新品首发），标记requires_human_confirmation。",
+      "agentRef": "creative-planner",
+      "dependentTasks": ["task-2"],
+      "requiredIntegrations": ["model-registry", "brand-asset-library"]
+    },
+    {
+      "id": "task-4",
+      "title": "关键创意决策判定",
+      "type": "condition",
+      "prompt": "判断当前任务是否涉及关键创意决策需要人工确认：品牌主KV创意方向、新品首发素材风格、品牌形象变更、全新风格方向的首次尝试等场景需要人工确认后才能继续；常规批量任务（重复性商品图/日常运营素材）可直接进入提示词生成环节。依据任务清单中的requires_human_confirmation字段判定。",
+      "agentRef": "creative-planner",
+      "dependentTasks": ["task-3"],
+      "requiredIntegrations": []
+    },
+    {
+      "id": "task-5",
+      "title": "提示词生成与模型路由",
+      "type": "agent",
+      "prompt": "接收创意规划师分发的子任务列表，为每个子任务生成优化的AI模型提示词。每条提示词必须包含四个模块：主体描述（Subject）、风格定义（Style）、构图指导（Composition）、负向约束（Negative）。执行模型路由决策——根据任务类型和质量等级选择最优模型（写实→Flux Pro，插画→Midjourney V6，商品图→Nova Canvas，文字→DALL-E 3）。配置完整生成参数（尺寸/步数/CFG/采样器）。进行置信度评估：高置信度直接输出，中置信度建议生成多版本A/B测试方案，低置信度建议人工确认。",
+      "agentRef": "prompt-engineer",
+      "dependentTasks": ["task-4"],
+      "requiredIntegrations": ["prompt-template-library", "model-registry"]
+    },
+    {
+      "id": "task-6",
+      "title": "提示词置信度判定",
+      "type": "condition",
+      "prompt": "判断提示词工程师输出的置信度评估结果：高置信度（confidence≥0.8）直接进入生成执行环节；中置信度（0.5-0.8）需要先执行A/B测试样本生成再全量投入；低置信度（<0.5）需要回到创意规划师重新评估方向或触发人工确认。",
+      "agentRef": "prompt-engineer",
+      "dependentTasks": ["task-5"],
+      "requiredIntegrations": []
+    },
+    {
+      "id": "task-7",
+      "title": "批量素材生成执行",
+      "type": "agent",
+      "prompt": "接收提示词工程师输出的完整生成指令（提示词+模型+参数配置），构建执行任务队列。采用分批策略：先执行10% Pilot批次验证通过率，Pilot通过率≥70%后全量投入。并发度控制在5-10（根据模型API限制动态调整）。实时监控执行状态——成功率>90%正常继续，<80%告警降并发，<70%暂停批次。处理异常：超时重试（最多3次）→切备用模型→3次失败标记跳过。所有生成结果保存完整元数据（时间/模型/提示词/参数/耗时/成本）。输出批次执行报告。",
+      "agentRef": "asset-synthesizer",
+      "dependentTasks": ["task-6"],
+      "requiredIntegrations": ["flux-api", "dalle-api", "midjourney-api", "nova-canvas-api", "runway-api"]
+    },
+    {
+      "id": "task-8",
+      "title": "生成异常处理判定",
+      "type": "condition",
+      "prompt": "判断批量生成的执行结果：如果整体成功率≥70%，将成功生成的素材提交质量评估；如果成功率<70%或出现模型服务不可用等严重异常，暂停批次并通知创意规划师重新评估方案（可能需要切换模型或调整提示词策略）。同时检查是否有配额耗尽需要切换模型的情况。",
+      "agentRef": "asset-synthesizer",
+      "dependentTasks": ["task-7"],
+      "requiredIntegrations": []
+    },
+    {
+      "id": "task-9",
+      "title": "多维度质量评估",
+      "type": "agent",
+      "prompt": "对生成完成的素材进行系统化质量评估。评估三个核心维度：技术质量（分辨率/清晰度/AI伪影/色彩/光照，权重40%）和创意匹配度（需求契合/风格一致/美学评分/品牌符合度，权重60%），计算综合评分。逐项检查AI常见伪影（手指变形/面部扭曲/文字乱码/重复纹理/接缝痕迹）。对比原始需求文档评估匹配度。虚拟试穿任务额外评估人物一致性（面部/体型/肤色，要求≥8分）。每个评分项须有具体扣分理由。输出标准化质量评估报告。",
+      "agentRef": "quality-inspector",
+      "dependentTasks": ["task-8"],
+      "requiredIntegrations": ["quality-baseline-db"]
+    },
+    {
+      "id": "task-10",
+      "title": "质量评分判定与分流",
+      "type": "condition",
+      "prompt": "根据质量评估结果进行分流决策：综合评分≥7.0且无安全红线→通过，进入安全合规检查；综合评分<7.0且当前素材重生成次数<3次→退回提示词工程师重生成（附带失败原因分析和改进建议）；综合评分<7.0且重生成次数已达3次→升级人工介入；发现安全红线问题→直接拒绝不进入重生成。",
+      "agentRef": "quality-inspector",
+      "dependentTasks": ["task-9"],
+      "requiredIntegrations": []
+    },
+    {
+      "id": "task-11",
+      "title": "安全合规检查",
+      "type": "agent",
+      "prompt": "对通过质量评估的素材执行全面安全合规检查，覆盖五大维度：政治敏感性（国旗/地图/领导人/政治符号）、色情暴力（裸露/血腥/恐怖/自残）、知识产权（商标/IP/名人肖像/版权作品）、广告法合规（极限词/虚假承诺/特殊行业限制，仅适用于含文字素材）、个人信息保护（可识别人脸/隐私泄露）。输出安全检查报告含置信度评分：高置信度安全（>0.95）自动放行，中置信度（0.7-0.95）标记风险点建议人工复核，触发红线直接拒绝。",
+      "agentRef": "quality-inspector",
+      "dependentTasks": ["task-10"],
+      "requiredIntegrations": ["content-safety-api", "compliance-review-system"]
+    },
+    {
+      "id": "task-12",
+      "title": "安全检查结果判定",
+      "type": "condition",
+      "prompt": "根据安全合规检查结果进行最终分流：安全通过（高置信度放行）→进入后处理和交付环节；中风险标记→转人工复核确认后决定放行或拒绝；触发安全红线→直接拒绝并上报审核系统，记录违规类型和详情，不允许重生成（需要从源头调整创意方向）。",
+      "agentRef": "quality-inspector",
+      "dependentTasks": ["task-11"],
+      "requiredIntegrations": []
+    },
+    {
+      "id": "task-13",
+      "title": "后处理与多平台适配",
+      "type": "agent",
+      "prompt": "对通过全部检查的素材执行后处理流水线：根据输出规格需求进行多尺寸适配裁切（基于主体检测的智能裁切）、格式转换（PNG/JPG/WebP按目标平台要求）、质量增强（超分辨率放大/锐化/降噪，如需要）、品牌元素叠加（logo水印/品牌色条，如需要）。执行文件规范化命名，生成预览缩略图，写入EXIF元数据。按标准文件夹结构组织交付物并打包。",
+      "agentRef": "asset-synthesizer",
+      "dependentTasks": ["task-12"],
+      "requiredIntegrations": ["image-processing-service", "asset-management-system"]
+    },
+    {
+      "id": "task-14",
+      "title": "素材交付与归档",
+      "type": "document",
+      "prompt": "完成最终素材交付：将处理完成的素材包写入资产管理系统，关联到对应的需求单和campaign。生成交付清单文档（含所有素材预览、规格信息、生成元数据）。通知需求方交付完成并提供资产库访问链接。记录完整的生产过程日志（从需求到交付的全链路追踪数据）用于后续分析和溯源。更新批次统计数据（产出量/通过率/成本/耗时）供质量趋势分析使用。",
+      "agentRef": "creative-planner",
+      "dependentTasks": ["task-13"],
+      "requiredIntegrations": ["asset-management-system", "notification-service"]
+    },
+    {
+      "id": "task-15",
+      "title": "质量趋势分析与优化建议",
+      "type": "agent",
+      "prompt": "在批次交付完成后，汇总本批次的质量数据进行趋势分析。按模型、任务类型、提示词模板等维度统计通过率和平均分。对比历史基线识别质量趋势（上升/稳定/下降）。分析失败案例的共性模式（最常见的失败原因Top 5）。如果发现系统性问题（某模型质量突降/某类任务持续低分），输出优化建议并通知相关Agent。更新质量基线数据库。当周均分低于7.5时自动触发流程复盘通知。",
+      "agentRef": "quality-inspector",
+      "dependentTasks": ["task-14"],
+      "requiredIntegrations": ["quality-baseline-db", "analytics-dashboard"]
+    }
+  ],
+  "variables": [
+    {
+      "variableId": "var-1",
+      "name": "rawRequirement",
+      "variableType": "string",
+      "description": "用户提交的原始创意需求描述文本",
+      "required": true
+    },
+    {
+      "variableId": "var-2",
+      "name": "referenceImages",
+      "variableType": "string",
+      "description": "用户提供的参考图片URL列表（JSON数组格式）",
+      "required": false
+    },
+    {
+      "variableId": "var-3",
+      "name": "brandId",
+      "variableType": "string",
+      "description": "品牌资产库中的品牌ID，用于引用品牌规范",
+      "required": false
+    },
+    {
+      "variableId": "var-4",
+      "name": "outputSpecs",
+      "variableType": "string",
+      "description": "输出规格要求（尺寸/格式/数量/分辨率，JSON格式）",
+      "required": true
+    },
+    {
+      "variableId": "var-5",
+      "name": "qualityTier",
+      "variableType": "string",
+      "description": "质量等级：flagship（旗舰级）/standard（标准级）/draft（草稿级）",
+      "required": true
+    },
+    {
+      "variableId": "var-6",
+      "name": "deadline",
+      "variableType": "string",
+      "description": "交付截止时间（ISO 8601格式）",
+      "required": false
+    },
+    {
+      "variableId": "var-7",
+      "name": "budgetLimit",
+      "variableType": "string",
+      "description": "总预算上限（美元），用于模型路由的成本约束",
+      "required": false
+    },
+    {
+      "variableId": "var-8",
+      "name": "targetPlatforms",
+      "variableType": "string",
+      "description": "目标投放平台列表（如：淘宝/抖音/小红书），影响尺寸适配",
+      "required": false
+    }
+  ]
+}

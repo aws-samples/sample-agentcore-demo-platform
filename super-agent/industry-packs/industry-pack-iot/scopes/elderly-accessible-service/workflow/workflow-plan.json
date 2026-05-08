@@ -1,0 +1,217 @@
+{
+  "title": "适老化与无障碍服务工作流",
+  "description": "覆盖老年用户适老交互、健康安全守护、用药提醒、家属协同四大核心流程的完整工作流，确保老人在智能家居场景下获得安全、便捷、有尊严的服务体验。",
+  "tasks": [
+    {
+      "id": "task-1",
+      "title": "语音输入接收与方言识别",
+      "type": "agent",
+      "prompt": "接收老人的语音输入（ASR引擎输出文本），执行方言类型判定（粤语/四川话/上海话/东北话/闽南语等），将方言文本转换为标准普通话文本。输出标准化文本、方言类型标签和转换置信度评分。若识别置信度低于60%，标记为需要额外处理的片段。对同一用户记忆其方言类型避免重复判定。",
+      "agentRef": "elder-interaction",
+      "dependentTasks": [],
+      "requiredIntegrations": ["ASR语音识别引擎", "方言词汇映射库"]
+    },
+    {
+      "id": "task-2",
+      "title": "模糊表达意图推断",
+      "type": "agent",
+      "prompt": "基于标准化后的文本，融合以下上下文信息进行意图推断：(1)最近10次交互历史；(2)当前时间和场景；(3)当前所有设备状态（开/关/参数）；(4)用户个人习惯模型。生成Top-3候选意图列表，每个候选附带置信度评分和推断依据。输出标准化意图结构：{target_device, action, parameters, confidence}。",
+      "agentRef": "elder-interaction",
+      "dependentTasks": ["task-1"],
+      "requiredIntegrations": ["设备状态API", "用户习惯模型存储"]
+    },
+    {
+      "id": "task-3",
+      "title": "意图置信度决策判断",
+      "type": "condition",
+      "prompt": "评估意图推断的置信度分数：如果最高候选置信度>=80%，判定为'意图明确'，直接进入执行流程；如果置信度在60%-80%之间，判定为'需要引导确认'，生成友好的引导确认语句；如果置信度<60%，判定为'高度不确定'，需要提供Top-2选项供老人选择。",
+      "agentRef": "elder-interaction",
+      "dependentTasks": ["task-2"],
+      "requiredIntegrations": []
+    },
+    {
+      "id": "task-4",
+      "title": "语音引导确认交互",
+      "type": "agent",
+      "prompt": "当意图不明确时，生成面向老人的语音引导确认播报。要求：使用简单词汇、句式简短（不超过15字）、语气温和亲切（如'您是想关卧室的灯吗？'）。最多进行3轮引导，每轮等待用户响应（超时30秒）。3轮后仍不确定则提供最可能的2个选项供老人选择。记录引导过程中用户的确认/否定反馈用于习惯学习。",
+      "agentRef": "elder-interaction",
+      "dependentTasks": ["task-3"],
+      "requiredIntegrations": ["TTS语音合成引擎"]
+    },
+    {
+      "id": "task-5",
+      "title": "设备控制指令执行",
+      "type": "action",
+      "prompt": "将确认的意图转换为设备控制指令，传递至智能家居控制域的设备调度控制器执行。等待执行结果反馈（超时500ms），确认设备ACK。如果执行失败，重试1次后返回失败状态。记录执行结果用于后续播报。",
+      "agentRef": "elder-interaction",
+      "dependentTasks": ["task-3", "task-4"],
+      "requiredIntegrations": ["设备调度控制器API", "设备注册表"]
+    },
+    {
+      "id": "task-6",
+      "title": "执行结果语音播报",
+      "type": "agent",
+      "prompt": "将设备控制执行结果转换为面向老人的友好语音播报。成功时明确告知：称谓+操作结果（如'张爷爷，已经帮您关掉卧室的灯了'）；失败时用通俗语言解释：'那个电器好像没反应，要不我帮您试试别的方法？'。语速配置为正常的70-80%，音量根据环境自适应。",
+      "agentRef": "elder-interaction",
+      "dependentTasks": ["task-5"],
+      "requiredIntegrations": ["TTS语音合成引擎", "环境噪音传感器"]
+    },
+    {
+      "id": "task-7",
+      "title": "多源健康数据持续采集",
+      "type": "agent",
+      "prompt": "7×24小时持续采集多源数据：穿戴设备数据（心率每5分钟/血压每日定时/血氧连续/步数累计）、家居传感器数据（人体红外实时/门磁实时/用水每小时/用电每小时）、AI视觉数据（跌倒检测实时/姿态分析实时）。执行数据清洗（去噪/插值/异常值标记）、与个人基线对比计算偏差度。",
+      "agentRef": "health-safety-guardian",
+      "dependentTasks": [],
+      "requiredIntegrations": ["穿戴设备数据接口", "家居传感器网关", "AI视觉分析模块"]
+    },
+    {
+      "id": "task-8",
+      "title": "异常级别评估与分级",
+      "type": "agent",
+      "prompt": "对采集的数据执行多级异常检测：(1)紧急指标检查——心率骤变(±40bpm)、血氧<90%、AI确认跌倒、48h无活动；(2)重要指标检查——连续2天作息偏移>2h、连续2次用药未确认、日活动量<基线30%；(3)轻度指标检查——单日偏差、睡眠质量下降、用水电异常。输出异常事件列表，每个事件包含级别、类型、数据证据、置信度。区分传感器故障和真实异常。",
+      "agentRef": "health-safety-guardian",
+      "dependentTasks": ["task-7"],
+      "requiredIntegrations": ["个人健康基线数据库"]
+    },
+    {
+      "id": "task-9",
+      "title": "紧急异常响应决策",
+      "type": "condition",
+      "prompt": "当检测到紧急级别异常时进入此决策节点。首先执行10秒语音确认（'请问您还好吗？如果没事请说一声'）。判断：如果老人回应'没事/还好'，取消紧急响应并记录事件；如果老人回应求助或10秒无回应，立即启动紧急呼叫流程。对用户主动求助（'救命/帮帮我'）和物理紧急按钮，跳过确认直接响应。",
+      "agentRef": "health-safety-guardian",
+      "dependentTasks": ["task-8"],
+      "requiredIntegrations": ["语音交互模块", "紧急按钮硬件接口"]
+    },
+    {
+      "id": "task-10",
+      "title": "紧急呼叫执行",
+      "type": "agent",
+      "prompt": "紧急事件确认后5秒内发起多通道呼叫：(1)拨打第一紧急联系人；(2)发送短信至所有紧急联系人（含事件描述和位置）；(3)拨打120急救电话（如配置启用）；(4)APP推送紧急告警至所有家属。联系人15秒未接听则拨打下一位。所有联系人未接听时每2分钟重试（最多10次）。同时：开启摄像头记录、持续语音安抚老人（'别着急，已经帮您联系家人了'）。生成完整事件时间线报告。",
+      "agentRef": "health-safety-guardian",
+      "dependentTasks": ["task-9"],
+      "requiredIntegrations": ["电话呼叫模块", "短信网关", "APP推送服务", "摄像头控制", "4G/5G蜂窝备份通道"]
+    },
+    {
+      "id": "task-11",
+      "title": "用药提醒触发",
+      "type": "agent",
+      "prompt": "到达服药计划中的预定时间，发起语音提醒。播报内容包含：称谓+药品通俗名+剂量+外观描述+服用方式（如'张爷爷，现在该吃降压药了。白色圆形小药片，一片，用温水送服'）。检查老人当前状态：若正在睡眠中且非紧急用药，延迟5分钟后重试。提醒后开始30分钟确认等待计时。",
+      "agentRef": "health-safety-guardian",
+      "dependentTasks": [],
+      "requiredIntegrations": ["用药计划数据库", "TTS语音合成引擎", "人体活动检测"]
+    },
+    {
+      "id": "task-12",
+      "title": "用药确认跟踪与升级",
+      "type": "condition",
+      "prompt": "监测用药确认状态：接受语音确认（'吃了/好了/知道了'）、确认按钮、药盒开启传感器三种确认方式。判断：如果30分钟内收到确认→记录服药时间戳并结束；如果超时未确认→发起二次提醒（语调略加紧迫但仍温和）；二次提醒后15分钟仍未确认→通知主要家属（APP推送含药品名和已过时长）；连续2次未确认→标记为重要异常纳入健康监测。",
+      "agentRef": "health-safety-guardian",
+      "dependentTasks": ["task-11"],
+      "requiredIntegrations": ["用药确认传感器", "APP推送服务"]
+    },
+    {
+      "id": "task-13",
+      "title": "隐私配置前置检查",
+      "type": "agent",
+      "prompt": "在任何通知发送或数据推送前，执行隐私配置校验。读取老人当前的隐私配置（模式:宽松/标准/详细 + 自定义屏蔽项），确认待推送的数据类型是否在允许范围内。对不允许的数据类型进行过滤，仅保留老人授权的内容。紧急安全类数据不受隐私配置限制（生命安全优先）。输出过滤后的可推送数据集和被屏蔽的数据类型。",
+      "agentRef": "family-coordinator",
+      "dependentTasks": ["task-8", "task-12"],
+      "requiredIntegrations": ["隐私配置数据库"]
+    },
+    {
+      "id": "task-14",
+      "title": "分级通知策略执行",
+      "type": "agent",
+      "prompt": "根据异常事件级别执行对应的通知策略。紧急事件：同时通过电话+短信+APP推送通知所有紧急联系人，确保100%触达。重要事件：仅APP推送通知主要家属（配置为重要接收人的成员），附带异常摘要和建议措施；若24小时APP未读则升级为短信。轻度事件：不单独通知，汇总至下一期日报/周报。执行后记录通知发送状态和已读/回执情况。同一类型重要事件24小时内不重复推送。",
+      "agentRef": "family-coordinator",
+      "dependentTasks": ["task-13"],
+      "requiredIntegrations": ["电话呼叫模块", "短信网关", "APP推送服务"]
+    },
+    {
+      "id": "task-15",
+      "title": "家属远程操作处理",
+      "type": "agent",
+      "prompt": "处理家属发起的远程操作请求。执行流程：(1)验证请求者登录状态和设备绑定；(2)确认请求者角色和权限级别；(3)检查目标操作是否在老人允许的远程控制范围内；(4)敏感操作（摄像头/门锁）触发二次验证；(5)权限通过后下发设备控制指令；(6)操作完成后通知老人（'您的女儿帮您把空调调到了26度'）。静默期（22:00-7:00）非紧急操作自动延迟。本地操作优先——老人正在操作的设备不可被远程覆盖。",
+      "agentRef": "family-coordinator",
+      "dependentTasks": [],
+      "requiredIntegrations": ["身份认证服务", "设备调度控制器API", "TTS语音合成引擎"]
+    },
+    {
+      "id": "task-16",
+      "title": "周期健康报告生成",
+      "type": "document",
+      "prompt": "按日/周/月周期自动生成面向家属的健康报告。报告结构：(1)整体健康评分(1-100分)+趋势；(2)关键指标摘要（心率/血压/睡眠/活动量/用药依从性）；(3)本期亮点（积极变化,如步数增加）；(4)关注点（需注意的指标）；(5)异常事件回顾（如有）；(6)用药依从性统计。报告中必须包含积极信息以让家属安心。按老人隐私配置过滤敏感数据。支持PDF导出供就医参考。按配置时间推送（如每日8:00、每周一9:00）。",
+      "agentRef": "family-coordinator",
+      "dependentTasks": ["task-7", "task-8"],
+      "requiredIntegrations": ["健康数据存储", "报告模板引擎", "PDF生成服务", "APP推送服务"]
+    },
+    {
+      "id": "task-17",
+      "title": "交互异常上报与联动",
+      "type": "agent",
+      "prompt": "监测老人的交互行为异常信号：连续重试超过3次、长时间沉默超过30秒、语音情绪异常（声音颤抖/哭泣/呼喊）。当检测到交互困难时，输出异常信号至健康安全守护器进行综合评估——交互困难可能暗示身体不适或认知障碍加重。同时温和询问老人是否需要帮助（'您是不是不舒服？要不要我帮您叫家人？'）。",
+      "agentRef": "elder-interaction",
+      "dependentTasks": ["task-4"],
+      "requiredIntegrations": ["情绪识别模块", "人体活动检测"]
+    }
+  ],
+  "variables": [
+    {
+      "variableId": "var-1",
+      "name": "elderUserProfile",
+      "variableType": "object",
+      "description": "老人用户档案，包含姓名、称谓、方言类型、听力水平、慢性病信息、紧急联系人列表",
+      "required": true
+    },
+    {
+      "variableId": "var-2",
+      "name": "medicationPlan",
+      "variableType": "object",
+      "description": "用药计划，包含药品列表、服用时间表、剂量、外观描述、约束条件",
+      "required": true
+    },
+    {
+      "variableId": "var-3",
+      "name": "healthBaseline",
+      "variableType": "object",
+      "description": "个人健康基线数据，包含心率/血压/作息/活动量等正常范围（基于7天以上历史数据计算）",
+      "required": true
+    },
+    {
+      "variableId": "var-4",
+      "name": "privacyConfig",
+      "variableType": "object",
+      "description": "老人隐私配置，包含通知模式（宽松/标准/详细）、自定义屏蔽项、家属权限级别",
+      "required": true
+    },
+    {
+      "variableId": "var-5",
+      "name": "emergencyContacts",
+      "variableType": "array",
+      "description": "紧急联系人列表，包含姓名、关系、电话、接收通知级别、是否为主要联系人",
+      "required": true
+    },
+    {
+      "variableId": "var-6",
+      "name": "deviceStateMap",
+      "variableType": "object",
+      "description": "全屋设备实时状态映射，包含设备ID、名称、当前状态、所在房间、是否允许远程控制",
+      "required": true
+    },
+    {
+      "variableId": "var-7",
+      "name": "interactionHistory",
+      "variableType": "array",
+      "description": "最近交互历史记录（最近10次），包含时间戳、原始表达、解析意图、执行结果",
+      "required": false
+    },
+    {
+      "variableId": "var-8",
+      "name": "anomalyAlertLevel",
+      "variableType": "string",
+      "description": "当前异常告警级别：emergency(紧急)/important(重要)/mild(轻度)/normal(正常)",
+      "required": false
+    }
+  ]
+}

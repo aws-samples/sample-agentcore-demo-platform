@@ -1,6 +1,6 @@
 {
   "version": "1.0.0",
-  "generatedAt": "2025-05-06T15:39:00.000Z",
+  "generatedAt": "2025-05-07T12:00:00.000Z",
   "generator": "super-agent-batch-v2",
   "industry": {
     "id": "customer-service",
@@ -9,12 +9,12 @@
     "color": "#EC4899"
   },
   "stats": {
-    "scopeCount": 3,
-    "agentCount": 11,
-    "skillCount": 40,
-    "workflowCount": 3,
+    "scopeCount": 4,
+    "agentCount": 15,
+    "skillCount": 52,
+    "workflowCount": 4,
     "twinCount": 1,
-    "sopCount": 3
+    "sopCount": 4
   },
   "scopes": [
     {
@@ -94,6 +94,32 @@
         "search-optimization",
         "template-based-authoring",
         "usage-data-analysis"
+      ],
+      "hasWorkflow": true,
+      "hasSop": true
+    },
+    {
+      "dirName": "cross-border-vertical-service",
+      "name": "跨境与行业垂直客服",
+      "agents": [
+        "multiplatform-gateway",
+        "vertical-business-processor",
+        "cross-border-analytics",
+        "opportunity-tracker"
+      ],
+      "skills": [
+        "automated-marketing-followup",
+        "cross-border-data-analytics",
+        "cross-session-memory-management",
+        "intent-scoring-engine",
+        "mcp-tool-orchestration",
+        "multiplatform-message-routing",
+        "opportunity-signal-detection",
+        "platform-health-surveillance",
+        "policy-engine-execution",
+        "realtime-translation",
+        "smart-scheduling",
+        "translation-quality-monitoring"
       ],
       "hasWorkflow": true,
       "hasSop": true

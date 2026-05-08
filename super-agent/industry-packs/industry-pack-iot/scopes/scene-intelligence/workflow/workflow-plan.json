@@ -1,0 +1,172 @@
+{
+  "title": "场景智能与主动感知决策流程",
+  "description": "从环境数据采集、用户偏好学习到LLM场景推理决策的端到端智能流程，覆盖数据融合、触发判断、多用户协商、能耗优化和反馈闭环的完整链路。",
+  "tasks": [
+    {
+      "id": "task-1",
+      "title": "传感器数据采集与清洗",
+      "type": "agent",
+      "prompt": "从全屋传感器网关拉取最新一轮原始数据（温湿度/光照/人体感应/空气质量/噪音/门窗磁），按照预设采集频率检查数据完整性。对原始数据执行去噪处理（卡尔曼滤波/移动平均）、缺失值插值（线性或样条，缺失率>5%标记不可信）、异常值过滤（物理范围硬约束+3σ统计约束+突变速率约束）。输出清洗后的各传感器读数集合，附带每个传感器的数据质量状态标记。",
+      "agentRef": "environment-perceiver",
+      "dependentTasks": [],
+      "requiredIntegrations": ["sensor-gateway", "zigbee-hub", "wifi-devices"]
+    },
+    {
+      "id": "task-2",
+      "title": "外部数据源集成与上下文增强",
+      "type": "agent",
+      "prompt": "获取外部环境数据增强室内传感器上下文：调用天气API获取当前及未来24小时预报（温度/湿度/风速/降水/AQI）、计算当日日出日落及当前太阳高度角、查询当前电价时段（峰/平/谷）及下次切换时间、读取用户日历获取未来2小时事件。对所有外部数据标注时效性和可靠性等级。API不可用时执行降级策略（使用缓存值+标记stale）。",
+      "agentRef": "environment-perceiver",
+      "dependentTasks": [],
+      "requiredIntegrations": ["weather-api", "electricity-tariff-api", "calendar-service"]
+    },
+    {
+      "id": "task-3",
+      "title": "多传感器数据融合与状态向量输出",
+      "type": "agent",
+      "prompt": "将清洗后的传感器数据与外部上下文数据进行融合计算：计算各房间体感温度PMV、综合舒适度指数、空间占用状态。生成标准化的环境状态向量JSON，计算数据质量评分（基于传感器在线率和完整度），计算与上一次输出的delta变化值。输出完整的环境状态向量供下游使用。",
+      "agentRef": "environment-perceiver",
+      "dependentTasks": ["task-1", "task-2"],
+      "requiredIntegrations": []
+    },
+    {
+      "id": "task-4",
+      "title": "环境变化触发阈值判断",
+      "type": "condition",
+      "prompt": "评估环境状态向量的delta变化是否超过触发阈值：温度变化>2°C、光照变化>30%、空气质量评分变化>0.2、人员在位状态变化。同时检查时间触发条件（是否接近用户作息时间点±5分钟）和事件触发条件（天气突变预警/日历事件即将开始）。如果任一触发条件满足且通过防抖校验（变化持续≥3分钟），则进入场景推理流程；否则继续监测。",
+      "agentRef": "environment-perceiver",
+      "dependentTasks": ["task-3"],
+      "requiredIntegrations": []
+    },
+    {
+      "id": "task-5",
+      "title": "获取当前用户偏好参数",
+      "type": "agent",
+      "prompt": "基于当前身份识别结果确定在场成员列表，加载各成员的最新偏好模型参数。对每位成员输出：当前场景下的温度偏好、光照偏好、空气质量偏好及各维度置信度评分。标注模型状态（学习中/稳定/检测到漂移）。如果处于冷启动期，输出默认值并标注来源（问卷/群体统计/行业标准）。",
+      "agentRef": "preference-learner",
+      "dependentTasks": ["task-4"],
+      "requiredIntegrations": ["identity-recognition-service"]
+    },
+    {
+      "id": "task-6",
+      "title": "LLM场景推理与参数方案生成",
+      "type": "agent",
+      "prompt": "融合环境状态向量、用户偏好参数、时间上下文和事件上下文，执行LLM场景推理：识别当前应处于的场景类型（起床/离家/回家/工作/用餐/休闲/睡眠等），计算该场景下各设备（空调/灯光/窗帘/空气净化）的最优参数组合。生成完整的设备参数推荐方案，包含目标设备、操作参数、执行优先级。",
+      "agentRef": "scene-reasoner",
+      "dependentTasks": ["task-3", "task-5"],
+      "requiredIntegrations": ["llm-inference-service"]
+    },
+    {
+      "id": "task-7",
+      "title": "多用户偏好冲突检测与协商",
+      "type": "condition",
+      "prompt": "检查当前在场成员的偏好是否存在冲突（温度差>2°C或场景偏好不一致）。如果检测到冲突，按优先级应用协商策略：安全健康优先→活跃用户优先→主账户优先→加权中间值。如果无冲突，直接通过。输出协商后的最终参数方案，记录协商策略和预估各成员满意度。",
+      "agentRef": "scene-reasoner",
+      "dependentTasks": ["task-6"],
+      "requiredIntegrations": []
+    },
+    {
+      "id": "task-8",
+      "title": "能耗优化修正",
+      "type": "agent",
+      "prompt": "对场景推荐方案应用能耗优化修正：检查当前电价时段，如果处于峰电时段则对非紧急高耗设备应用节能策略（空调+1°C制冷/-1°C制热、非紧急负载延迟至谷电）。检查月度能耗预算消耗进度，超前时加强限制。生成低能耗替代方案建议。计算节能预估金额。确保修正不超过用户设定的最大偏差容忍度，且不影响安全和健康需求。",
+      "agentRef": "scene-reasoner",
+      "dependentTasks": ["task-7"],
+      "requiredIntegrations": ["energy-monitoring-service"]
+    },
+    {
+      "id": "task-9",
+      "title": "置信度评估与执行策略决定",
+      "type": "condition",
+      "prompt": "计算最终推荐方案的置信度评分：数据质量权重(0.3)×数据质量评分 + 偏好匹配权重(0.4)×偏好模型置信度 + 场景确定性权重(0.3)×场景识别确定性。根据置信度决定执行策略：>=0.85自动执行、0.6-0.85请求用户确认、<0.6不执行仅记录。对于需确认的方案，生成人类可读的推荐理由文本。",
+      "agentRef": "scene-reasoner",
+      "dependentTasks": ["task-8"],
+      "requiredIntegrations": []
+    },
+    {
+      "id": "task-10",
+      "title": "控制指令集输出与下发",
+      "type": "document",
+      "prompt": "将最终确认的推荐方案转换为标准化的控制指令集JSON格式，包含：目标设备ID、操作类型、参数值、执行优先级、置信度评分、推荐理由。按设备执行顺序排列（主设备→辅助设备→缓慢生效设备）。如有延迟执行项（如峰电结束后恢复温度），生成定时指令。将指令集发送至设备调度控制器。",
+      "agentRef": "scene-reasoner",
+      "dependentTasks": ["task-9"],
+      "requiredIntegrations": ["device-dispatcher-api"]
+    },
+    {
+      "id": "task-11",
+      "title": "反馈监测与偏好模型更新",
+      "type": "agent",
+      "prompt": "场景执行完成后启动5分钟反馈监测窗口，监听用户手动设备调整事件。如果检测到用户手动调整（即负反馈）：记录推荐值与用户实际值的差异、当时的完整环境上下文，使用高学习率(α=0.6)即时增量更新偏好模型。如果连续3次同场景被覆盖，触发该维度的深度重学习评估。更新后重新计算模型置信度。如果5分钟内无调整，记录为正向反馈（用户接受），以正常学习率(α=0.2)强化当前模型。",
+      "agentRef": "preference-learner",
+      "dependentTasks": ["task-10"],
+      "requiredIntegrations": ["device-event-stream"]
+    },
+    {
+      "id": "task-12",
+      "title": "异常数据降级处理",
+      "type": "agent",
+      "prompt": "当传感器数据异常检测触发时执行降级处理：单传感器异常→标记该传感器不可信+使用7天同时段历史均值替代+生成维修通知；多传感器同时异常→判定为网关故障+全量降级+紧急告警；数据质量评分<0.7→降低场景推理置信度+增加用户确认要求。所有降级处理记录完整日志。通知设备控制域的状态同步监控器排查故障原因。",
+      "agentRef": "environment-perceiver",
+      "dependentTasks": ["task-1"],
+      "requiredIntegrations": ["maintenance-notification-service"]
+    }
+  ],
+  "variables": [
+    {
+      "variableId": "var-1",
+      "name": "environmentStateVector",
+      "variableType": "object",
+      "description": "环境状态向量，包含各房间传感器融合数据、舒适度指数、数据质量评分和delta变化值",
+      "required": true
+    },
+    {
+      "variableId": "var-2",
+      "name": "userPreferences",
+      "variableType": "object",
+      "description": "当前在场成员的偏好参数集合，含各维度偏好值和置信度评分",
+      "required": true
+    },
+    {
+      "variableId": "var-3",
+      "name": "confidenceThreshold",
+      "variableType": "number",
+      "description": "场景推荐自动执行的置信度阈值，默认0.85",
+      "required": true
+    },
+    {
+      "variableId": "var-4",
+      "name": "currentElectricityPeriod",
+      "variableType": "string",
+      "description": "当前电价时段标识：peak(峰)/flat(平)/valley(谷)",
+      "required": true
+    },
+    {
+      "variableId": "var-5",
+      "name": "presentMembers",
+      "variableType": "array",
+      "description": "当前在场家庭成员列表，包含成员ID、身份识别置信度和所在房间",
+      "required": true
+    },
+    {
+      "variableId": "var-6",
+      "name": "triggerDeltaThresholds",
+      "variableType": "object",
+      "description": "触发场景推理的环境变化阈值配置：温度变化阈值(默认2°C)、光照变化阈值(默认30%)等",
+      "required": false
+    },
+    {
+      "variableId": "var-7",
+      "name": "monthlyEnergyBudget",
+      "variableType": "number",
+      "description": "用户设定的月度能耗预算(kWh)，用于能耗优化决策约束",
+      "required": false
+    },
+    {
+      "variableId": "var-8",
+      "name": "coldStartStatus",
+      "variableType": "object",
+      "description": "各用户的冷启动状态信息：是否在学习期、当前阶段、已收集数据天数",
+      "required": false
+    }
+  ]
+}

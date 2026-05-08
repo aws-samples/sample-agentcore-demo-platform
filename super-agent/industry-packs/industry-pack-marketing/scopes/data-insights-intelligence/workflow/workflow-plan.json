@@ -1,0 +1,183 @@
+{
+  "title": "数据洞察与决策智能工作流",
+  "description": "营销数据的全链路智能分析工作流，覆盖数据采集清洗、竞品监测、归因分析、爆款预测、自然语言查询响应和定期报告生成，为营销决策提供数据驱动的智能支撑。",
+  "tasks": [
+    {
+      "id": "task-1",
+      "title": "数据源健康检查与数据采集",
+      "type": "action",
+      "prompt": "执行每日数据源健康检查：逐一验证各广告平台API连接状态（Google Ads、Meta Ads、TikTok/巨量引擎、快手磁力引擎）、网站分析数据源（GA4）、CRM系统接口。检查数据完整性（对比近7天数据量均值，偏差>30%标记异常）、字段空值率（关键字段空值>5%标记异常）、数据时效性（延迟>2小时触发告警）。输出数据健康度评分（0-100分）和异常清单。如所有数据源健康，确认数据采集正常进行。",
+      "agentRef": "data-query-advisor",
+      "dependentTasks": [],
+      "requiredIntegrations": ["google-ads-api", "meta-ads-api", "tiktok-ads-api", "kuaishou-ads-api", "ga4-api", "crm-system"]
+    },
+    {
+      "id": "task-2",
+      "title": "数据清洗与异常流量检测",
+      "type": "action",
+      "prompt": "对采集到的原始数据执行清洗和异常检测：1)数据去重和格式统一化处理；2)识别跟踪代码失效时段（UTM参数缺失率突增、Pixel触发异常）；3)异常流量检测——基于IP集中度、设备重复率、点击时间分布、转化后行为缺失等特征识别作弊流量；4)数据缺失时段标记和处理（切换备用数据源或使用历史均值补全）。输出清洗后的干净数据集和异常数据隔离报告。",
+      "agentRef": "attribution-analyst",
+      "dependentTasks": ["task-1"],
+      "requiredIntegrations": ["data-warehouse"]
+    },
+    {
+      "id": "task-3",
+      "title": "数据健康状态判断",
+      "type": "condition",
+      "prompt": "评估数据健康检查和清洗结果：数据健康度评分是否≥80分？如果≥80分，数据质量满足分析要求，流程正常继续三个并行分支（竞品监测、归因分析、趋势预测）。如果<80分但≥60分，标记数据局限性后继续流程，但所有分析结果需附带数据质量声明。如果<60分，暂停依赖该数据的分析任务，触发紧急数据修复流程并告警数据工程团队。",
+      "agentRef": "data-query-advisor",
+      "dependentTasks": ["task-2"],
+      "requiredIntegrations": []
+    },
+    {
+      "id": "task-4",
+      "title": "竞品广告创意与策略监测",
+      "type": "agent",
+      "prompt": "执行每日竞品监测任务：1)扫描Top5核心竞品的广告透明度库，识别新增/下架素材，记录创意风格变化（视觉风格、文案策略、促销力度）；2)监测竞品社交媒体官方账号动态和互动数据变化；3)检查竞品电商旗舰店价格和促销变动；4)对检测到的变化进行评级——L1(常规更新)归档、L2(值得关注)记录待纳入周报、L3(重大事件)立即生成告警。如发现L3级变化，输出包含「竞品名称+变化类型+具体内容+潜在影响+建议应对」的即时告警。",
+      "agentRef": "market-intelligence",
+      "dependentTasks": ["task-3"],
+      "requiredIntegrations": ["meta-ad-library", "tiktok-creative-center", "social-media-api", "ecommerce-monitor"]
+    },
+    {
+      "id": "task-5",
+      "title": "多触点归因模型运行",
+      "type": "agent",
+      "prompt": "执行每日归因分析：1)整合昨日各渠道的转化路径数据（展示→点击→互动→转化完整链路）；2)使用当前主归因模型计算各渠道/广告组/创意的归因转化数和归因ROAS；3)对比归因ROAS与当前预算分配比例，识别偏差>15%的渠道；4)识别数据异常（跟踪失效时段、可疑归因劫持），标记受影响数据范围和潜在偏差；5)输出每日归因快报，如发现预算分配与归因结果显著不匹配，生成预算调整建议。",
+      "agentRef": "attribution-analyst",
+      "dependentTasks": ["task-3"],
+      "requiredIntegrations": ["google-ads-api", "meta-ads-api", "tiktok-ads-api", "ga4-api", "crm-system"]
+    },
+    {
+      "id": "task-6",
+      "title": "爆款趋势预测模型运行",
+      "type": "agent",
+      "prompt": "运行爆款预测模型：1)采集最新趋势信号——搜索量变化（百度指数、巨量算数）、社交热度（抖音热榜、小红书热门话题）、电商供给侧信号（同类商品上架激增、KOL密集种草）；2)提取信号特征向量，与历史爆款案例库进行模式匹配；3)运行预测模型输出爆款概率评分（0-100分）；4)对高置信度预测（>80分）生成即时行动建议，包含创意方向建议、最佳投放平台、建议切入时间窗口；5)对中等置信度预测（60-80分）加入观察清单。",
+      "agentRef": "market-intelligence",
+      "dependentTasks": ["task-3"],
+      "requiredIntegrations": ["baidu-index-api", "tiktok-trending", "xiaohongshu-api", "ecommerce-data"]
+    },
+    {
+      "id": "task-7",
+      "title": "归因与预算匹配度判断",
+      "type": "condition",
+      "prompt": "评估归因分析结果与当前预算分配的匹配度：各渠道归因ROAS排名与预算占比是否一致？具体判断标准：1)如果ROAS排名前3的渠道获得的预算占比≥60%，且无渠道ROAS<目标值50%连续获得高预算——判定为'匹配'，维持当前分配；2)如果存在高ROAS渠道预算不足或低ROAS渠道预算过高（偏差>15%）——判定为'不匹配'，需要生成预算调整建议推送给投放优化Scope。",
+      "agentRef": "attribution-analyst",
+      "dependentTasks": ["task-5"],
+      "requiredIntegrations": []
+    },
+    {
+      "id": "task-8",
+      "title": "生成预算调整建议",
+      "type": "document",
+      "prompt": "基于归因分析结果生成结构化预算调整建议：1)列出需要增加预算的渠道（ROAS>目标值150%但预算占比偏低），建议增幅（不超过当前的30%）；2)列出需要削减预算的渠道（ROAS<目标值50%连续2天），建议削减幅度；3)计算预算调整后的预期整体ROAS变化；4)评估调整风险（如：高ROAS渠道是否存在流量天花板）；5)输出格式化的预算调整建议文档，推送给投放优化Scope的投放策略Agent。",
+      "agentRef": "attribution-analyst",
+      "dependentTasks": ["task-7"],
+      "requiredIntegrations": ["ad-delivery-scope-interface"]
+    },
+    {
+      "id": "task-9",
+      "title": "爆款预测结果评估",
+      "type": "condition",
+      "prompt": "评估爆款预测模型输出：是否识别到高置信度（>80分）的爆款趋势？1)如果存在>80分的预测项，判定为'高潜力趋势已识别'，需要立即生成创意方向建议推送给创意生产Scope；2)如果仅有60-80分的中等预测，判定为'持续观察'，加入观察清单在下一周期重新评估；3)如果所有预测项<60分，判定为'当前无显著趋势'，继续常规监测。",
+      "agentRef": "market-intelligence",
+      "dependentTasks": ["task-6"],
+      "requiredIntegrations": []
+    },
+    {
+      "id": "task-10",
+      "title": "生成创意方向建议",
+      "type": "document",
+      "prompt": "基于高置信度爆款预测结果，生成推送给创意生产Scope的创意方向建议：1)趋势描述——当前识别到的爆款信号是什么，为什么判断有爆发潜力；2)创意方向建议——参考该趋势的内容特征，建议素材风格、切入角度、关键卖点；3)历史相似案例——列举2-3个历史上类似趋势的爆款案例及其创意特征；4)最佳切入时间窗口——建议最迟何时完成素材上线；5)建议投放平台和目标受众。输出格式化的创意brief建议文档。",
+      "agentRef": "market-intelligence",
+      "dependentTasks": ["task-9"],
+      "requiredIntegrations": ["creative-scope-interface"]
+    },
+    {
+      "id": "task-11",
+      "title": "响应自然语言数据查询",
+      "type": "agent",
+      "prompt": "实时响应营销团队的自然语言数据查询请求：1)接收查询并解析意图——识别查询类型（单值/对比/排名/趋势/原因分析）、提取实体（时间范围、指标、维度、筛选条件）；2)确定数据源并执行结构化查询，严格控制响应时间<10秒；3)组织返回结果——核心答案+环比同比变化+行业基准对比+一句话解读；4)自动补充上下文信息和2-3个追问建议；5)如数据存在质量问题主动声明。整合市场情报Agent的竞品数据和效果归因Agent的ROI数据，提供统一的跨维度数据视图。",
+      "agentRef": "data-query-advisor",
+      "dependentTasks": ["task-3"],
+      "requiredIntegrations": ["data-warehouse", "google-ads-api", "meta-ads-api", "tiktok-ads-api", "ga4-api"]
+    },
+    {
+      "id": "task-12",
+      "title": "生成周度市场趋势报告",
+      "type": "document",
+      "prompt": "整合本周所有分析结果，生成周度市场趋势报告。报告严格按照三段式结构输出：1)数据摘要——本周核心指标概览（整体ROAS、总消耗、核心渠道表现概要）、竞品重大动态汇总、趋势信号概要；2)关键洞察（3-5条）——每条包含：洞察结论+数据支撑+对业务的影响+行动建议。涵盖维度：行业热点变化、消费者偏好迁移、竞品策略变化、新兴渠道机会；3)建议行动项——按优先级排列的具体操作建议，每条标注执行主体、预期收益和时间窗口。报告必须在每周一10:00前完成交付。",
+      "agentRef": "data-query-advisor",
+      "dependentTasks": ["task-4", "task-5", "task-6"],
+      "requiredIntegrations": []
+    },
+    {
+      "id": "task-13",
+      "title": "生成月度ROI分析报告",
+      "type": "document",
+      "prompt": "整合全月归因分析、竞品情报和效果数据，生成月度营销ROI分析报告。报告内容包括：1)数据摘要——全月总投放花费、总归因收入、整体ROAS及环比/同比变化、各渠道贡献占比饼图描述；2)渠道效率深度分析——各渠道ROAS排名及趋势、预算利用率、边际效益分析、归因模型下的渠道真实价值评估；3)关键洞察——效率最高/最低渠道分析、最大改善机会识别、竞品动态对自身效果的影响评估、爆款预测命中回顾；4)下月策略推荐——预算调整建议（精确到渠道和金额比例）、渠道策略方向、创意方向建议、风险预警；5)附录——归因模型说明、数据质量声明。报告须在每月5日前完成交付。",
+      "agentRef": "attribution-analyst",
+      "dependentTasks": ["task-4", "task-5", "task-6"],
+      "requiredIntegrations": []
+    },
+    {
+      "id": "task-14",
+      "title": "数据异常告警与主动通知",
+      "type": "agent",
+      "prompt": "持续监控营销关键指标并执行主动告警：1)每5分钟采集核心指标数据（ROAS、CPA、CTR、消耗速度），与动态基线（近7天滑动均值，考虑时段和星期效应）对比；2)触发告警规则——ROAS日环比降>20%黄色告警、降>40%红色告警；CPA日环比升>30%黄色告警；消耗速度偏离日均>50%红色告警；3)连续3个采集周期（15分钟）持续偏离才确认告警，避免瞬时波动误报；4)告警内容生成——标题+当前值vs基线+初步原因分析（2-3个候选原因）+建议操作；5)机会发现——某渠道/受众ROAS日环比提升>50%推送机会通知。",
+      "agentRef": "data-query-advisor",
+      "dependentTasks": ["task-2"],
+      "requiredIntegrations": ["notification-system", "data-warehouse"]
+    }
+  ],
+  "variables": [
+    {
+      "variableId": "var-1",
+      "name": "competitorList",
+      "variableType": "string",
+      "description": "竞品清单配置，包含Top10竞争对手名称、品牌ID和关联的各平台账号信息",
+      "required": true
+    },
+    {
+      "variableId": "var-2",
+      "name": "attributionModel",
+      "variableType": "string",
+      "description": "当前使用的主归因模型类型（first_touch/last_touch/linear/time_decay/position_based/data_driven）",
+      "required": true
+    },
+    {
+      "variableId": "var-3",
+      "name": "targetRoas",
+      "variableType": "string",
+      "description": "目标ROAS阈值，用于判断渠道效率和预算分配合理性（默认3.0）",
+      "required": true
+    },
+    {
+      "variableId": "var-4",
+      "name": "alertThresholds",
+      "variableType": "string",
+      "description": "告警阈值配置，包含各指标的黄色和红色告警触发条件（JSON格式）",
+      "required": true
+    },
+    {
+      "variableId": "var-5",
+      "name": "reportRecipients",
+      "variableType": "string",
+      "description": "报告接收人列表及其对应接收的报告类型（周报/月报/即时告警）",
+      "required": true
+    },
+    {
+      "variableId": "var-6",
+      "name": "industryCategory",
+      "variableType": "string",
+      "description": "所属行业品类（如美妆、3C、食品），影响趋势分析和爆款预测的品类适配参数",
+      "required": true
+    },
+    {
+      "variableId": "var-7",
+      "name": "dataSourceConfig",
+      "variableType": "string",
+      "description": "各数据源接入配置信息，包含API密钥引用、数据刷新频率和备用数据路径",
+      "required": true
+    }
+  ]
+}

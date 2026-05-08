@@ -1,0 +1,235 @@
+{
+  "title": "会员运营智能化工作流",
+  "description": "覆盖会员分层运营、流失预警与挽留、社交内容运营、品牌舆情管理四大核心流程的端到端自动化工作流，实现会员价值体系的智能化管理与持续优化。",
+  "tasks": [
+    {
+      "id": "task-1",
+      "title": "会员数据采集与预处理",
+      "type": "agent",
+      "prompt": "从客户运营域获取最新客户画像数据，采集全量会员近90天的行为数据（登录频率、消费金额、消费频次、权益使用率、互动活跃度）。执行数据清洗：处理缺失值、去重、异常值检测，将各维度数据归一化到0-100分范围。输出标准化会员特征数据集，确保数据完整性≥99%。若数据源不可用，使用前次缓存数据并标记降级处理。",
+      "agentRef": "membership-growth-engine",
+      "dependentTasks": [],
+      "requiredIntegrations": ["客户数据平台", "会员行为日志系统"]
+    },
+    {
+      "id": "task-2",
+      "title": "会员分层模型运算",
+      "type": "agent",
+      "prompt": "基于已采集的标准化数据，运行RFM+行为特征综合评分模型。计算全量会员的MVP Score（RFM占55%+行为特征占45%），按照分层阈值划分5个等级：钻石(≥90)/铂金(75-89)/金卡(55-74)/银卡(35-54)/普通(<35)。校验分层覆盖率必须为100%，检查等级分布与上周偏差是否≤5%。输出全量会员分层结果和等级变动明细清单。",
+      "agentRef": "membership-growth-engine",
+      "dependentTasks": ["task-1"],
+      "requiredIntegrations": ["会员等级系统"]
+    },
+    {
+      "id": "task-3",
+      "title": "等级变动与权益配置",
+      "type": "agent",
+      "prompt": "对比上周等级生成升级/降级/维持清单。处理升级会员：配置新等级权益包、标记祝贺通知任务。处理降级会员：检查是否有投诉冻结标记（冻结的跳过降级），设置保级任务和限时挽留方案。等级跳跃2级以上标记人工复核。确保权益发放准确率100%，全部配置在2小时内完成。",
+      "agentRef": "membership-growth-engine",
+      "dependentTasks": ["task-2"],
+      "requiredIntegrations": ["权益管理系统", "消息推送系统"]
+    },
+    {
+      "id": "task-4",
+      "title": "判断是否触发流失预警",
+      "type": "condition",
+      "prompt": "检查会员分层数据和行为特征，判断是否有会员风险评分进入高风险区间(<30)或中风险区间(30-50)，以及是否有会员单日评分下降超过15分。如有任一条件满足，进入流失预警与挽留流程；如无，继续常规运营流程。",
+      "agentRef": "membership-growth-engine",
+      "dependentTasks": ["task-2"],
+      "requiredIntegrations": []
+    },
+    {
+      "id": "task-5",
+      "title": "流失风险评分与预警生成",
+      "type": "agent",
+      "prompt": "运行流失预测模型，综合分析登录频率下降、消费金额递减、权益使用率走低、互动活跃度衰减等多维特征。为每位会员生成流失风险评分(0-100)，标注TOP3风险因素。筛选高风险(评分<30)、中风险(30-50)和急剧恶化(单日下降>15)的会员生成分级预警清单。目标预警准确率≥75%。",
+      "agentRef": "membership-growth-engine",
+      "dependentTasks": ["task-4"],
+      "requiredIntegrations": ["会员行为分析平台"]
+    },
+    {
+      "id": "task-6",
+      "title": "执行分级挽留策略",
+      "type": "agent",
+      "prompt": "根据分级预警清单执行差异化挽留动作：高风险会员(评分<30)在4小时内触发1v1专属关怀+高价值挽留券+升级体验邀请；中风险会员(30-50)当日内自动推送活动邀请+积分加速+会员专属内容；急剧恶化会员立即标记重点关注并24小时内干预。确保挽留触达率≥95%。同时将高流失风险会员的社交行为特征传递给社交内容策划师进行定向内容运营。",
+      "agentRef": "membership-growth-engine",
+      "dependentTasks": ["task-5"],
+      "requiredIntegrations": ["消息推送系统", "优惠券系统", "客服系统"]
+    },
+    {
+      "id": "task-7",
+      "title": "挽留效果追踪与策略优化",
+      "type": "agent",
+      "prompt": "在挽留动作触发7天后，追踪挽留效果指标：是否回访/登录、是否产生消费、权益是否被使用、风险评分变化。判定挽留结果（成功/部分成功/失败）。输出挽留效果报告，分析各策略的成功率和成本效益，识别高效挽留组合。目标挽留成功率≥30%。不达标时触发策略复盘，调整挽留方案。",
+      "agentRef": "membership-growth-engine",
+      "dependentTasks": ["task-6"],
+      "requiredIntegrations": ["会员行为分析平台"]
+    },
+    {
+      "id": "task-8",
+      "title": "内容排期规划",
+      "type": "agent",
+      "prompt": "每周五整合品牌营销日历、会员活动安排（来自会员增长引擎）、热点预判和各平台流量规律，制定下周7天的多平台内容发布排期。覆盖微博/抖音/小红书/知乎，内容类型按7:2:1分配（价值:互动:营销），确保每周至少1条会员专属内容。预留2个机动位应对热点。输出完整排期表含日期/平台/主题/形态/发布时间/目标KPI。",
+      "agentRef": "social-content-strategist",
+      "dependentTasks": ["task-3"],
+      "requiredIntegrations": ["内容管理系统"]
+    },
+    {
+      "id": "task-9",
+      "title": "AI多平台内容生成",
+      "type": "agent",
+      "prompt": "按照内容排期表的主题和目标平台，为每条待发布内容生成完整的内容包。微博内容：≤140字+话题标签+配图描述；抖音内容：15-60秒视频脚本+BGM建议+转场设计；小红书：标题≤20字+正文≤1000字+配图6-9张描述；知乎：≥500字专业内容+数据引用。所有内容100%原创，通过合规性预检（敏感词/广告法/平台规则），生成A/B版本供选择，提交至人工审核队列。",
+      "agentRef": "social-content-strategist",
+      "dependentTasks": ["task-8"],
+      "requiredIntegrations": ["内容管理系统", "合规检测系统"]
+    },
+    {
+      "id": "task-10",
+      "title": "判断内容审核结果",
+      "type": "condition",
+      "prompt": "检查人工审核队列的审核结果。判断条件：(1)审核通过→进入发布环节；(2)审核未通过→退回修改，标记修改原因供AI学习，2小时内完成修改重新提交；(3)审核超时4小时→自动升级给审核负责人。只有审核通过的内容才能进入发布执行。",
+      "agentRef": "social-content-strategist",
+      "dependentTasks": ["task-9"],
+      "requiredIntegrations": ["审核管理系统"]
+    },
+    {
+      "id": "task-11",
+      "title": "内容排期发布与展示确认",
+      "type": "agent",
+      "prompt": "将审核通过的内容按排期时间自动发布到对应平台。发布后2小时内确认内容正常展示无异常（无被限流、无审核未通过、无展示错误）。记录发布确认日志。发布失败自动重试3次，仍失败则通知运营手动处理。确保发布准时率≥98%。",
+      "agentRef": "social-content-strategist",
+      "dependentTasks": ["task-10"],
+      "requiredIntegrations": ["微博API", "抖音API", "小红书API", "知乎API"]
+    },
+    {
+      "id": "task-12",
+      "title": "内容互动监控与效果分析",
+      "type": "agent",
+      "prompt": "追踪已发布内容的互动数据（阅读量/点赞/评论/转发/收藏），计算互动率和传播系数。识别异常表现内容：爆款(超均值200%)进行成功因素拆解，低效(低于均值50%)触发优化建议（调整时间/追加投放）。检测评论区情感，负面占比>30%立即暂停推广并转舆情流程。每周一输出内容效果分析报告，含TOP3爆款分析、BOTTOM3诊断和下周优化建议。",
+      "agentRef": "social-content-strategist",
+      "dependentTasks": ["task-11"],
+      "requiredIntegrations": ["社交数据分析平台"]
+    },
+    {
+      "id": "task-13",
+      "title": "判断内容是否引发争议",
+      "type": "condition",
+      "prompt": "在内容互动监控中检测是否存在以下情况：(1)评论区负面情感占比>30%；(2)内容被大量举报；(3)出现品牌相关的负面讨论扩散。如触发任一条件，暂停该内容推广并将事件传递给舆情监控卫士进行评估；如未触发，继续常规互动监控。",
+      "agentRef": "social-content-strategist",
+      "dependentTasks": ["task-12"],
+      "requiredIntegrations": []
+    },
+    {
+      "id": "task-14",
+      "title": "全网舆情实时监控",
+      "type": "agent",
+      "prompt": "7×24小时监控微博、抖音、小红书、知乎、百度贴吧、黑猫投诉等平台的品牌相关内容。使用NLP情感分析对每条内容进行正面/中性/负面分类。执行水军和恶意攻击识别（账号特征+行为模式），标记非自然舆情不纳入统计。维护实时舆情热力图和24小时趋势线。每日09:00输出前日舆情摘要。平台覆盖率≥95%，数据延迟≤10分钟。",
+      "agentRef": "brand-sentinel",
+      "dependentTasks": [],
+      "requiredIntegrations": ["社交媒体监控平台", "NLP分析引擎"]
+    },
+    {
+      "id": "task-15",
+      "title": "舆情严重等级判定",
+      "type": "condition",
+      "prompt": "对监控到的负面舆情进行严重等级判定：评估传播数据（转发量/评论量）、传播速度（1小时增速）、发布者影响力（粉丝量）、平台覆盖数、媒体介入情况。判定结果：P2-普通负面(个别投诉，转发<100)→记录并常规处理；P1-传播性负面(转发>100/KOL/多平台)→30分钟内出预警报告；P0-重大危机(热搜/媒体/公关危机)→5分钟内通知管理层。",
+      "agentRef": "brand-sentinel",
+      "dependentTasks": ["task-14"],
+      "requiredIntegrations": []
+    },
+    {
+      "id": "task-16",
+      "title": "预警报告生成与传播分析",
+      "type": "agent",
+      "prompt": "针对P1/P0级别舆情，在30分钟内完成：(1)追溯原始源头（首发平台/账号/时间）；(2)绘制传播路径和关键传播节点；(3)评估当前影响范围和预测扩散趋势；(4)评估业务影响和品牌形象影响；(5)生成结构化预警报告（含事件概述/严重等级/传播数据/影响评估/紧急程度标注）。P0级别5分钟内即时通知管理层。",
+      "agentRef": "brand-sentinel",
+      "dependentTasks": ["task-15"],
+      "requiredIntegrations": ["传播路径分析工具", "管理层通知系统"]
+    },
+    {
+      "id": "task-17",
+      "title": "应对方案建议输出",
+      "type": "agent",
+      "prompt": "在预警报告生成后1小时内，输出至少3套差异化应对方案：方案A-快速回应（官方声明+问题处理+补偿方案），方案B-观察引导（监控发展+评论区引导+正面内容对冲），方案C-主动沟通（联系源头+定向回应+事实澄清）。每个方案附带预期效果、所需资源、风险评估和执行时间线。标注推荐方案及理由。通知社交内容策划师准备官方回应内容。",
+      "agentRef": "brand-sentinel",
+      "dependentTasks": ["task-16"],
+      "requiredIntegrations": ["舆情事件库"]
+    },
+    {
+      "id": "task-18",
+      "title": "舆情事件跟踪与复盘归档",
+      "type": "agent",
+      "prompt": "开启事件追踪模式：每30分钟更新传播数据和影响评估，评估应对措施效果（舆情趋势是否缓解/稳定/恶化）。事件结束后48小时内完成全流程复盘：完整时间线记录、应对措施及效果评估、经验教训总结、应急模板更新。将正面口碑案例传递给会员增长引擎作为忠诚度培养素材。归入舆情事件库供未来参考。",
+      "agentRef": "brand-sentinel",
+      "dependentTasks": ["task-17"],
+      "requiredIntegrations": ["舆情事件库"]
+    },
+    {
+      "id": "task-19",
+      "title": "月度会员运营综合报告",
+      "type": "document",
+      "prompt": "每月3号前生成月度会员运营综合报告，整合以下数据：(1)会员分层变动总结（各级人数/占比/变化趋势）；(2)流失预警与挽留效果（预警准确率/挽留成功率/成本效益）；(3)社交内容运营效果（各平台互动数据/爆款分析/ROI）；(4)品牌舆情月度分析（声誉健康度评分/关键事件回顾）；(5)核心KPI达成情况（会员活跃度环比/复购率/NPS）。输出下月工作重点和优化方向。",
+      "agentRef": "membership-growth-engine",
+      "dependentTasks": ["task-7", "task-12", "task-18"],
+      "requiredIntegrations": ["数据报表系统"]
+    }
+  ],
+  "variables": [
+    {
+      "variableId": "var-1",
+      "name": "membershipTierThresholds",
+      "variableType": "object",
+      "description": "会员分层阈值配置（钻石≥90/铂金75-89/金卡55-74/银卡35-54/普通<35）",
+      "required": true
+    },
+    {
+      "variableId": "var-2",
+      "name": "churnRiskThreshold",
+      "variableType": "object",
+      "description": "流失风险分级阈值（高风险<30/中风险30-50/正常>50）",
+      "required": true
+    },
+    {
+      "variableId": "var-3",
+      "name": "retentionBudgetLimit",
+      "variableType": "number",
+      "description": "单次挽留动作的最大预算金额（元），不超过会员预期LTV的15%",
+      "required": true
+    },
+    {
+      "variableId": "var-4",
+      "name": "contentPlatforms",
+      "variableType": "array",
+      "description": "目标社交平台列表（微博/抖音/小红书/知乎）",
+      "required": true
+    },
+    {
+      "variableId": "var-5",
+      "name": "sentimentAlertThreshold",
+      "variableType": "object",
+      "description": "舆情预警阈值配置（P0:热搜+媒体/P1:转发>100+KOL/P2:个别投诉）",
+      "required": true
+    },
+    {
+      "variableId": "var-6",
+      "name": "brandKeywords",
+      "variableType": "array",
+      "description": "品牌舆情监控关键词矩阵（品牌词+产品词+竞品词+负面预警词）",
+      "required": true
+    },
+    {
+      "variableId": "var-7",
+      "name": "contentReviewTimeout",
+      "variableType": "number",
+      "description": "内容审核超时时间（小时），超时自动升级，默认4小时",
+      "required": false
+    },
+    {
+      "variableId": "var-8",
+      "name": "weeklyActiveGrowthTarget",
+      "variableType": "number",
+      "description": "月活跃度环比提升目标百分比，默认5%",
+      "required": true
+    }
+  ]
+}

@@ -1,0 +1,124 @@
+{
+  "version": "1.0.0",
+  "generatedAt": "2025-01-15T10:00:00.000Z",
+  "generator": "super-agent-batch-v2",
+  "industry": {
+    "id": "marketing",
+    "name": "营销与广告",
+    "icon": "📢",
+    "color": "#F59E0B"
+  },
+  "stats": {
+    "scopeCount": 4,
+    "agentCount": 14,
+    "skillCount": 47,
+    "workflowCount": 4,
+    "twinCount": 1,
+    "sopCount": 4
+  },
+  "scopes": [
+    {
+      "dirName": "creative-production",
+      "name": "创意生产与内容创作",
+      "agents": [
+        "creative-supervisor",
+        "visual-generation",
+        "content-editor",
+        "quality-assessor"
+      ],
+      "skills": [
+        "brand-compliance-check",
+        "brief-analysis",
+        "copy-quality-review",
+        "copywriting",
+        "image-generation",
+        "layout-composition",
+        "multi-size-rendering",
+        "multilingual-localization",
+        "quality-decision",
+        "style-adaptation",
+        "task-orchestration",
+        "visual-quality-scoring"
+      ],
+      "hasWorkflow": true,
+      "hasSop": true
+    },
+    {
+      "dirName": "ad-delivery-optimization",
+      "name": "广告投放与智能优化",
+      "agents": [
+        "delivery-strategist",
+        "budget-controller",
+        "audience-targeting",
+        "performance-monitor"
+      ],
+      "skills": [
+        "alert-management",
+        "anomaly-diagnosis",
+        "audience-segmentation-analysis",
+        "audience-testing-validation",
+        "bid-optimization",
+        "budget-anomaly-detection",
+        "budget-dynamic-allocation",
+        "cross-platform-strategy-planning",
+        "lookalike-expansion",
+        "performance-diagnosis",
+        "realtime-performance-monitoring",
+        "spend-pacing-control"
+      ],
+      "hasWorkflow": true,
+      "hasSop": true
+    },
+    {
+      "dirName": "data-insights-intelligence",
+      "name": "数据洞察与决策智能",
+      "agents": [
+        "market-intelligence",
+        "attribution-analyst",
+        "data-query-advisor"
+      ],
+      "skills": [
+        "anomaly-detection",
+        "attribution-modeling",
+        "competitor-monitoring",
+        "data-alerting",
+        "decision-report-generation",
+        "natural-language-query",
+        "roi-analysis",
+        "trend-analysis",
+        "viral-prediction"
+      ],
+      "hasWorkflow": true,
+      "hasSop": true
+    },
+    {
+      "dirName": "customer-acquisition",
+      "name": "用户获客与智能外呼",
+      "agents": [
+        "outbound-caller",
+        "lead-scorer",
+        "private-domain-operator"
+      ],
+      "skills": [
+        "call-summary-generation",
+        "churn-prediction-response",
+        "conversation-intent-recognition",
+        "customer-lifecycle-segmentation",
+        "lead-routing-management",
+        "lead-scoring-model",
+        "outbound-call-execution",
+        "retention-campaign-design",
+        "scoring-model-validation"
+      ],
+      "hasWorkflow": true,
+      "hasSop": true
+    }
+  ],
+  "digitalTwins": [
+    {
+      "dirName": "cmo-首席营销官",
+      "name": "CMO / 首席营销官",
+      "role": "Chief Marketing Officer / 营销副总裁"
+    }
+  ]
+}

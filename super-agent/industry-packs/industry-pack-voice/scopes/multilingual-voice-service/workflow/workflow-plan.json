@@ -1,0 +1,235 @@
+{
+  "title": "多语言语音服务处理工作流",
+  "description": "端到端多语言语音处理工作流，覆盖语种检测、语音转写、内容分析、实时翻译全链路，支持实时和离线两种处理路径，实现语音数据的结构化转化和深度分析。",
+  "tasks": [
+    {
+      "id": "task-1",
+      "title": "音频输入预处理",
+      "type": "action",
+      "prompt": "接收输入语音流并执行预处理：1) 将音频统一转换为16kHz/16bit PCM格式；2) 执行VAD检测过滤纯静音和纯噪声段；3) 计算信噪比SNR并标记质量等级（SNR>=15dB为优质、5-15dB为一般、<5dB为低质量）；4) 若音频为文件格式则提取元数据（时长、声道数、采样率）；5) 将预处理后的音频流和质量标注传递给语种检测环节。若SNR<3dB且无法增强，返回错误码AUDIO_QUALITY_INSUFFICIENT。",
+      "agentRef": "language-router",
+      "dependentTasks": [],
+      "requiredIntegrations": ["audio-processing-engine"]
+    },
+    {
+      "id": "task-2",
+      "title": "语种检测与路由决策",
+      "type": "agent",
+      "prompt": "对预处理后的音频流执行实时语种检测：1) 提取首500ms音频的声学特征（Mel频谱40维+基频F0+韵律模式）；2) 运行语种分类模型输出Top-3候选语种及置信度；3) 检查用户session_context中的language_preference作为先验；4) 根据置信度阈值做出路由决策——>=0.85确认、0.7-0.85临时确认+持续修正、<0.7使用默认模型+标记待修正；5) 输出结构化路由决策{detected_language, confidence, model_recommendation, fallback_applied}。整个过程必须在500ms内完成。",
+      "agentRef": "language-router",
+      "dependentTasks": ["task-1"],
+      "requiredIntegrations": ["language-id-model", "user-profile-service"]
+    },
+    {
+      "id": "task-3",
+      "title": "语码混合检测与分段",
+      "type": "condition",
+      "prompt": "判断输入语音是否存在语码混合（Code-Switching）：基于帧级语言后验概率分析，若检测到语言切换信号（帧间语言概率变化>0.4），则判定为语码混合场景需要启用分段处理。判定条件：is_code_switching=true时进入分段处理路径；is_code_switching=false时进入单语种直接处理路径。",
+      "agentRef": "language-router",
+      "dependentTasks": ["task-2"],
+      "requiredIntegrations": []
+    },
+    {
+      "id": "task-4",
+      "title": "语码混合分段处理",
+      "type": "agent",
+      "prompt": "对检测到语码混合的语音流执行精细分段：1) 在帧级别计算多语言后验概率，标记潜在切换点；2) 在切换点前后各200ms窗口内进行音素级语言归属判定，确定精确切换时间戳（±50ms）；3) 将语音按切换边界分割为独立片段，每片段标注{segment_id, start_ms, end_ms, language, confidence}；4) 合并过短片段（<200ms），标注嵌入词类型；5) 将各语言片段分发到对应ASR引擎并行处理；6) 按时间戳顺序合并各引擎返回的转写结果，保持原始语码混合文本形式。",
+      "agentRef": "language-router",
+      "dependentTasks": ["task-3"],
+      "requiredIntegrations": ["multi-language-asr-engine"]
+    },
+    {
+      "id": "task-5",
+      "title": "方言识别与模型匹配",
+      "type": "agent",
+      "prompt": "当语种检测结果为中文且声学特征呈方言指示时，执行方言细分识别：1) 分析声调数量和模式（粤语6-9声调vs普通话4声调）、韵母系统特征、声母特有音素；2) 使用方言分类模型输出Top-3方言候选及置信度；3) 利用用户地域信息和历史方言使用记录作为辅助判定；4) 查询方言ASR模型可用性——有专用模型则路由到专用模型，无专用模型则回退到通用普通话模型并标记{dialect_fallback: true, expected_wer_degradation}；5) 置信度<0.6时生成用户确认建议。",
+      "agentRef": "language-router",
+      "dependentTasks": ["task-3"],
+      "requiredIntegrations": ["dialect-model-registry", "user-profile-service"]
+    },
+    {
+      "id": "task-6",
+      "title": "转写模式判定",
+      "type": "condition",
+      "prompt": "根据输入类型和业务需求判定转写处理模式：1) 实时音频流输入且需要低延迟输出（实时字幕/同传场景）→选择流式转写模式（realtime）；2) 完整音频文件且对准确率要求高（会议录音/通话回放）→选择离线高精度模式（offline）；3) 输出模式决策{mode: 'realtime'|'offline'}及对应处理参数。",
+      "agentRef": "transcription-analyst",
+      "dependentTasks": ["task-4", "task-5"],
+      "requiredIntegrations": []
+    },
+    {
+      "id": "task-7",
+      "title": "流式实时转写",
+      "type": "agent",
+      "prompt": "对实时语音流执行流式转写处理：1) 使用CTC/Attention混合解码器，每接收320ms音频帧输出增量转写结果；2) 区分partial（可修改）和final（已确认）状态输出；3) 保证首字输出延迟<300ms；4) 注入热词列表提升专有名词识别率；5) 对语码混合文本保持原始混合形式输出；6) 实时计算每个输出片段的置信度分数；7) 低置信度片段（<0.7）实时标记。输出格式：{segment_id, text, is_final, confidence, timestamp}的增量流。",
+      "agentRef": "transcription-analyst",
+      "dependentTasks": ["task-6"],
+      "requiredIntegrations": ["streaming-asr-engine"]
+    },
+    {
+      "id": "task-8",
+      "title": "离线高精度转写",
+      "type": "agent",
+      "prompt": "对完整音频文件执行高精度离线转写：1) 多遍解码——第一遍CTC快速解码+第二遍Attention精细解码+LM重打分；2) 说话人分离——执行Speaker Diarization聚类，为每段话标注说话人ID，DER<12%；3) 强制对齐——生成词级时间戳（精度±200ms）；4) 标点恢复——基于语义和停顿模式插入标点，准确率>=95%；5) 数字/日期规范化处理；6) 敏感信息检测与脱敏（身份证号/银行卡号/手机号→***）；7) 计算整体WER估计和质量评分。输出完整的结构化转写文档含说话人标签和时间戳。",
+      "agentRef": "transcription-analyst",
+      "dependentTasks": ["task-6"],
+      "requiredIntegrations": ["offline-asr-engine", "speaker-diarization-model"]
+    },
+    {
+      "id": "task-9",
+      "title": "内容分析场景路由",
+      "type": "condition",
+      "prompt": "根据输入元数据和业务标识判定内容分析场景类型：1) 含meeting_id或会议元数据→会议分析场景（meeting）；2) 含call_id或客服通话标识→客服质检场景（call_inspection）；3) 其他→通用分析场景（general）。输出场景类型决策，决定后续分析流程分支。",
+      "agentRef": "transcription-analyst",
+      "dependentTasks": ["task-8"],
+      "requiredIntegrations": []
+    },
+    {
+      "id": "task-10",
+      "title": "会议摘要与行动项分析",
+      "type": "agent",
+      "prompt": "对会议转写文本执行深度分析生成结构化会议纪要：1) 议题自动分割——识别议题切换边界（显式转折语、话题语义突变、说话人主导权切换），为每个议题生成8-15字标题；2) 逐议题摘要——3-5句概括讨论要点和结论，标注关键发言人；3) 决策点提取——识别共识性语言和条件判断，结构化输出{content, rationale, participants_agreed}；4) 行动项提取——识别任务分配语句提取四要素{task, owner, deadline, priority}，模糊日期转化为具体日期；5) 组装完整MeetingSummary，标注各项置信度，低置信度标记[待确认]。会议摘要覆盖率目标>=95%。",
+      "agentRef": "transcription-analyst",
+      "dependentTasks": ["task-9"],
+      "requiredIntegrations": ["llm-analysis-engine"]
+    },
+    {
+      "id": "task-11",
+      "title": "客服通话质检分析",
+      "type": "agent",
+      "prompt": "对客服通话转写执行全维度质检分析：1) 合规话术检查——加载行业合规模板，逐项检查必说话术（开场白/身份确认/风险提示/结束语）的出现及时序合规性，输出pass/fail/partial状态；2) 服务态度评估——分析礼貌用语频率、禁忌用语检测、主动服务意识、响应及时性，输出1-10分评分；3) 情绪轨迹标注——每30秒标注用户/坐席情绪类别和强度，识别情绪转折点；4) 敏感信息检测——扫描个人隐私信息并执行脱敏标注；5) 按场景模板提取结构化信息（如保险报案信息）；6) 计算综合质检评分（合规40%+态度30%+解决30%），生成改进建议。报告生成时间<通话时长10%。",
+      "agentRef": "transcription-analyst",
+      "dependentTasks": ["task-9"],
+      "requiredIntegrations": ["compliance-template-service", "llm-analysis-engine"]
+    },
+    {
+      "id": "task-12",
+      "title": "通用内容分析",
+      "type": "agent",
+      "prompt": "对通用场景转写文本执行标准内容分析：1) 关键词和关键短语提取——使用TF-IDF+语义重要性评分，输出Top-20关键词及其重要性分数；2) 情感倾向分析——判定整体情感（正面/中性/负面）及强度分数（0-1），标注情感段落位置；3) 主题分类——将内容归类到预定义主题分类体系中，支持多标签；4) 文本摘要——按指定压缩比（默认20%）生成摘要文本；5) 输出ContentAnalysis结构化JSON，所有提取结果附带置信度分数。",
+      "agentRef": "transcription-analyst",
+      "dependentTasks": ["task-9"],
+      "requiredIntegrations": ["llm-analysis-engine"]
+    },
+    {
+      "id": "task-13",
+      "title": "翻译需求判定",
+      "type": "condition",
+      "prompt": "判断当前会话是否需要激活实时翻译服务：1) 检查会话配置中是否设置了target_language且与source_language不同→需要翻译；2) 检查是否为跨语言客服场景（双方语言不同）→需要双向对话翻译；3) 检查是否为字幕翻译请求→需要字幕翻译；4) 以上条件均不满足→不需要翻译。输出{translation_needed: true/false, mode: 'simultaneous'|'dialogue'|'subtitle'|null}。",
+      "agentRef": "realtime-translator",
+      "dependentTasks": ["task-7"],
+      "requiredIntegrations": []
+    },
+    {
+      "id": "task-14",
+      "title": "术语表加载与预处理",
+      "type": "action",
+      "prompt": "在翻译启动前加载所需的术语资源：1) 根据业务场景/客户/行业标识加载对应术语表；2) 构建精确匹配索引、变体匹配索引和上下文消歧索引；3) 加载翻译记忆库（TM），建立模糊匹配索引（匹配率>=70%时可复用）；4) 验证术语表版本为最新，若检测到版本冲突则使用最新版本并记录日志；5) 输出术语表加载状态{loaded_terms_count, tm_entries_count, version, status}。术语表加载不应增加超过50ms的附加延迟。",
+      "agentRef": "realtime-translator",
+      "dependentTasks": ["task-13"],
+      "requiredIntegrations": ["terminology-database"]
+    },
+    {
+      "id": "task-15",
+      "title": "实时流式翻译执行",
+      "type": "agent",
+      "prompt": "执行端到端实时翻译管道：1) 接收实时转写的增量文本输出；2) 执行翻译分段策略——句完整时翻译优先，检测到语义单元完整（主谓宾齐全）时提前启动，超过3秒未成句强制翻译缓冲内容；3) 术语预处理——扫描输入中术语表词条并标记；4) 调用翻译模型执行翻译，注入上下文窗口（最近10句历史）保持语境连贯；5) 术语后处理——强制替换为术语表指定翻译；6) 计算翻译延迟和置信度；7) 低置信度翻译标记uncertain_translation；8) 端到端延迟严格<2秒。输出{source_text, translated_text, confidence, latency_ms, terminology_matched}。",
+      "agentRef": "realtime-translator",
+      "dependentTasks": ["task-14"],
+      "requiredIntegrations": ["translation-model-engine", "terminology-database"]
+    },
+    {
+      "id": "task-16",
+      "title": "双向对话翻译管理",
+      "type": "agent",
+      "prompt": "管理跨语言双向对话的完整翻译流程：1) 初始化双向翻译管道（A→B和B→A）；2) 实时监控双方音频通道活动状态，维护话权状态机（IDLE/A_SPEAKING/B_SPEAKING/TRANSITION/OVERLAP）；3) 话权切换触发：当前方静音>=500ms且对方开始说话时切换翻译方向；4) 切换时完成当前方向最后一个翻译片段输出，切换延迟<200ms；5) 维护双语统一上下文窗口记录双方所有发言（原文+翻译）；6) 处理重叠语音：优先保持当前翻译方向，缓冲新方向输入；7) 翻译延迟>3秒时输出'正在翻译...'占位提示。",
+      "agentRef": "realtime-translator",
+      "dependentTasks": ["task-14"],
+      "requiredIntegrations": ["translation-model-engine", "tts-engine"]
+    },
+    {
+      "id": "task-17",
+      "title": "翻译结果TTS合成",
+      "type": "action",
+      "prompt": "将翻译后的目标语言文本合成为语音输出：1) 根据目标语言选择对应TTS模型和voice参数；2) 执行文本预处理——数字/缩写/特殊符号的读法规范化、SSML标记注入；3) 流式合成生成音频流，首字节延迟<150ms；4) 语速匹配——目标语言TTS语速与源语言说话速度适配；5) 情感保持——注入与源语音匹配的情感参数；6) 对语码混合翻译结果处理语言切换处的韵律平滑；7) 输出PCM/Opus音频流。MOS评分目标>=4.0。",
+      "agentRef": "realtime-translator",
+      "dependentTasks": ["task-15", "task-16"],
+      "requiredIntegrations": ["tts-engine"]
+    },
+    {
+      "id": "task-18",
+      "title": "质量评估与复核分发",
+      "type": "agent",
+      "prompt": "对全流程输出进行质量评估和低置信度片段管理：1) 收集所有环节标记的低置信度片段（语种检测<0.7、转写<0.7、翻译<0.6）；2) 按业务关键度×置信度倒数排序优先级；3) 将高优先级片段推入人工复核队列；4) 计算整体处理质量指标——ASR WER估计、翻译BLEU估计、术语一致性率；5) 生成质量评估报告{overall_quality_score, low_confidence_count, estimated_wer, terminology_consistency}；6) 若质量指标持续下降（连续3个批次低于阈值），触发异常告警。人工复核批次周转时间目标<4小时。",
+      "agentRef": "transcription-analyst",
+      "dependentTasks": ["task-7", "task-8", "task-15"],
+      "requiredIntegrations": ["review-queue-service", "monitoring-system"]
+    },
+    {
+      "id": "task-19",
+      "title": "结果输出与持久化",
+      "type": "document",
+      "prompt": "将所有处理结果进行最终整合和持久化存储：1) 转写结果存储——完整转写文本+说话人标签+时间戳存入文档库，建立全文检索索引；2) 分析结果存储——会议摘要/质检报告/内容分析结果存入结构化数据库；3) 翻译记忆更新——将本次翻译对中人工确认的高质量翻译存入翻译记忆库；4) 用户偏好更新——将本次确认的语言偏好/方言选择写入用户Profile；5) 数据同步——将质检结果推送给智能语音客服Scope的质检Agent，将语言偏好同步给跨Scope共享数据层；6) 输出最终处理报告和资产化数据清单。",
+      "agentRef": "transcription-analyst",
+      "dependentTasks": ["task-10", "task-11", "task-12", "task-17", "task-18"],
+      "requiredIntegrations": ["document-storage", "structured-database", "cross-scope-sync-service"]
+    }
+  ],
+  "variables": [
+    {
+      "variableId": "var-1",
+      "name": "audioInput",
+      "variableType": "stream",
+      "description": "输入语音流或音频文件，支持PCM/WAV/MP3/Opus格式",
+      "required": true
+    },
+    {
+      "variableId": "var-2",
+      "name": "targetLanguage",
+      "variableType": "string",
+      "description": "目标翻译语言代码（ISO 639-1），若不需要翻译则为空",
+      "required": false
+    },
+    {
+      "variableId": "var-3",
+      "name": "processingMode",
+      "variableType": "string",
+      "description": "处理模式：realtime（实时流式）或offline（离线高精度），影响转写和翻译策略选择",
+      "required": true
+    },
+    {
+      "variableId": "var-4",
+      "name": "sessionContext",
+      "variableType": "object",
+      "description": "会话上下文信息，包含user_id、language_preference历史、geo_hint地域信息、business_scenario业务场景标识",
+      "required": false
+    },
+    {
+      "variableId": "var-5",
+      "name": "terminologySetIds",
+      "variableType": "array",
+      "description": "需要加载的术语表ID列表，用于翻译一致性保障",
+      "required": false
+    },
+    {
+      "variableId": "var-6",
+      "name": "analysisScenario",
+      "variableType": "string",
+      "description": "内容分析场景类型：meeting（会议）、call_inspection（客服质检）、general（通用），决定分析模板选择",
+      "required": false
+    },
+    {
+      "variableId": "var-7",
+      "name": "hotWords",
+      "variableType": "array",
+      "description": "热词列表，用于提升专有名词和人名的ASR识别率",
+      "required": false
+    },
+    {
+      "variableId": "var-8",
+      "name": "qualityThreshold",
+      "variableType": "object",
+      "description": "质量阈值配置，包含confidence_threshold（低置信度阈值）、max_latency_ms（最大延迟）等参数",
+      "required": false
+    }
+  ]
+}

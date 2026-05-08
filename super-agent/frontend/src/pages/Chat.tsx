@@ -1,6 +1,6 @@
 import { useState, useCallback, useEffect, useRef, useContext, useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Send, ChevronDown, AlertCircle, X, Bot, Layers, MessageSquare, File as FileIcon, Save, Eye, Pencil, Square, Paperclip, Upload, Trash2, Globe, Rocket, RefreshCw, ExternalLink, Brain, Download, Users } from 'lucide-react'
+import { Send, ChevronDown, AlertCircle, X, Bot, Layers, MessageSquare, File as FileIcon, Save, Eye, Pencil, Square, Paperclip, Upload, Trash2, Globe, Rocket, RefreshCw, ExternalLink, Brain, Download, Users, PanelRightClose, PanelRightOpen } from 'lucide-react'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 import hljs from 'highlight.js'
@@ -1761,6 +1761,7 @@ function ChatInterfaceContent() {
   // Resizable workspace panel
   const [panelWidth, setPanelWidth] = useState(288) // 18rem ≈ 288px
   const [workspaceMode, setWorkspaceMode] = useState<'artifacts' | 'files'>('artifacts')
+  const [panelCollapsed, setPanelCollapsed] = useState(false)
   // When a file is being previewed, collapse side panels for a clean left-chat / right-preview layout
   const [previewingFile, setPreviewingFile] = useState<{ path: string; name: string } | null>(null)
 
@@ -1771,9 +1772,14 @@ function ChatInterfaceContent() {
   const [showCreateRoom, setShowCreateRoom] = useState(false)
 
   const handleFileOpen = useCallback((path: string, name: string) => {
-    // Enter preview mode: collapse side panels, show chat + file preview on right
-    setPreviewingFile({ path, name })
-    // Do NOT open a file tab on the left — keep chat visible
+    // Open file as a tab in the main content area
+    const tabId = `file:${path}`
+    setFileTabs(prev => {
+      const existing = prev.find(t => t.id === tabId)
+      if (existing) return prev // already open
+      return [...prev, { id: tabId, name, path, kind: 'file' as const }]
+    })
+    setActiveTab(tabId)
   }, [])
 
   const handleCloseTab = useCallback((tabId: string, e: React.MouseEvent) => {
@@ -2124,70 +2130,89 @@ function ChatInterfaceContent() {
         </div>
       ) : (
         /* Normal mode: workspace panel with mode toggle */
-        <div
-          className="border-l border-gray-800 bg-gray-900 flex flex-col flex-shrink-0"
-          style={{ width: panelWidth, minWidth: 200 }}
-        >
-          {/* Mode toggle tabs — always visible */}
-          <div className="flex border-b border-gray-800 flex-shrink-0">
+        panelCollapsed ? (
+          /* Collapsed state — thin icon strip */
+          <div className="border-l border-gray-800 bg-gray-900 flex flex-col items-center py-3 px-1 gap-1 flex-shrink-0 w-12">
             <button
-              onClick={() => setWorkspaceMode('artifacts')}
-              className={`flex-1 px-3 py-2 text-xs font-medium transition-colors ${
-                workspaceMode === 'artifacts'
-                  ? 'text-blue-400 border-b-2 border-blue-400 bg-gray-800/50'
-                  : 'text-gray-500 hover:text-gray-300'
-              }`}
+              onClick={() => setPanelCollapsed(false)}
+              className="p-1.5 rounded-lg hover:bg-gray-700 text-gray-400 hover:text-white transition-colors"
+              title="展开面板"
             >
-              📋 产出物
-            </button>
-            <button
-              onClick={() => setWorkspaceMode('files')}
-              className={`flex-1 px-3 py-2 text-xs font-medium transition-colors ${
-                workspaceMode === 'files'
-                  ? 'text-blue-400 border-b-2 border-blue-400 bg-gray-800/50'
-                  : 'text-gray-500 hover:text-gray-300'
-              }`}
-            >
-              📁 文件管理
+              <PanelRightOpen className="w-4 h-4" />
             </button>
           </div>
+        ) : (
+          <div
+            className="border-l border-gray-800 bg-gray-900 flex flex-col flex-shrink-0"
+            style={{ width: panelWidth, minWidth: 200 }}
+          >
+            {/* Mode toggle tabs + collapse button */}
+            <div className="flex border-b border-gray-800 flex-shrink-0">
+              <button
+                onClick={() => setWorkspaceMode('artifacts')}
+                className={`flex-1 px-3 py-2 text-xs font-medium transition-colors ${
+                  workspaceMode === 'artifacts'
+                    ? 'text-blue-400 border-b-2 border-blue-400 bg-gray-800/50'
+                    : 'text-gray-500 hover:text-gray-300'
+                }`}
+              >
+                📋 产出物
+              </button>
+              <button
+                onClick={() => setWorkspaceMode('files')}
+                className={`flex-1 px-3 py-2 text-xs font-medium transition-colors ${
+                  workspaceMode === 'files'
+                    ? 'text-blue-400 border-b-2 border-blue-400 bg-gray-800/50'
+                    : 'text-gray-500 hover:text-gray-300'
+                }`}
+              >
+                📁 文件管理
+              </button>
+              <button
+                onClick={() => setPanelCollapsed(true)}
+                className="px-2 py-2 text-gray-500 hover:text-white hover:bg-gray-800 transition-colors"
+                title="收起面板"
+              >
+                <PanelRightClose className="w-4 h-4" />
+              </button>
+            </div>
 
-          {/* Panel content based on mode */}
-          <div className="flex-1 overflow-hidden">
-            {workspaceMode === 'artifacts' ? (
-              <ArtifactListPanel
-                sessionId={backendSessionId}
-                isGenerating={isSending}
-                onFileOpen={handleFileOpen}
-                onPreviewApp={(folder) => {
-                  // Trigger preview via the same publish-from-workspace API
-                  if (!backendSessionId) return
-                  restClient.post<{ id: string; name: string; access_url: string }>('/api/apps/publish-from-workspace', {
-                    session_id: backendSessionId,
-                    folder_path: folder,
-                    name: 'preview',
-                    status: 'preview',
-                  }).then(res => {
-                    window.dispatchEvent(new CustomEvent('preview-ready', {
-                      detail: { url: res.access_url, name: res.name, appId: res.id },
-                    }))
-                  }).catch(err => console.error('[ArtifactPanel] preview failed:', err))
-                }}
-                refreshKey={wsRefreshKey}
-              />
-            ) : (
-              <WorkspaceExplorer
-                sessionId={backendSessionId}
-                businessScopeId={selectedBusinessScopeId}
-                refreshKey={wsRefreshKey}
-                isGenerating={isSending}
-                onFileOpen={handleFileOpen}
-                width={panelWidth}
-                onWidthChange={setPanelWidth}
-              />
-            )}
+            {/* Panel content based on mode */}
+            <div className="flex-1 overflow-hidden">
+              {workspaceMode === 'artifacts' ? (
+                <ArtifactListPanel
+                  sessionId={backendSessionId}
+                  isGenerating={isSending}
+                  onFileOpen={handleFileOpen}
+                  onPreviewApp={(folder) => {
+                    if (!backendSessionId) return
+                    restClient.post<{ id: string; name: string; access_url: string }>('/api/apps/publish-from-workspace', {
+                      session_id: backendSessionId,
+                      folder_path: folder,
+                      name: 'preview',
+                      status: 'preview',
+                    }).then(res => {
+                      window.dispatchEvent(new CustomEvent('preview-ready', {
+                        detail: { url: res.access_url, name: res.name, appId: res.id },
+                      }))
+                    }).catch(err => console.error('[ArtifactPanel] preview failed:', err))
+                  }}
+                  refreshKey={wsRefreshKey}
+                />
+              ) : (
+                <WorkspaceExplorer
+                  sessionId={backendSessionId}
+                  businessScopeId={selectedBusinessScopeId}
+                  refreshKey={wsRefreshKey}
+                  isGenerating={isSending}
+                  onFileOpen={handleFileOpen}
+                  width={panelWidth}
+                  onWidthChange={setPanelWidth}
+                />
+              )}
+            </div>
           </div>
-        </div>
+        )
       )}
 
       {/* Save to Memory modal */}
@@ -2229,8 +2254,12 @@ export function Chat() {
     localStorage.removeItem('super-agent-chat-backend-session')
   }
 
+  // Use a key based on scope+prompt+timestamp to force remount when navigating from Showcase
+  const chatKey = `${urlScope || ''}-${urlSession || ''}-${params.get('t') || '0'}`
+
   return (
     <ChatProvider
+      key={chatKey}
       initialSessionId={urlSession}
       initialScopeId={urlScope}
       initialAgentId={urlAgent}

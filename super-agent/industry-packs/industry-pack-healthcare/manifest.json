@@ -1,0 +1,156 @@
+{
+  "version": "1.0.0",
+  "generatedAt": "2025-01-15T12:30:00.000Z",
+  "generator": "super-agent-batch-v2",
+  "industry": {
+    "id": "healthcare",
+    "name": "医疗健康",
+    "icon": "🏥",
+    "color": "#06B6D4"
+  },
+  "stats": {
+    "scopeCount": 5,
+    "agentCount": 17,
+    "skillCount": 61,
+    "workflowCount": 5,
+    "twinCount": 1,
+    "sopCount": 5
+  },
+  "scopes": [
+    {
+      "dirName": "appointment-patient-service",
+      "name": "预约与患者服务",
+      "agents": [
+        "appointment-scheduler",
+        "intelligent-triage",
+        "notification-reminder",
+        "queue-optimizer"
+      ],
+      "skills": [
+        "appointment-booking",
+        "appointment-notification",
+        "department-recommendation",
+        "emergency-detection",
+        "emergency-dispatch",
+        "multi-room-dispatch",
+        "no-show-alert",
+        "no-show-control",
+        "patient-flow-analysis",
+        "queue-anomaly-detection",
+        "queue-status-push",
+        "satisfaction-survey",
+        "slot-management",
+        "symptom-collection",
+        "triage-assessment",
+        "wait-time-prediction"
+      ],
+      "hasWorkflow": true,
+      "hasSop": true
+    },
+    {
+      "dirName": "clinical-decision-support",
+      "name": "诊疗辅助",
+      "agents": [
+        "history-collector",
+        "diagnosis-assistant",
+        "medication-reviewer",
+        "clinical-pathway"
+      ],
+      "skills": [
+        "antibiotic-stewardship",
+        "critical-value-alert",
+        "differential-diagnosis",
+        "dosage-validation",
+        "drg-cost-control",
+        "drug-interaction-detection",
+        "evidence-grading",
+        "pathway-matching",
+        "pathway-monitoring",
+        "patient-summary-generation",
+        "prescription-audit",
+        "risk-identification",
+        "structured-history-collection",
+        "test-recommendation",
+        "variance-management"
+      ],
+      "hasWorkflow": true,
+      "hasSop": true
+    },
+    {
+      "dirName": "medical-record-quality",
+      "name": "病历与医疗质控",
+      "agents": [
+        "record-quality-inspector",
+        "quality-monitor",
+        "adverse-event-manager"
+      ],
+      "skills": [
+        "adverse-event-detection",
+        "corrective-action-tracking",
+        "event-classification-reporting",
+        "medical-record-timeliness-check",
+        "pdca-improvement-planning",
+        "quality-indicator-monitoring",
+        "quality-report-generation",
+        "quality-trend-analysis",
+        "record-completeness-audit",
+        "record-consistency-validation",
+        "record-grading-assessment",
+        "root-cause-analysis"
+      ],
+      "hasWorkflow": true,
+      "hasSop": true
+    },
+    {
+      "dirName": "genomics-precision-medicine",
+      "name": "基因组与精准医疗",
+      "agents": [
+        "variant-interpreter",
+        "rare-disease-diagnostician",
+        "pharmacogenomics-advisor"
+      ],
+      "skills": [
+        "drug-repurposing",
+        "family-cosegregation-analysis",
+        "gene-prioritization",
+        "molecular-docking-analysis",
+        "pharmacogenomics-guidance",
+        "phenotype-matching",
+        "rare-disease-diagnosis",
+        "variant-interpretation",
+        "variant-report-generation"
+      ],
+      "hasWorkflow": true,
+      "hasSop": true
+    },
+    {
+      "dirName": "healthcare-finance-revenue",
+      "name": "医疗财务与收入优化",
+      "agents": [
+        "drg-coding-specialist",
+        "revenue-optimizer",
+        "compliance-auditor"
+      ],
+      "skills": [
+        "claim-rejection-analysis",
+        "cmi-tracking",
+        "coding-quality-audit",
+        "cost-overrun-alerting",
+        "department-revenue-reporting",
+        "drg-case-grouping",
+        "fee-structure-optimization",
+        "medical-insurance-settlement",
+        "revenue-leakage-detection"
+      ],
+      "hasWorkflow": true,
+      "hasSop": true
+    }
+  ],
+  "digitalTwins": [
+    {
+      "dirName": "医疗质量总监",
+      "name": "医疗质量总监",
+      "role": "Chief Medical Officer / 医务部主任"
+    }
+  ]
+}

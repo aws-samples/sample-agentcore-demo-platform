@@ -1,0 +1,154 @@
+{
+  "version": "1.0.0",
+  "description": "行业场景注册表 — Industry Pack 与 Showcase 的映射关系 Source of Truth",
+  "lastUpdated": "2025-05-07",
+  "source": "0424 整体PPT.pptx + 行业场景汇总.md",
+  "summary": {
+    "totalIndustries": 14,
+    "packsReady": 7,
+    "packsPlanned": 7,
+    "totalScopes": 50
+  },
+  "industries": [
+    {
+      "id": "customer-service",
+      "name": "客户服务",
+      "icon": "🎧",
+      "packDir": "industry-pack-customer-service",
+      "packStatus": "ready",
+      "showcaseSlug": "customer-service",
+      "scopes": ["工单处理", "投诉管理", "知识库运营", "跨境与行业垂直客服"],
+      "pptReference": "Slide 8-15"
+    },
+    {
+      "id": "sales-management",
+      "name": "销售管理",
+      "icon": "📈",
+      "packDir": "industry-pack-sales-management",
+      "packStatus": "ready",
+      "showcaseSlug": "sales-management",
+      "scopes": ["线索与商机管理", "报价与合同", "客户成功", "销售数据分析", "销售培训与AI陪练"],
+      "pptReference": "Slide 7"
+    },
+    {
+      "id": "finance-risk",
+      "name": "金融风控",
+      "icon": "💰",
+      "packDir": "industry-pack-finance-risk",
+      "packStatus": "ready",
+      "showcaseSlug": "finance-risk",
+      "scopes": ["信贷审批", "逾期资产治理", "反欺诈中心", "保险与财富管理", "支付与交易风控"],
+      "pptReference": "Slide 17"
+    },
+    {
+      "id": "healthcare",
+      "name": "医疗健康",
+      "icon": "🏥",
+      "packDir": "industry-pack-healthcare",
+      "packStatus": "ready",
+      "showcaseSlug": "healthcare",
+      "scopes": ["预约与患者服务", "诊疗辅助", "病历与医疗质控", "基因组与精准医疗", "医疗财务与收入优化"],
+      "pptReference": "Slide 1 (行业总览)"
+    },
+    {
+      "id": "human-resources",
+      "name": "人力资源",
+      "icon": "👥",
+      "packDir": "industry-pack-human-resources",
+      "packStatus": "ready",
+      "showcaseSlug": "human-resources",
+      "scopes": ["智能招聘", "员工服务", "培训管理"],
+      "pptReference": "Slide 1 (职能总览)"
+    },
+    {
+      "id": "it-operations",
+      "name": "IT运维",
+      "icon": "🖥️",
+      "packDir": "industry-pack-it-operations",
+      "packStatus": "ready",
+      "showcaseSlug": "it-operations",
+      "scopes": ["故障诊断", "智能监控", "变更管理"],
+      "pptReference": "Slide 1 (职能总览)"
+    },
+    {
+      "id": "legal-compliance",
+      "name": "法务合规",
+      "icon": "⚖️",
+      "packDir": "industry-pack-legal-compliance",
+      "packStatus": "ready",
+      "showcaseSlug": "legal-compliance",
+      "scopes": ["合同审核", "合规审计", "证据收集"],
+      "pptReference": "Slide 1 (职能总览)"
+    },
+    {
+      "id": "marketing",
+      "name": "营销与广告",
+      "icon": "📢",
+      "packDir": "industry-pack-marketing",
+      "packStatus": "planned",
+      "showcaseSlug": "marketing",
+      "scopes": ["创意生产与内容创作", "广告投放与智能优化", "数据洞察与决策智能", "用户获客与智能外呼"],
+      "pptReference": "Slide 2-6"
+    },
+    {
+      "id": "operations",
+      "name": "运营管理",
+      "icon": "⚙️",
+      "packDir": "industry-pack-operations",
+      "packStatus": "planned",
+      "showcaseSlug": "operations",
+      "scopes": ["客户运营", "会员运营", "电商运营", "综合运营管理"],
+      "pptReference": "Slide 16"
+    },
+    {
+      "id": "content",
+      "name": "内容生成与审核",
+      "icon": "📄",
+      "packDir": "industry-pack-content",
+      "packStatus": "planned",
+      "showcaseSlug": "content",
+      "scopes": ["创意素材生成", "内容合规审核", "多模态内容创作"],
+      "pptReference": "Slide 19-21"
+    },
+    {
+      "id": "voice",
+      "name": "语音智能体",
+      "icon": "🎤",
+      "packDir": "industry-pack-voice",
+      "packStatus": "planned",
+      "showcaseSlug": "voice",
+      "scopes": ["智能语音客服", "语音驱动业务闭环", "多语言语音服务", "语音赋能智能硬件"],
+      "pptReference": "Slide 22-23"
+    },
+    {
+      "id": "video",
+      "name": "视频Agent",
+      "icon": "🎬",
+      "packDir": "industry-pack-video",
+      "packStatus": "planned",
+      "showcaseSlug": "video",
+      "scopes": ["端到端视频生成", "智能视频剪辑", "多语种视频分发"],
+      "pptReference": "Slide 24-35"
+    },
+    {
+      "id": "iot",
+      "name": "设备控制与IoT",
+      "icon": "🏠",
+      "packDir": "industry-pack-iot",
+      "packStatus": "planned",
+      "showcaseSlug": "iot",
+      "scopes": ["智能家居控制", "场景智能与主动感知", "车家互联与远程管理", "适老化与无障碍服务"],
+      "pptReference": "Slide 36-40"
+    },
+    {
+      "id": "manufacturing",
+      "name": "制造业",
+      "icon": "🏭",
+      "packDir": "industry-pack-manufacturing",
+      "packStatus": "planned",
+      "showcaseSlug": "manufacturing",
+      "scopes": ["质量管理", "供应链管理", "设备维护管理", "工业IoT与产线优化", "客户反馈与产品改进"],
+      "pptReference": "Slide 1 (行业总览)"
+    }
+  ]
+}

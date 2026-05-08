@@ -1,0 +1,236 @@
+{
+  "title": "跨境与行业垂直客服全流程工作流",
+  "description": "覆盖从多平台消息接入、翻译、意图识别、业务处理、商机跟进到数据分析的端到端自动化客服工作流，支持7×24小时多语言多平台服务",
+  "tasks": [
+    {
+      "id": "task-1",
+      "title": "多平台消息接收与标准化",
+      "type": "agent",
+      "prompt": "接收来自各跨境电商平台（Shopee/Lazada/TikTok Shop/Amazon/独立站）的客户消息。执行以下操作：1）解析平台特定消息格式，提取发送者ID、消息内容、消息类型（文本/图片/视频/订单卡片）、关联订单号等核心字段；2）基于platform_message_id执行消息去重；3）计算该平台的SLA截止时间（Shopee 12小时、Amazon 24小时等）；4）生成标准化内部消息体（Standard Message Object）。输出标准化消息体和SLA信息。",
+      "agentRef": "multiplatform-gateway",
+      "dependentTasks": [],
+      "requiredIntegrations": ["Shopee Open Platform API", "Lazada Open API", "TikTok Shop API", "Amazon SP-API"]
+    },
+    {
+      "id": "task-2",
+      "title": "语言检测与实时翻译",
+      "type": "agent",
+      "prompt": "对接收到的标准化消息执行语言检测和翻译处理：1）自动检测消息源语言（支持泰语/越南语/印尼语/马来语/菲律宾语/缅甸语/英语/西班牙语等8+种语言）；2）加载电商专业术语库，锁定术语翻译；3）调用翻译引擎将源语言翻译为中文；4）应用文化适配（泰语礼貌词尾、越南语人称代词等）；5）计算翻译置信度评分。若置信度>=70%则标记为可直接使用，<70%则标记需人工校验。输出翻译后的中文消息和置信度评分。",
+      "agentRef": "multiplatform-gateway",
+      "dependentTasks": ["task-1"],
+      "requiredIntegrations": ["Translation Engine API", "Terminology Database"]
+    },
+    {
+      "id": "task-3",
+      "title": "翻译置信度评估与路由",
+      "type": "condition",
+      "prompt": "评估翻译置信度并决定路由：如果翻译置信度>=70%，消息进入正常处理流程；如果翻译置信度<70%，消息标记为需人工校验，进入人工翻译审核队列，校验完成后再回流至正常处理流程。所有消息无论置信度如何，都需要最终进入意图识别环节。",
+      "agentRef": "multiplatform-gateway",
+      "dependentTasks": ["task-2"],
+      "requiredIntegrations": []
+    },
+    {
+      "id": "task-4",
+      "title": "智能调度与时段判定",
+      "type": "agent",
+      "prompt": "判断当前服务时段并执行调度策略：1）确认当前时段（工作时段08:00-22:00 / 夜间时段22:00-08:00 / 特殊时段）；2）工作时段：查询在线坐席技能矩阵和当前负载，准备人工分配方案；3）夜间时段：启动AI自动处理模式，L1/L2消息由AI直接处理，L3消息缓存待值班人工；4）监控各平台消息队列深度，队列积压超阈值触发负载均衡预警；5）维护SLA倒计时，对接近超时的消息提升处理优先级。输出调度决策（AI自动/人工分配/排队等待）。",
+      "agentRef": "multiplatform-gateway",
+      "dependentTasks": ["task-3"],
+      "requiredIntegrations": ["Agent Scheduling System", "Queue Management System"]
+    },
+    {
+      "id": "task-5",
+      "title": "客户记忆加载",
+      "type": "agent",
+      "prompt": "为当前客户加载跨会话记忆：1）通过统一客户ID检索记忆库；2）判断距上次交互时间——若<24小时则加载STM（上次对话摘要、未解决问题、进行中操作状态）；3）加载LTM（语言偏好、常购品类、历史问题模式、VIP等级）；4）将记忆上下文注入当前对话，使后续处理Agent了解客户背景，免重复信息采集；5）如客户是跨平台关联用户，合并多平台记忆信息。输出客户上下文摘要和个性化服务建议。",
+      "agentRef": "vertical-business-processor",
+      "dependentTasks": ["task-4"],
+      "requiredIntegrations": ["Customer Memory Store", "Customer Identity Service"]
+    },
+    {
+      "id": "task-6",
+      "title": "意图识别与分流",
+      "type": "condition",
+      "prompt": "对翻译后的客户消息进行意图识别和分流决策：分析消息内容判断客户意图类型，输出以下分流方向之一：A）标准业务查询（物流查询/订单状态/退换货等）→ 进入垂直业务自动处理；B）复杂业务操作（航空退改签/金融交易/高额退款等）→ 进入Policy Engine规则验证；C）咨询中包含商机信号（询价/比价/批量需求等）→ 同时进入业务处理和商机识别；D）投诉或复杂问题超出当前Scope能力 → 翻译后转入工单处理Scope或投诉管理Scope。",
+      "agentRef": "vertical-business-processor",
+      "dependentTasks": ["task-5"],
+      "requiredIntegrations": []
+    },
+    {
+      "id": "task-7",
+      "title": "标准业务MCP工具自动处理",
+      "type": "agent",
+      "prompt": "对标准业务查询调用MCP Server工具执行自动化处理：1）根据意图类型选择对应MCP工具（物流轨迹查询/订单状态查询/退换货申请/优惠券发放等）；2）从对话和系统上下文中提取工具所需参数（订单号、物流单号等）；3）验证参数完整性，缺少则生成追问话术；4）调用MCP工具获取结果；5）将技术性返回结果转化为客户友好的自然语言描述；6）工具调用失败时执行重试或降级处理。输出处理结果和面向客户的回复内容。",
+      "agentRef": "vertical-business-processor",
+      "dependentTasks": ["task-6"],
+      "requiredIntegrations": ["Logistics Tracking API", "Order Management API", "Return/Exchange System", "Coupon Management System"]
+    },
+    {
+      "id": "task-8",
+      "title": "Policy Engine规则验证与决策",
+      "type": "agent",
+      "prompt": "对涉及资金变动或高风险操作的请求执行Policy Engine规则验证：1）验证客户身份（订单号+手机尾号双重验证）；2）加载操作类型对应的规则集最新版本；3）执行前置条件验证（时效性/数据完整性/防重复）；4）按优先级顺序执行规则链（黑名单→硬性限制→金额阈值→频次限制→业务逻辑）；5）输出决策：PERMIT（允许执行，生成授权token）/ DENY（拒绝，生成原因说明和替代方案）/ ESCALATE（超阈值，生成审批工单）；6）决策写入不可篡改审计日志。",
+      "agentRef": "vertical-business-processor",
+      "dependentTasks": ["task-6"],
+      "requiredIntegrations": ["Policy Engine", "Identity Verification Service", "Audit Log System"]
+    },
+    {
+      "id": "task-9",
+      "title": "高额操作人工审批流程",
+      "type": "agent",
+      "prompt": "处理Policy Engine输出ESCALATE决策的高额操作审批：1）生成包含完整上下文的审批工单（客户信息/操作详情/金额/风险评估/建议意见）；2）根据金额段推送至对应审批人（500-2000元→组长、2000-5000元→主管、>5000元→总监）；3）向客户发送等待通知'您的请求正在审批中，预计30分钟内处理'；4）监控审批超时（30分钟），超时自动升级；5）审批通过→执行操作并通知客户；审批驳回→生成驳回说明和替代方案通知客户。输出审批结果和执行状态。",
+      "agentRef": "vertical-business-processor",
+      "dependentTasks": ["task-8"],
+      "requiredIntegrations": ["Approval Workflow System", "Notification Service"]
+    },
+    {
+      "id": "task-10",
+      "title": "商机信号识别",
+      "type": "agent",
+      "prompt": "对客户对话内容进行实时商机信号检测：1）分析对话上下文（最近10轮），识别购买意向信号类型（直接询价/批量需求/竞品比较/犹豫信号/复购意向/紧迫购买等）；2）支持跨语言特征增强——结合翻译后的中文内容和原始语言的情感/语气特征；3）结合客户LTM数据（历史购买力、过往转化率）增强信号判定；4）过滤反模式（售后场景/投诉场景/明确拒绝等误判情况）；5）对检测到的信号进行多维度意向评分（0-100分）。输出商机信号报告、意向度评分和推荐后续策略。",
+      "agentRef": "opportunity-tracker",
+      "dependentTasks": ["task-6"],
+      "requiredIntegrations": ["CRM System", "Product Catalog API"]
+    },
+    {
+      "id": "task-11",
+      "title": "商机评分与策略执行",
+      "type": "condition",
+      "prompt": "根据商机意向评分执行分级策略：评估意向度评分结果，分三路处理——高意向(>=80分)：生成商机卡片（含客户画像摘要、对话关键句、推荐跟进策略、预计成交金额），在1小时内推送至对应区域/品类的销售人员，设置2小时未响应自动升级提醒；中意向(50-79分)：进入自动化营销跟进队列，根据信号类型选择营销策略（限时优惠券/促销信息/个性化推荐），48小时后重新评估；低意向(<50分)：标记存档，在服务完成后附加轻量推荐信息，纳入批量营销池。",
+      "agentRef": "opportunity-tracker",
+      "dependentTasks": ["task-10"],
+      "requiredIntegrations": ["CRM System", "Sales Team Notification", "Marketing Automation Platform"]
+    },
+    {
+      "id": "task-12",
+      "title": "回复翻译与发送",
+      "type": "agent",
+      "prompt": "将处理完成的中文回复翻译为客户目标语言并通过对应平台发送：1）获取客户语言偏好（来自LTM或消息源语言）；2）调用翻译引擎将中文回复翻译为目标语言；3）应用术语库锁定翻译和文化适配；4）计算翻译置信度——>=70%直接发送，<70%进入人工校验后发送；5）通过对应平台API发送消息（确保符合平台消息格式要求）；6）确认发送成功，记录响应时间（用于SLA统计）。若平台API故障，启动消息缓存+重试机制。",
+      "agentRef": "multiplatform-gateway",
+      "dependentTasks": ["task-7", "task-8", "task-9"],
+      "requiredIntegrations": ["Translation Engine API", "Shopee Open Platform API", "Lazada Open API", "TikTok Shop API", "Amazon SP-API"]
+    },
+    {
+      "id": "task-13",
+      "title": "对话记忆保存与更新",
+      "type": "agent",
+      "prompt": "对话结束或阶段性完成时保存和更新客户记忆：1）生成STM快照——包含本次对话核心摘要（<200字）、未解决问题列表、进行中操作状态、客户情绪标记、最后意图类型；2）增量更新STM（不覆盖之前内容，追加记录）；3）基于本次交互数据评估是否更新LTM——如发现新的偏好变化（语言/品类/沟通风格），更新对应LTM字段并标注置信度；4）执行隐私合规检查——确保不存储敏感信息（支付密码、完整证件号等）；5）持久化存储，确保下次会话可正确加载。",
+      "agentRef": "vertical-business-processor",
+      "dependentTasks": ["task-12"],
+      "requiredIntegrations": ["Customer Memory Store"]
+    },
+    {
+      "id": "task-14",
+      "title": "平台API异常应急处理",
+      "type": "agent",
+      "prompt": "当检测到平台API异常时执行应急处理流程：1）确认异常类型（连接超时/认证失败/服务端错误/限流）；2）启动消息缓存机制，将待发送消息存入本地队列（确保零丢失）；3）按5分钟间隔执行重试，最多3次；4）3次重试失败后通知运维团队（附带故障详情和影响范围评估）；5）对受影响的客户通过替代渠道（邮件/短信）发送通知；6）平台恢复后按时间顺序清理缓存队列（30分钟内完成）；7）生成故障事件报告。输出故障处理状态和影响评估。",
+      "agentRef": "multiplatform-gateway",
+      "dependentTasks": ["task-1"],
+      "requiredIntegrations": ["Message Cache Queue", "Alert Notification System", "Email/SMS Gateway"]
+    },
+    {
+      "id": "task-15",
+      "title": "多维运营数据分析与报告",
+      "type": "agent",
+      "prompt": "聚合全维度服务数据生成运营分析报告：1）从各Agent和系统采集数据——消息量/响应时效/平台分布（多平台网关）、操作类型/Policy Engine决策日志（垂直业务处理）、商机识别/转化数据（商机识别）、翻译量/置信度分布（翻译引擎）；2）按平台/语言/时段/品类/处理方式进行多维交叉分析；3）计算核心指标（SLA达标率/翻译准确率/AI处理率/商机转化率等）；4）执行异常检测——偏离基线2σ以上触发Warning，3σ触发Critical；5）监控平台健康度（店铺评分/回复率），在接近处罚阈值时预警；6）输出日报/周报/月报及优化建议。",
+      "agentRef": "cross-border-analytics",
+      "dependentTasks": ["task-12", "task-11"],
+      "requiredIntegrations": ["Data Warehouse", "BI Dashboard", "Alert System"]
+    },
+    {
+      "id": "task-16",
+      "title": "翻译质量监控与优化",
+      "type": "agent",
+      "prompt": "持续监控翻译质量并推动优化：1）采集翻译质量信号——客户困惑反馈、人工抽检评分、翻译后客户沉默率；2）月度抽样200+条翻译记录，按语言×消息类型分层抽样送人工评分；3）计算各语言翻译准确率，识别系统性偏差模式（特定语言整体偏低/特定术语反复错误/特定句式翻译不佳）；4）输出术语库更新建议（新增/修正术语映射）和模型优化方向；5）追踪优化措施落地效果（前后对比）；6）翻译引擎版本更新后执行回归测试验证质量。输出翻译质量报告和优化建议。",
+      "agentRef": "cross-border-analytics",
+      "dependentTasks": ["task-15"],
+      "requiredIntegrations": ["Translation Engine API", "Quality Assessment System", "Terminology Database"]
+    }
+  ],
+  "variables": [
+    {
+      "variableId": "var-1",
+      "name": "platformSource",
+      "variableType": "string",
+      "description": "消息来源平台标识（shopee/lazada/tiktok_shop/amazon/website）",
+      "required": true
+    },
+    {
+      "variableId": "var-2",
+      "name": "customerId",
+      "variableType": "string",
+      "description": "统一客户标识ID，用于跨平台身份关联和记忆检索",
+      "required": true
+    },
+    {
+      "variableId": "var-3",
+      "name": "sourceLanguage",
+      "variableType": "string",
+      "description": "消息源语言代码（th/vi/id/ms/tl/my/en/es等）",
+      "required": true
+    },
+    {
+      "variableId": "var-4",
+      "name": "translationConfidence",
+      "variableType": "number",
+      "description": "翻译置信度评分（0-100），低于70需人工校验",
+      "required": true
+    },
+    {
+      "variableId": "var-5",
+      "name": "intentType",
+      "variableType": "string",
+      "description": "客户意图类型（standard_query/complex_operation/opportunity_signal/complaint）",
+      "required": true
+    },
+    {
+      "variableId": "var-6",
+      "name": "policyDecision",
+      "variableType": "string",
+      "description": "Policy Engine决策结果（PERMIT/DENY/ESCALATE）",
+      "required": false
+    },
+    {
+      "variableId": "var-7",
+      "name": "opportunityScore",
+      "variableType": "number",
+      "description": "商机意向度评分（0-100），>=80为高意向",
+      "required": false
+    },
+    {
+      "variableId": "var-8",
+      "name": "operationAmount",
+      "variableType": "number",
+      "description": "操作涉及金额（人民币），用于审批阈值判定",
+      "required": false
+    },
+    {
+      "variableId": "var-9",
+      "name": "slaDeadline",
+      "variableType": "string",
+      "description": "SLA截止时间（ISO 8601格式），基于平台规则计算",
+      "required": true
+    },
+    {
+      "variableId": "var-10",
+      "name": "currentTimeSlot",
+      "variableType": "string",
+      "description": "当前服务时段（work_hours/night_shift/holiday/promotion）",
+      "required": true
+    },
+    {
+      "variableId": "var-11",
+      "name": "customerMemory",
+      "variableType": "object",
+      "description": "客户跨会话记忆对象，包含STM（短期记忆）和LTM（长期记忆）",
+      "required": false
+    },
+    {
+      "variableId": "var-12",
+      "name": "platformHealthStatus",
+      "variableType": "string",
+      "description": "平台健康度状态（green/yellow/red），影响调度策略",
+      "required": false
+    }
+  ]
+}

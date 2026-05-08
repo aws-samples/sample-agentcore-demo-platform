@@ -1,0 +1,190 @@
+{
+  "title": "车家互联与远程管理工作流",
+  "description": "覆盖车家联动触发、远程设备安全控制、能耗智能调度三大核心流程的端到端工作流，确保从地理围栏事件检测到设备响应执行在30秒内完成，同时保障安全认证和能耗优化。",
+  "tasks": [
+    {
+      "id": "task-1",
+      "title": "位置数据采集与多源融合",
+      "type": "agent",
+      "prompt": "持续接收用户的多源定位数据（GPS、WiFi扫描、蜂窝基站、车辆OBD状态），执行数据融合算法输出统一的用户位置估计。根据与最近围栏的距离自动切换定位精度模式：远距离使用省电模式（WiFi+蜂窝），接近围栏时切换精确模式（GPS+WiFi）。输出融合后的位置坐标、精度、移动状态（静止/移动/高速移动）和置信度。检测并过滤GPS多径效应和位置跳变异常。",
+      "agentRef": "geofence-trigger",
+      "dependentTasks": [],
+      "requiredIntegrations": ["GPS模块", "WiFi定位服务", "蜂窝基站定位", "车辆OBD蓝牙接口"]
+    },
+    {
+      "id": "task-2",
+      "title": "地理围栏穿越事件检测",
+      "type": "agent",
+      "prompt": "基于融合后的实时位置数据，计算用户与所有活跃围栏的距离，判断是否发生围栏穿越事件（从圈外进入圈内=enter，从圈内到圈外=exit）。使用Haversine公式计算球面距离，对比围栏配置半径做穿越判定。生成穿越事件候选记录，包含围栏ID、穿越方向、发生时间、当前位置精度。",
+      "agentRef": "geofence-trigger",
+      "dependentTasks": ["task-1"],
+      "requiredIntegrations": ["围栏配置数据库"]
+    },
+    {
+      "id": "task-3",
+      "title": "围栏事件防抖验证",
+      "type": "condition",
+      "prompt": "对穿越事件候选执行防抖验证：检查过去5分钟（防抖窗口）内是否存在反方向的穿越事件。如果存在反向事件（如5分钟内先enter后exit），判定为围栏边缘抖动并丢弃本次事件。如果防抖窗口内无反向事件，确认事件有效并进入下一步处理。输出决策结果：confirmed（确认触发）或discarded（抖动丢弃）。",
+      "agentRef": "geofence-trigger",
+      "dependentTasks": ["task-2"],
+      "requiredIntegrations": []
+    },
+    {
+      "id": "task-4",
+      "title": "ETA计算与预启动时机决策",
+      "type": "agent",
+      "prompt": "当确认围栏进入事件且关联场景包含设备预启动需求时，计算用户到达目标点的ETA。融合当前车速、剩余距离、历史通勤数据和实时路况生成ETA预估（秒）。将ETA与设备预热需求时间对比：当ETA≤设备预热时间+3分钟安全余量时，建议立即触发预启动。每2分钟重新计算ETA并动态调整建议。输出ETA值、置信度、预启动建议和建议启动的设备列表。",
+      "agentRef": "geofence-trigger",
+      "dependentTasks": ["task-3"],
+      "requiredIntegrations": ["路况数据API", "历史通勤数据库"]
+    },
+    {
+      "id": "task-5",
+      "title": "联动指令身份认证与鉴权",
+      "type": "agent",
+      "prompt": "对接收到的控制请求（来自地理围栏自动触发或用户手动远程操作）执行安全认证。第一步验证用户Token（JWT解码+签名验证+有效期检查）；第二步验证用户与目标设备的绑定关系和权限级别（管理员/成员/访客）；第三步检查是否为敏感操作（门锁/摄像头/安防），如是则触发二次确认流程。输出认证结果（通过/拒绝/需二次确认）和授权范围。同时执行异常访问检测（异地IP/新设备/非常规时间）。",
+      "agentRef": "remote-controller",
+      "dependentTasks": ["task-4"],
+      "requiredIntegrations": ["身份认证服务", "设备绑定注册表", "短信验证码服务", "生物特征SDK"]
+    },
+    {
+      "id": "task-6",
+      "title": "敏感操作二次确认判定",
+      "type": "condition",
+      "prompt": "判断当前操作是否属于敏感操作类别。敏感操作包括：智能门锁的任何操作、摄像头开启/查看/下载、安防系统撤防/配置修改、全屋断电/重置、车库门远程开启。如果是敏感操作，触发二次确认流程（优先生物特征认证，备选短信验证码），等待用户在5分钟内完成确认。超时则取消操作。如果不是敏感操作，直接通过进入下一步。",
+      "agentRef": "remote-controller",
+      "dependentTasks": ["task-5"],
+      "requiredIntegrations": ["生物特征认证SDK", "短信网关"]
+    },
+    {
+      "id": "task-7",
+      "title": "本地远程冲突检测与仲裁",
+      "type": "condition",
+      "prompt": "检查目标设备当前是否正在被本地用户操作（通过设备最近操作来源和时间判断）。如果设备在最近60秒内有本地操作（物理按键/本地APP/语音控制），判定为本地占用状态。本地占用时：远程指令暂缓执行，通知远程用户'设备正在本地使用中，您的操作已排队'。本地无冲突时：放行远程指令进入执行阶段。",
+      "agentRef": "remote-controller",
+      "dependentTasks": ["task-6"],
+      "requiredIntegrations": ["设备状态同步服务"]
+    },
+    {
+      "id": "task-8",
+      "title": "设备控制指令下发与确认",
+      "type": "agent",
+      "prompt": "将认证通过的控制指令通过对应通信通道下发至目标设备。单设备操作直接发送，分组操作展开为设备列表并行下发（每批5个，避免网关过载）。启动ACK等待计时器（WiFi设备3秒/Zigbee 5秒/BLE 8秒）。收到ACK确认执行成功后更新设备状态。未收到ACK则执行重试（最多2次，间隔递增）。全部指令执行完成后生成结果摘要通知用户。记录完整操作审计日志。",
+      "agentRef": "remote-controller",
+      "dependentTasks": ["task-7"],
+      "requiredIntegrations": ["设备调度控制器", "设备通信网关", "消息推送服务"]
+    },
+    {
+      "id": "task-9",
+      "title": "网络中断指令队列管理",
+      "type": "agent",
+      "prompt": "当设备控制指令下发失败（网络超时/连接断开）时，将指令写入持久化队列。按优先级标记：安全类(critical/TTL60分钟)、联动触发(high/TTL30分钟)、手动操作(normal/TTL30分钟)、定时任务(low/TTL15分钟)。每30秒探测网关连接状态，网络恢复后按优先级从高到低逐条重发（间隔500ms）。已过期指令丢弃并通知用户失败原因。队列中对同一设备的重复指令自动合并为最新状态。通知用户当前队列状态。",
+      "agentRef": "remote-controller",
+      "dependentTasks": ["task-8"],
+      "requiredIntegrations": ["持久化消息队列", "网络状态监测服务"]
+    },
+    {
+      "id": "task-10",
+      "title": "实时电价与设备负载数据获取",
+      "type": "agent",
+      "prompt": "获取当地电网的分时电价策略（峰/平/谷时段划分和对应单价），查询当月累计用电量和阶梯电价档位。扫描家庭设备注册表识别所有可调度负载（EV充电桩、电热水器、洗碗机、洗衣机、烘干机、储能电池充电）和不可调度负载。获取可调度设备的额定功率、预估运行时长和用户使用约束（如EV需要明早8点前充满）。如有光伏系统，获取当日发电预测和储能电池当前SOC。",
+      "agentRef": "energy-optimizer",
+      "dependentTasks": [],
+      "requiredIntegrations": ["电价信息API", "设备注册表", "光伏逆变器接口", "储能BMS接口"]
+    },
+    {
+      "id": "task-11",
+      "title": "最优调度方案生成",
+      "type": "agent",
+      "prompt": "基于电价时段、可调度设备列表、用户约束和电力容量限制，运行多目标优化算法生成最优调度方案。目标函数：最小化电费=Σ(功率×时长×时段电价)，约束条件：所有任务在用户截止时间前完成、任意时刻总负载不超过进线容量90%、储能SOC保持在20%-90%区间。为每个设备生成计划启停时间，计算预期节省金额和舒适度影响评分(0-10分)。如有光伏储能系统，同步生成充放电策略。",
+      "agentRef": "energy-optimizer",
+      "dependentTasks": ["task-10"],
+      "requiredIntegrations": []
+    },
+    {
+      "id": "task-12",
+      "title": "调度方案舒适度影响评估",
+      "type": "condition",
+      "prompt": "评估调度方案对用户舒适度的影响评分。评分标准：0-3分=无感知影响（设备延迟启动但不影响使用）；4-5分=轻微影响（需要用户微调习惯）；6-10分=显著影响（可能导致不便）。当评分>5分时，该方案不自动执行，必须推送给用户展示具体影响说明并请求确认。用户确认后执行，拒绝则回退到无影响的保守方案。评分≤5的方案可自动执行。",
+      "agentRef": "energy-optimizer",
+      "dependentTasks": ["task-11"],
+      "requiredIntegrations": ["消息推送服务"]
+    },
+    {
+      "id": "task-13",
+      "title": "调度方案执行与实时监控",
+      "type": "agent",
+      "prompt": "在计划时间点向对应设备发送启动/停止指令（通过远程控制管理器的安全通道）。执行过程中持续监控：设备是否正常启动、实际功耗是否与预期一致、总负载是否接近容量上限。如检测到偏差>20%（设备未启动/功率异常/用户临时改变计划），触发动态重新调度。每日结束后统计实际节能数据：各设备实际运行时段、实际用电量、与方案偏差、实际节省金额。",
+      "agentRef": "energy-optimizer",
+      "dependentTasks": ["task-12"],
+      "requiredIntegrations": ["远程控制管理器", "设备功耗监测", "设备调度控制器"]
+    },
+    {
+      "id": "task-14",
+      "title": "能耗报告自动生成与推送",
+      "type": "document",
+      "prompt": "按配置的周期（日/周/月）自动生成能耗分析报告。日报（每日8:00）：前日总用电量和费用、峰谷分布、节省金额、1条节能建议。周报（周一9:00）：本周累计数据、设备能耗Top5排行、对比上周变化、关键异常事件。月报（每月1日10:00）：完整月度数据含同比环比、预算执行率、碳减排数据、详细节能建议(3-5条)、光伏储能收益分析。通过用户偏好渠道推送并存档。",
+      "agentRef": "energy-optimizer",
+      "dependentTasks": ["task-13"],
+      "requiredIntegrations": ["报告模板引擎", "消息推送服务", "数据存储服务"]
+    }
+  ],
+  "variables": [
+    {
+      "variableId": "var-1",
+      "name": "userLocation",
+      "variableType": "object",
+      "description": "用户当前融合位置数据，包含经纬度、精度、速度、方向",
+      "required": true
+    },
+    {
+      "variableId": "var-2",
+      "name": "activeGeofences",
+      "variableType": "array",
+      "description": "用户配置的所有活跃地理围栏列表，含中心点、半径、关联场景",
+      "required": true
+    },
+    {
+      "variableId": "var-3",
+      "name": "userAuthToken",
+      "variableType": "string",
+      "description": "用户身份认证JWT Token",
+      "required": true
+    },
+    {
+      "variableId": "var-4",
+      "name": "targetDevices",
+      "variableType": "array",
+      "description": "目标控制设备列表，含设备ID、所属住所、通信协议、在线状态",
+      "required": true
+    },
+    {
+      "variableId": "var-5",
+      "name": "tariffSchedule",
+      "variableType": "object",
+      "description": "当地分时电价配置，含峰/平/谷时段划分和对应单价",
+      "required": true
+    },
+    {
+      "variableId": "var-6",
+      "name": "residenceId",
+      "variableType": "string",
+      "description": "当前操作的住所ID，用于设备和权限的住所隔离",
+      "required": true
+    },
+    {
+      "variableId": "var-7",
+      "name": "vehicleOBDData",
+      "variableType": "object",
+      "description": "车辆OBD数据，含点火状态、车速、里程等",
+      "required": false
+    },
+    {
+      "variableId": "var-8",
+      "name": "solarBatteryState",
+      "variableType": "object",
+      "description": "光伏储能系统状态，含光伏发电功率、储能SOC、充放电功率",
+      "required": false
+    }
+  ]
+}

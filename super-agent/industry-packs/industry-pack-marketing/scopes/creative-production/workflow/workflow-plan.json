@@ -1,0 +1,165 @@
+{
+  "title": "创意生产与内容创作工作流",
+  "description": "从创意Brief受理到素材交付的端到端自动化创意生产流程，覆盖需求解析、并行生成、质量评估、不合格重做和最终交付。支持100+素材批量并发处理，确保品牌合规通过率≥95%、质量合格率≥80%。",
+  "tasks": [
+    {
+      "id": "task-1",
+      "title": "创意Brief受理与完整性验证",
+      "type": "agent",
+      "prompt": "接收创意需求Brief，执行完整性验证。检查以下必填项是否齐备：品牌指南（Logo文件、色彩体系、字体清单、调性说明）、受众画像（目标人群特征、消费场景）、渠道规格（平台列表、广告位类型、尺寸要求）、语言要求（语言列表、文化适配需求）、数量与排期（素材数量、变体数量、截止时间）。输出Brief完整性验证报告，标记所有缺失项。如有缺失，生成补充请求并说明缺失信息对生产的影响。",
+      "agentRef": "creative-supervisor",
+      "dependentTasks": [],
+      "requiredIntegrations": ["brief-management-system"]
+    },
+    {
+      "id": "task-2",
+      "title": "Brief完整性决策",
+      "type": "condition",
+      "prompt": "判断创意Brief是否通过完整性验证。条件：所有必填项（品牌指南、受众画像、渠道规格、语言要求、数量排期）均已提供且无矛盾。如果通过，进入任务拆解环节；如果不通过，等待信息补充后重新验证。",
+      "agentRef": "creative-supervisor",
+      "dependentTasks": ["task-1"],
+      "requiredIntegrations": []
+    },
+    {
+      "id": "task-3",
+      "title": "任务拆解与并发批次规划",
+      "type": "agent",
+      "prompt": "将验证通过的创意Brief拆解为可执行的素材生产任务清单。分析素材类型需求（图片/文案/图文合成），为每个任务设定task_id、task_type、priority（P0-P3）、assigned_agent、style_guide、dimensions、language_list、variant_count。构建任务依赖关系DAG，识别可并行任务组。规划并发批次（单批次≤50），设置超时阈值（图片30秒、视频5分钟）。输出结构化JSON任务清单和批次执行计划。",
+      "agentRef": "creative-supervisor",
+      "dependentTasks": ["task-2"],
+      "requiredIntegrations": []
+    },
+    {
+      "id": "task-4",
+      "title": "视觉素材AI生成",
+      "type": "agent",
+      "prompt": "根据任务指令生成广告视觉素材。步骤：1）解析风格方向、目标尺寸和品牌色彩要求；2）构建结构化图像生成Prompt（主体描述+场景/背景+光影风格+构图指导+品质参数）；3）设置生成参数（分辨率≥2048px）；4）执行图像生成（单张≤30秒）；5）生成后自检（AI伪影、色彩偏差Delta E<5、构图合理性）；6）不通过自检则调整prompt自动重试（最多2次）；7）生成A/B变体（控制单一变量）；8）输出图片文件+完整元数据（generation_prompt、seed_value、style_tags、variant_label、dimensions）。",
+      "agentRef": "visual-generation",
+      "dependentTasks": ["task-3"],
+      "requiredIntegrations": ["image-generation-api", "asset-storage"]
+    },
+    {
+      "id": "task-5",
+      "title": "广告文案撰写与多语言本地化",
+      "type": "agent",
+      "prompt": "根据文案任务指令撰写广告文案并完成多语言本地化。步骤：1）解析核心卖点、目标受众、品牌调性、目标情感基调；2）按AIDA模型撰写源语言文案（标题≤15字强Hook + 正文利益点场景化 + CTA明确行动指引）；3）生成3-5个文案变体（差异化维度：理性vs感性/痛点vs利益点/紧迫感vs从容感）；4）执行广告法合规自检（无绝对化用语/无虚假承诺/无违禁词）；5）对目标语言列表执行文化重创作（不是逐字翻译）；6）验证各渠道字符长度限制；7）输出结构化文案（headline/body_copy/cta × 变体数 × 语言数）。",
+      "agentRef": "content-editor",
+      "dependentTasks": ["task-3"],
+      "requiredIntegrations": ["translation-api"]
+    },
+    {
+      "id": "task-6",
+      "title": "图文排版合成",
+      "type": "agent",
+      "prompt": "将文案与视觉素材合成为最终可投放的广告素材。步骤：1）按task_id匹配视觉素材与对应文案；2）确认排版规范（品牌指定字体/字重/字号/颜色/位置）；3）规划视觉层级（主标题→副标题→CTA→Logo）；4）执行文案叠加渲染，确保文字对比度≥4.5:1（WCAG AA标准）；5）Logo标准化放置（遵循净空间规范）；6）安全区域验证（核心内容在各平台安全区内）；7）文字可读性检查（最小字号符合渠道规范）；8）输出最终合成素材（PNG/JPG）+排版规格说明。",
+      "agentRef": "content-editor",
+      "dependentTasks": ["task-4", "task-5"],
+      "requiredIntegrations": ["layout-engine", "asset-storage"]
+    },
+    {
+      "id": "task-7",
+      "title": "素材质量评估与品牌合规检查",
+      "type": "agent",
+      "prompt": "对所有生成素材执行全维度质量评估。执行：1）品牌合规5项强制检查（一票否决制）——Logo使用规范✓/✗、主色调符合度（Delta E≤5）✓/✗、字体规范✓/✗、安全区预留✓/✗、分辨率达标✓/✗；2）视觉质量4维度评分——清晰度(25%)+构图质量(25%)+美观度(25%)+AI伪影(25%)，综合≥7.0通过；3）文案质量评审——语法语义(30%)+情感匹配(20%)+广告法合规(30%)+说服力(20%)。输出每个素材的评分报告（overall_score、pass_status、brand_compliance_checklist、issues_found、improvement_suggestions）和批次汇总（pass_rate、common_failure_patterns）。",
+      "agentRef": "quality-assessor",
+      "dependentTasks": ["task-6"],
+      "requiredIntegrations": []
+    },
+    {
+      "id": "task-8",
+      "title": "合格率决策判定",
+      "type": "condition",
+      "prompt": "基于质量评估结果进行决策。判定条件：1）批次合格率≥80%且无Critical违规 → 合格素材进入交付流程，不合格素材进入标准重做；2）批次合格率60%-80%且无Critical → 分析共性问题，不合格素材进入重做流程；3）批次合格率<60% → 暂停批次，进行根因分析，可能需要调整Brief方向；4）存在品牌合规Critical违规（Logo缺失/错误）→ 立即中止批次并触发紧急告警。",
+      "agentRef": "creative-supervisor",
+      "dependentTasks": ["task-7"],
+      "requiredIntegrations": []
+    },
+    {
+      "id": "task-9",
+      "title": "不合格素材重做处理",
+      "type": "agent",
+      "prompt": "对不合格素材执行重做策略。步骤：1）分析每个不合格素材的具体原因和重做轮次记录；2）第1次不合格→生成局部修改指令（精确到参数级别，如调整prompt中的色彩描述/修改构图指导/更换背景风格），设置重做优先级P0；3）第2次不合格→更大幅度调整（更换风格方向/重新构图），同时通知人工审核；4）第3次不合格→标记为'Brief需求调整'，暂停自动重做，生成问题诊断报告（3次尝试详细记录+根因分析+建议Brief修改方向）等待人工决策。将重做任务发回对应的生成Agent。",
+      "agentRef": "creative-supervisor",
+      "dependentTasks": ["task-8"],
+      "requiredIntegrations": []
+    },
+    {
+      "id": "task-10",
+      "title": "品牌合规严重违规告警",
+      "type": "action",
+      "prompt": "当检测到品牌合规Critical级违规时（Logo缺失、Logo错误、竞品元素混入），立即执行：1）中止当前批次所有进行中的任务；2）标记违规素材并记录违规详情；3）发送紧急告警通知给人工管理者（包含违规类型、影响范围、建议处理方案）；4）将批次状态设置为'暂停-等待人工确认'；5）不进行任何自动重试。等待人工确认后的指令才能继续。",
+      "agentRef": "creative-supervisor",
+      "dependentTasks": ["task-8"],
+      "requiredIntegrations": ["alert-system", "notification-service"]
+    },
+    {
+      "id": "task-11",
+      "title": "素材交付打包与入库",
+      "type": "agent",
+      "prompt": "将所有合格素材打包交付并入库。步骤：1）汇总本批次最终产出清单（合格素材+条件通过素材+未解决不合格素材状态）；2）按渠道规格分类组织文件结构；3）为每个素材附加完整元数据（版本号v1/v2、变体标签A/B/C、适用受众标签、适用渠道、生成参数快照、有效期）；4）执行交付完整性验收——对照原始Brief逐项确认所有需求已满足；5）同步至投放系统素材库（API对接）；6）输出交付验收报告和批次执行总结。",
+      "agentRef": "creative-supervisor",
+      "dependentTasks": ["task-8"],
+      "requiredIntegrations": ["asset-library", "ad-delivery-system"]
+    },
+    {
+      "id": "task-12",
+      "title": "批次执行报告生成",
+      "type": "document",
+      "prompt": "生成本批次创意生产的执行总结报告。包含：1）Brief概要（客户/产品/目标/规模）；2）执行统计（总任务数/完成数/合格数/重做数/失败数）；3）质量指标（合格率/品牌合规率/平均质量分）；4）时效指标（总耗时/平均单素材耗时/是否超时）；5）异常记录（发生的异常及处理方式）；6）优化建议（基于本次执行发现的可改进点）；7）交付物清单和素材库链接。报告格式为结构化Markdown。",
+      "agentRef": "creative-supervisor",
+      "dependentTasks": ["task-11"],
+      "requiredIntegrations": []
+    }
+  ],
+  "variables": [
+    {
+      "variableId": "var-1",
+      "name": "creativeBrief",
+      "variableType": "object",
+      "description": "创意需求Brief，包含品牌指南、受众画像、渠道规格、语言要求、数量排期等完整需求信息",
+      "required": true
+    },
+    {
+      "variableId": "var-2",
+      "name": "brandGuidelines",
+      "variableType": "object",
+      "description": "品牌视觉规范，包含Logo文件及使用规范、品牌色彩体系（主色/辅色/禁用色HEX值）、授权字体列表、品牌调性关键词",
+      "required": true
+    },
+    {
+      "variableId": "var-3",
+      "name": "targetChannels",
+      "variableType": "array",
+      "description": "目标投放渠道及规格列表，每个渠道包含平台名、广告位类型、尺寸要求、安全区规范、文件格式和大小限制",
+      "required": true
+    },
+    {
+      "variableId": "var-4",
+      "name": "targetLanguages",
+      "variableType": "array",
+      "description": "目标语言列表（ISO 639-1语言代码），用于文案多语言本地化",
+      "required": true
+    },
+    {
+      "variableId": "var-5",
+      "name": "batchSize",
+      "variableType": "number",
+      "description": "批量素材生产数量，影响并发调度策略和超时阈值设置",
+      "required": true
+    },
+    {
+      "variableId": "var-6",
+      "name": "qualityThreshold",
+      "variableType": "number",
+      "description": "质量合格分数阈值，默认7.0（1-10分制），低于此分数的素材判定为不合格",
+      "required": false
+    },
+    {
+      "variableId": "var-7",
+      "name": "variantCount",
+      "variableType": "number",
+      "description": "每个创意方向的A/B测试变体数量，默认3",
+      "required": false
+    }
+  ]
+}

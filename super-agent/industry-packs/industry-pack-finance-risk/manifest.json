@@ -1,6 +1,6 @@
 {
   "version": "1.0.0",
-  "generatedAt": "2025-04-13T01:30:00.000Z",
+  "generatedAt": "2025-07-14T09:00:00.000Z",
   "generator": "super-agent-batch-v2",
   "industry": {
     "id": "finance-risk",
@@ -9,12 +9,12 @@
     "color": "#F59E0B"
   },
   "stats": {
-    "scopeCount": 3,
-    "agentCount": 14,
-    "skillCount": 51,
-    "workflowCount": 3,
+    "scopeCount": 5,
+    "agentCount": 22,
+    "skillCount": 80,
+    "workflowCount": 5,
     "twinCount": 2,
-    "sopCount": 3
+    "sopCount": 5
   },
   "scopes": [
     {
@@ -108,6 +108,63 @@
         "rule-lifecycle-management",
         "system-health-monitoring",
         "threat-intelligence-collection"
+      ],
+      "hasWorkflow": true,
+      "hasSop": true
+    },
+    {
+      "dirName": "insurance-wealth-management",
+      "name": "保险与财富管理",
+      "agents": [
+        "asset-advisor",
+        "claims-adjudicator",
+        "contract-analyzer",
+        "redemption-processor"
+      ],
+      "skills": [
+        "claims-fraud-detection",
+        "claims-material-verification",
+        "confidence-assessment",
+        "contract-clause-extraction",
+        "contract-comparison-analysis",
+        "customer-profiling",
+        "liquidity-monitoring",
+        "payout-calculation",
+        "portfolio-allocation",
+        "post-investment-monitoring",
+        "redemption-compliance-check",
+        "share-calculation"
+      ],
+      "hasWorkflow": true,
+      "hasSop": true
+    },
+    {
+      "dirName": "payment-transaction-risk",
+      "name": "支付与交易风控",
+      "agents": [
+        "aml-monitor",
+        "cross-border-compliance",
+        "payment-authorizer",
+        "risk-strategy-optimizer"
+      ],
+      "skills": [
+        "ab-test-design-evaluation",
+        "compliance-report-generation",
+        "cross-border-identity-verification",
+        "customer-risk-rating",
+        "enhanced-due-diligence",
+        "forex-quota-monitoring",
+        "large-transaction-reporting",
+        "model-health-assessment",
+        "payment-authorization-decision",
+        "realtime-risk-scoring",
+        "risk-metrics-monitoring",
+        "sanctions-screening",
+        "strategy-parameter-tuning",
+        "suspicious-transaction-detection",
+        "timeout-degradation-handling",
+        "trade-background-validation",
+        "transaction-limit-management"
       ],
       "hasWorkflow": true,
       "hasSop": true

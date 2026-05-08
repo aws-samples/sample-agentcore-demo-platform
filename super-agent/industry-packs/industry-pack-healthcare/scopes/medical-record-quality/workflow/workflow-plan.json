@@ -1,0 +1,299 @@
+{
+  "title": "病历与医疗质控全流程工作流",
+  "description": "覆盖病历质控、质量监测、不良事件管理和归档管理四大核心流程的自动化工作流，确保病历质量持续达标、医疗质量指标实时监控、不良事件及时识别处理。",
+  "tasks": [
+    {
+      "id": "task-1",
+      "title": "病历时限监控启动",
+      "type": "agent",
+      "prompt": "监测到新的临床事件（入院、手术完成、出院、死亡、转科），根据事件类型确定对应病历类型和时限规则（入院记录8h、首次病程8h、手术记录24h、出院记录24h、死亡记录24h），启动时限倒计时，记录起始时间和截止时间。检查当前在院患者中是否有即将到期或已超时的病历任务。",
+      "agentRef": "record-quality-inspector",
+      "dependentTasks": [],
+      "requiredIntegrations": ["HIS系统", "电子病历系统"]
+    },
+    {
+      "id": "task-2",
+      "title": "时限合规性判断",
+      "type": "condition",
+      "prompt": "判断当前监控的病历是否已超过规定书写时限。检查条件：当前时间是否已超过截止时间？是否处于截止前2小时的预警窗口期？基于判断结果路由到对应的处理流程。",
+      "agentRef": "record-quality-inspector",
+      "dependentTasks": ["task-1"],
+      "requiredIntegrations": []
+    },
+    {
+      "id": "task-3",
+      "title": "超时预警通知与升级",
+      "type": "action",
+      "prompt": "病历已超过规定时限，执行分级预警通知：1)超时即时通知主治医生（系统消息+手机推送）；2)超时2小时后升级通知科主任；3)超时4小时后升级通知医务部。记录每次通知的发送时间和送达状态。如果之前的通知未被确认阅读，使用备用通道（短信/电话）重新发送。",
+      "agentRef": "record-quality-inspector",
+      "dependentTasks": ["task-2"],
+      "requiredIntegrations": ["消息推送系统", "短信平台"]
+    },
+    {
+      "id": "task-4",
+      "title": "病历质量全面检查",
+      "type": "agent",
+      "prompt": "对已提交的病历执行全面质量检查：1)要素完整性检查——逐项核查必填项是否填写且内容充实；2)内容一致性校验——检查诊断与医嘱一致性、主诉与现病史呼应性、入院与出院诊断变化合理性、手术记录与同意书一致性（至少5个维度）；3)术语规范性审查——疾病名称ICD-10匹配、手术名称ICD-9-CM3合规、药物通用名使用。综合各维度检查结果，生成详细的问题清单和修改建议。",
+      "agentRef": "record-quality-inspector",
+      "dependentTasks": ["task-2"],
+      "requiredIntegrations": ["电子病历系统", "ICD编码库", "诊疗辅助模块"]
+    },
+    {
+      "id": "task-5",
+      "title": "病历等级自动预评定",
+      "type": "agent",
+      "prompt": "基于质量检查结果进行综合评分和等级判定：按照及时性(15分)+完整性(30分)+一致性(25分)+规范性(20分)+科学性(10分)的评分框架计算总分。判定等级：甲级≥90分且无原则性错误、乙级75-89分、丙级<75分或存在原则性错误（缺少知情同意书、诊断与病情完全不符等）。生成评分明细表，每个扣分点引用具体规范条款。",
+      "agentRef": "record-quality-inspector",
+      "dependentTasks": ["task-4"],
+      "requiredIntegrations": ["电子病历系统"]
+    },
+    {
+      "id": "task-6",
+      "title": "丙级病历判定与处理",
+      "type": "condition",
+      "prompt": "判断病历预评级是否为丙级。如果是丙级：标记为重点关注病历，通知科室质控员和责任医生，退回修改并设置3个工作日修改时限；如果是乙级：提供修改建议供医生参考，允许归档；如果是甲级：直接进入归档流程。",
+      "agentRef": "record-quality-inspector",
+      "dependentTasks": ["task-5"],
+      "requiredIntegrations": ["消息推送系统"]
+    },
+    {
+      "id": "task-7",
+      "title": "病历归档处理",
+      "type": "action",
+      "prompt": "对通过质量评定的病历执行归档操作：确认电子签名完整、锁定编辑权限、分配归档编号、设置保存期限（住院30年、门诊15年）。将评级结果同步给质量监测Agent纳入统计。对于退回修改后重新提交的病历，执行重新评级流程。",
+      "agentRef": "record-quality-inspector",
+      "dependentTasks": ["task-6"],
+      "requiredIntegrations": ["电子病历系统", "归档管理系统"]
+    },
+    {
+      "id": "task-8",
+      "title": "质量指标每日采集与计算",
+      "type": "agent",
+      "prompt": "执行每日定时质量指标采集和计算任务：从HIS、EMR、LIS等系统抽取前日原始数据，计算核心指标——病历甲级率、时限达标率、平均住院日、药占比、耗占比、非计划再入院率(31天)、手术并发症率、院内感染率、CMI值、时间消耗指数、费用消耗指数等。按全院和科室两个维度分别计算，同时计算环比和同比变化率。确保数据完整性（缺失率<1%），对异常值标记待核实。",
+      "agentRef": "quality-monitor",
+      "dependentTasks": [],
+      "requiredIntegrations": ["HIS系统", "电子病历系统", "LIS系统", "DRG分组系统"]
+    },
+    {
+      "id": "task-9",
+      "title": "指标阈值偏离判断",
+      "type": "condition",
+      "prompt": "将计算得到的各指标值与目标阈值进行比对：偏离20%-50%判定为黄色预警，偏离>50%判定为红色预警。同时检查是否存在连续3天或3周的持续偏离（趋势性问题判定）。对安全类指标（非计划再入院率、院内感染率等）采用绝对阈值判断。输出预警级别和趋势判定结果。",
+      "agentRef": "quality-monitor",
+      "dependentTasks": ["task-8"],
+      "requiredIntegrations": []
+    },
+    {
+      "id": "task-10",
+      "title": "预警生成与根因下钻分析",
+      "type": "agent",
+      "prompt": "对触发预警的指标执行多维度下钻分析：按科室维度识别主要贡献科室、按病种维度定位高风险DRG组、按时间维度确定偏离起始时间点。结合病历质控数据、路径偏差数据、不良事件数据进行关联分析。生成预警报告包含：指标现状、偏离幅度、主要贡献因素、初步根因判断。将预警推送至相关科室负责人。",
+      "agentRef": "quality-monitor",
+      "dependentTasks": ["task-9"],
+      "requiredIntegrations": ["消息推送系统"]
+    },
+    {
+      "id": "task-11",
+      "title": "趋势性问题专项分析",
+      "type": "agent",
+      "prompt": "对被判定为趋势性问题（连续3天/周偏离）的指标生成专项分析报告：使用统计过程控制(SPC)方法区分特殊原因变异和普通原因变异。分析可能的外部因素（政策变更、人员变动、季节性等）。引用历史同期数据和标杆医院数据进行对标。提出具体的PDCA改进建议方案。将报告推送医务部并建议召开专题讨论会。",
+      "agentRef": "quality-monitor",
+      "dependentTasks": ["task-10"],
+      "requiredIntegrations": ["消息推送系统"]
+    },
+    {
+      "id": "task-12",
+      "title": "PDCA改进方案制定",
+      "type": "agent",
+      "prompt": "基于专项分析结果，制定结构化的PDCA改进方案：Plan阶段——明确问题定义（用数据）、设定SMART目标、制定针对性措施（短期1-2周/中期1-3月/长期3-6月）、分配责任人和时限；Do阶段——创建任务跟踪项，设置检查点；Check阶段——设定4-8周观察期和效果验证标准；Act阶段——定义成功后的标准化路径和未达标的调整策略。方案需提交医务部审批。",
+      "agentRef": "quality-monitor",
+      "dependentTasks": ["task-11"],
+      "requiredIntegrations": ["任务管理系统"]
+    },
+    {
+      "id": "task-13",
+      "title": "质量报告定期生成",
+      "type": "document",
+      "prompt": "根据当前周期（日/周/月）自动生成对应的质量报告：日报包含各科室关键指标数值和预警事项（8:00前完成）；周报包含趋势图、科室排名和重点关注事项（周一10:00前）；月报包含综合分析、PDCA进展跟踪、改进建议和下月重点（每月5日前）。报告内容数据来源于指标监测结果，格式遵循标准模板，结论前置，图表为主。",
+      "agentRef": "quality-monitor",
+      "dependentTasks": ["task-8"],
+      "requiredIntegrations": ["报告生成系统"]
+    },
+    {
+      "id": "task-14",
+      "title": "不良事件主动监测扫描",
+      "type": "agent",
+      "prompt": "每5分钟执行一次系统数据扫描，将新增临床数据与20+触发规则进行匹配。重点监测：非计划再手术、非计划转ICU、院内心跳骤停、非计划再入院、院内跌倒、严重DDI触发、输血反应、手术部位错误、异物遗留、院内感染暴发、危急值未及时处理等。对匹配事件进行初步验证（排除已知例外如计划性再手术），确认后推送至事件分级流程。同时保持被动上报通道畅通，接收医护人员主动上报的事件。",
+      "agentRef": "adverse-event-manager",
+      "dependentTasks": [],
+      "requiredIntegrations": ["HIS系统", "手术系统", "护理系统", "LIS系统", "药物系统"]
+    },
+    {
+      "id": "task-15",
+      "title": "不良事件分级判定",
+      "type": "condition",
+      "prompt": "对确认的不良事件根据患者结局和事件性质进行三级分类：I级警告事件（死亡或永久性伤害，如手术部位错误、院内非预期死亡）——需即时响应；II级不良事件（临时伤害，需额外治疗或延长住院）——24小时内上报；III级无伤害事件（近似事件，及时拦截未造成伤害）——72小时内上报。分级结果决定后续响应流程和通知范围。",
+      "agentRef": "adverse-event-manager",
+      "dependentTasks": ["task-14"],
+      "requiredIntegrations": []
+    },
+    {
+      "id": "task-16",
+      "title": "警告事件即时响应",
+      "type": "action",
+      "prompt": "I级警告事件触发即时响应链：1)立即通知医务部主任（电话+系统消息+短信三通道确保送达）；2)同步通知分管院长和质控委员会主席；3)24小时内组建RCA分析团队（由医务部指定负责人，纳入相关科室主任和专业人员）；4)冻结相关病历和记录（防止篡改）；5)创建事件专案，启动72小时RCA分析倒计时。记录所有通知的送达确认时间。",
+      "agentRef": "adverse-event-manager",
+      "dependentTasks": ["task-15"],
+      "requiredIntegrations": ["消息推送系统", "电话通知系统", "电子病历系统"]
+    },
+    {
+      "id": "task-17",
+      "title": "标准上报表生成与提交",
+      "type": "agent",
+      "prompt": "为II级和III级不良事件生成标准化上报表，自动填充可从系统获取的信息（患者基本信息脱敏、事件时间、科室、触发规则等），提示责任科室补充事件经过描述、即时处理措施和初步原因分析。监控上报时限（II级24小时、III级72小时），距时限前4小时发送提醒，超时未上报自动升级通知科室主任。确保上报人信息匿名化保护。",
+      "agentRef": "adverse-event-manager",
+      "dependentTasks": ["task-15"],
+      "requiredIntegrations": ["不良事件上报系统"]
+    },
+    {
+      "id": "task-18",
+      "title": "RCA根因分析执行",
+      "type": "agent",
+      "prompt": "辅助RCA分析团队执行结构化根因分析：1)收集事件相关信息（病历、医嘱、护理记录、设备日志等）；2)辅助重建事件时间线，标注关键节点；3)提供鱼骨图分析框架（人员/流程/设备/环境/制度5维度）；4)引导5-Why深层追问（至少追问到第3层）；5)关联历史类似事件数据；6)辅助生成RCA报告初稿，包含根因结论、促成因素和整改建议。所有分析仅作为参考，最终结论由团队讨论确认。",
+      "agentRef": "adverse-event-manager",
+      "dependentTasks": ["task-16"],
+      "requiredIntegrations": ["电子病历系统", "知识库"]
+    },
+    {
+      "id": "task-19",
+      "title": "整改措施制定与登记",
+      "type": "agent",
+      "prompt": "基于RCA分析结论，辅助制定针对每个根因的整改措施。确保措施符合SMART原则：具体描述要做什么、可衡量的验证标准、在现有条件下可实现、与根因相关、明确完成时限。对措施进行分类：短期紧急措施（7天内）、中期系统改进（30天内）、长期制度建设（90天内）。为每项措施分配责任人和协作人，登记到整改跟踪系统，设置检查点和超期预警规则。",
+      "agentRef": "adverse-event-manager",
+      "dependentTasks": ["task-18"],
+      "requiredIntegrations": ["任务管理系统"]
+    },
+    {
+      "id": "task-20",
+      "title": "整改执行跟踪与效果验证",
+      "type": "agent",
+      "prompt": "持续跟踪整改措施的执行状态：监控各措施的进度（未开始/进行中/已完成/超期），距截止日前7天发送提醒，超期7天升级通知医务部。要求责任人提交完成证据（制度文件、培训记录、系统截图等）。措施完成后启动30天效果观察期：监测相关指标是否改善、观察同类事件是否复发。效果达标则关闭措施并纳入知识库；未达标则重启分析，调整方案进入下一轮改进。每月生成整改完成率统计报告。",
+      "agentRef": "adverse-event-manager",
+      "dependentTasks": ["task-19"],
+      "requiredIntegrations": ["任务管理系统", "消息推送系统"]
+    },
+    {
+      "id": "task-21",
+      "title": "不良事件月度汇总分析",
+      "type": "document",
+      "prompt": "每月汇总分析当月所有不良事件数据：事件总数及分级分布、事件类别分布（药物/手术/跌倒/感染等）、高发科室和高发时段、上报及时率统计、RCA完成情况、整改进展。与上月和去年同期对比分析趋势变化。重点关注上报率的环比增长（正向指标）和同类事件的复发情况。生成月度患者安全简报，推送质控委员会和各科室主任。",
+      "agentRef": "adverse-event-manager",
+      "dependentTasks": ["task-14", "task-20"],
+      "requiredIntegrations": ["报告生成系统"]
+    },
+    {
+      "id": "task-22",
+      "title": "病历质控数据同步至质量监测",
+      "type": "action",
+      "prompt": "将病历质控Agent产生的评级数据（甲级率、时限达标率、丙级病历数等）实时同步给质量监测Agent。同步内容包括：每份病历的评分明细、各科室的汇总统计、发现的系统性问题模式。数据格式标准化，确保质量监测Agent可直接纳入指标计算体系。对于发现的某科室某类病历普遍存在共性缺陷的情况，单独标记为系统性问题推送趋势分析。",
+      "agentRef": "record-quality-inspector",
+      "dependentTasks": ["task-5"],
+      "requiredIntegrations": ["数据同步接口"]
+    },
+    {
+      "id": "task-23",
+      "title": "不良事件数据同步至质量监测",
+      "type": "action",
+      "prompt": "将不良事件Agent产生的事件数据和分析结论同步给质量监测Agent纳入整体质量评估。同步内容包括：事件数量和分级分布、各科室事件率、RCA发现的系统性问题、整改措施的执行情况和效果。确保质量监测Agent在生成质量报告时能获取完整的安全维度数据。",
+      "agentRef": "adverse-event-manager",
+      "dependentTasks": ["task-17", "task-20"],
+      "requiredIntegrations": ["数据同步接口"]
+    }
+  ],
+  "variables": [
+    {
+      "variableId": "var-1",
+      "name": "patientId",
+      "variableType": "string",
+      "description": "当前处理的患者唯一标识ID",
+      "required": true
+    },
+    {
+      "variableId": "var-2",
+      "name": "admissionId",
+      "variableType": "string",
+      "description": "住院号/就诊流水号",
+      "required": true
+    },
+    {
+      "variableId": "var-3",
+      "name": "recordType",
+      "variableType": "string",
+      "description": "病历类型（入院记录/首次病程/手术记录/出院记录/死亡记录等）",
+      "required": true
+    },
+    {
+      "variableId": "var-4",
+      "name": "departmentId",
+      "variableType": "string",
+      "description": "科室标识ID",
+      "required": true
+    },
+    {
+      "variableId": "var-5",
+      "name": "responsibleDoctorId",
+      "variableType": "string",
+      "description": "责任医生工号",
+      "required": true
+    },
+    {
+      "variableId": "var-6",
+      "name": "triggerEventTime",
+      "variableType": "string",
+      "description": "触发事件发生时间（ISO 8601格式）",
+      "required": true
+    },
+    {
+      "variableId": "var-7",
+      "name": "recordGrade",
+      "variableType": "string",
+      "description": "病历评级结果（甲级/乙级/丙级）",
+      "required": false
+    },
+    {
+      "variableId": "var-8",
+      "name": "qualityScore",
+      "variableType": "number",
+      "description": "病历质量评分（0-100）",
+      "required": false
+    },
+    {
+      "variableId": "var-9",
+      "name": "adverseEventLevel",
+      "variableType": "string",
+      "description": "不良事件等级（I级/II级/III级）",
+      "required": false
+    },
+    {
+      "variableId": "var-10",
+      "name": "calculationPeriod",
+      "variableType": "string",
+      "description": "质量指标计算周期（daily/weekly/monthly/quarterly/yearly）",
+      "required": false
+    },
+    {
+      "variableId": "var-11",
+      "name": "alertLevel",
+      "variableType": "string",
+      "description": "预警级别（normal/yellow/red）",
+      "required": false
+    },
+    {
+      "variableId": "var-12",
+      "name": "isTrendIssue",
+      "variableType": "boolean",
+      "description": "是否为趋势性问题（连续3天/周偏离阈值）",
+      "required": false
+    }
+  ]
+}

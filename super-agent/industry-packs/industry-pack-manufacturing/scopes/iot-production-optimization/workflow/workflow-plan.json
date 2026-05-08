@@ -1,0 +1,222 @@
+{
+  "title": "工业IoT设备监控与产线优化工作流",
+  "description": "从传感器数据采集到异常检测、预测性维护和产线优化的端到端自动化工作流，涵盖实时监控、告警管理、故障预测和排产优化四大核心路径。",
+  "tasks": [
+    {
+      "id": "task-1",
+      "title": "传感器数据采集与预处理",
+      "type": "agent",
+      "prompt": "从OPC-UA/MQTT数据通道接收设备传感器的实时数据流（振动、温度、电流、压力），执行数据清洗（去噪、插值、标准化）和特征提取（时域特征：RMS/峰值/峭度；频域特征：FFT频谱/主频/谐波能量）。验证数据完整性和时效性，对数据质量低于95%的传感器触发数据质量告警。输出清洗后的结构化特征数据集供下游异常检测和健康度评估使用。",
+      "agentRef": "iot-monitoring-analyst",
+      "dependentTasks": [],
+      "requiredIntegrations": ["OPC-UA数据平台", "MQTT消息中间件", "时序数据库"]
+    },
+    {
+      "id": "task-2",
+      "title": "实时异常检测",
+      "type": "agent",
+      "prompt": "基于传感器数据预处理输出的特征数据，应用多层次异常检测算法：（1）阈值检测——当前值与设备基线3σ范围对比；（2）趋势检测——CUSUM/EWMA检测均值偏移和过程漂移；（3）模式检测——Isolation Forest对多维特征空间进行异常评分。对检测到的异常进行二次确认（连续3个数据点异常才确认），并判定异常严重程度评分（0-1）。输出异常检测结果包含：是否异常、异常类型、异常评分、数据证据。整个检测过程从数据到达到结论输出必须在30秒内完成。",
+      "agentRef": "iot-monitoring-analyst",
+      "dependentTasks": ["task-1"],
+      "requiredIntegrations": ["异常检测模型服务", "设备基线数据库"]
+    },
+    {
+      "id": "task-3",
+      "title": "设备健康度评分计算",
+      "type": "agent",
+      "prompt": "综合多维度传感器特征数据，计算设备实时健康度综合评分（0-100分）。按设备类型应用相应权重配置（如旋转设备：振动40%、温度25%、电气25%、润滑10%），每个维度独立计算子分数后加权汇总。应用修正因子：设备年龄修正、季节环境修正。输出综合评分、各维度子分数、评分变化趋势（改善/稳定/退化）、以及触发的动作级别（正常>80分/关注60-80分/告警40-60分/紧急<40分）。评分每分钟更新一次。",
+      "agentRef": "iot-monitoring-analyst",
+      "dependentTasks": ["task-1"],
+      "requiredIntegrations": ["设备台账系统", "健康度评分配置库"]
+    },
+    {
+      "id": "task-4",
+      "title": "异常级别判定与分流",
+      "type": "condition",
+      "prompt": "根据异常检测结果和设备健康度评分，判定异常级别并决定后续处理路径：（1）无异常（未检测到异常且健康度>80分）→ 数据归档，继续正常监控；（2）观察级（检测到异常特征但健康度>60分）→ 增加监控频率，标记关注，纳入预测性维护评估队列；（3）告警级（健康度40-60分）→ 生成告警，通知维护团队安排检查；（4）紧急级（健康度<40分）→ 生成紧急告警，建议立即停机检修，联动故障诊断专家。",
+      "agentRef": "iot-monitoring-analyst",
+      "dependentTasks": ["task-2", "task-3"],
+      "requiredIntegrations": []
+    },
+    {
+      "id": "task-5",
+      "title": "告警生成与分级推送",
+      "type": "agent",
+      "prompt": "对判定为告警级或紧急级的异常，生成标准化告警记录（告警ID、设备信息、异常类型、严重级别、发生时间、数据证据、建议动作）。判断是否为重复告警（同设备同类未关闭告警不重复推送）。按级别执行推送路由：告警级推送到维护班组长+设备责任人（系统消息+即时通讯），紧急级推送到维护经理+班组长+设备责任人+生产主管（系统+即时通讯+电话）。确保告警从产生到推送完成<30秒。启动响应跟踪：紧急级5分钟/告警级30分钟内需确认，超时自动升级。",
+      "agentRef": "iot-monitoring-analyst",
+      "dependentTasks": ["task-4"],
+      "requiredIntegrations": ["告警管理平台", "企业即时通讯", "短信网关"]
+    },
+    {
+      "id": "task-6",
+      "title": "告警响应跟踪与闭环",
+      "type": "agent",
+      "prompt": "持续跟踪已推送告警的响应状态（未确认→已确认→处理中→已关闭）。对超时未确认的告警执行升级机制：紧急级5分钟未确认升级到车间主任，15分钟未确认升级到工厂经理；告警级30分钟未确认升级到维护经理。告警关闭时记录闭环信息（处置结果分类：真实异常已修复/观察后恢复/误报-模型需优化/误报-传感器故障）。月度统计告警处理时效和误报率，对误报率高的告警规则提出优化建议。确保所有告警7天内闭环。",
+      "agentRef": "iot-monitoring-analyst",
+      "dependentTasks": ["task-5"],
+      "requiredIntegrations": ["告警管理平台", "CMMS维护管理系统"]
+    },
+    {
+      "id": "task-7",
+      "title": "预测性维护RUL评估",
+      "type": "agent",
+      "prompt": "定期（每周）对所有A类关键设备运行剩余使用寿命（RUL）评估。从IoT数据平台提取设备退化特征数据（振动RMS趋势、温度偏移率、电流THD变化等），构建退化曲线。应用预测模型（数据充足用LSTM，数据有限用Weibull分布）输出RUL区间估计（P10/P50/P90）和置信度评估。对RUL<7天的设备标记为高风险，RUL 7-30天标记为需关注。对高置信度（>85%）的预测生成维护建议，中置信度（50-85%）建议增加监控频率，低置信度（<50%）仅标注为参考信息。",
+      "agentRef": "predictive-maintenance-agent",
+      "dependentTasks": ["task-1"],
+      "requiredIntegrations": ["预测模型服务", "设备故障历史数据库", "时序数据库"]
+    },
+    {
+      "id": "task-8",
+      "title": "维护建议生成与推送",
+      "type": "agent",
+      "prompt": "基于RUL评估结果，为识别出7天内有潜在故障风险的设备生成结构化维护建议。建议内容包含：设备编号及目标部件、预测故障模式、RUL估算（区间+置信度）、建议维护时间窗口（最早/推荐/最迟，结合生产排程避开高峰期）、所需备件清单（检查库存可用性）、预估维修工时和停机时间。附带成本效益分析（预防性维护成本vs故障停机损失）。将维护建议推送给设备维护Scope的维护计划调度员，格式符合CMMS工单接口要求。标注决策截止日期。",
+      "agentRef": "predictive-maintenance-agent",
+      "dependentTasks": ["task-7"],
+      "requiredIntegrations": ["CMMS维护管理系统", "备件库存系统", "生产排程系统"]
+    },
+    {
+      "id": "task-9",
+      "title": "预测模型性能评估与迭代",
+      "type": "agent",
+      "prompt": "月度评估预测性维护模型的运行表现。对照历史预测记录和实际故障/正常运行结果，计算模型性能指标：准确率（目标>=80%）、召回率（目标>=85%）、误报率（目标<20%）、平均预测提前期（目标>=7天）。检测模型性能退化信号（准确率连续2月下降>5%、误报率持续上升）。对误报和漏报事件进行原因分析。若性能不达标，触发模型重训练流程（数据增强→特征优化→模型重训练→离线验证→灰度发布）。确保新故障模式在30天内纳入训练集。输出月度模型性能报告。",
+      "agentRef": "predictive-maintenance-agent",
+      "dependentTasks": ["task-7"],
+      "requiredIntegrations": ["模型训练平台", "预测日志数据库", "故障记录系统"]
+    },
+    {
+      "id": "task-10",
+      "title": "产线瓶颈分析",
+      "type": "agent",
+      "prompt": "每班次结束后，从MES和IoT系统采集生产数据（各工序实际CT、WIP堆积量、良率、设备可用率），应用多维度瓶颈识别方法：CT对比法（实际CT vs理论CT差异最大）、WIP堆积法（堆积最多的工序前为瓶颈）、利用率法（利用率接近100%为产能约束点）。综合三维度评分排名输出TOP3瓶颈工序，对每个瓶颈进行根因分类（设备/工艺/物料/人员），评估对整体产出的影响程度。生成结构化瓶颈分析报告，包含改善建议（短期/中期/长期）和量化预期效果。报告须在班次结束后30分钟内完成。",
+      "agentRef": "production-line-optimizer",
+      "dependentTasks": ["task-1"],
+      "requiredIntegrations": ["MES制造执行系统", "IoT数据平台"]
+    },
+    {
+      "id": "task-11",
+      "title": "OEE实时计算与六大损失分解",
+      "type": "agent",
+      "prompt": "持续实时计算各设备/产线的OEE值。按SEMI E10标准分类设备时间，计算可用率（计划时间-非计划停机/计划时间）、性能率（实际产出×理论CT/运行时间）、良品率（良品数/总产出）。将OEE gap分解为六大损失：故障停机损失、换型调整损失、空转暂停损失、速度降低损失、不良品损失、启动损失。按损失时间占比排序确定改善优先级。与目标值对比（A类设备>=85%，B类>=75%），对低于目标的设备标注并输出改善方向。确保OEE看板数据刷新延迟<5秒。",
+      "agentRef": "production-line-optimizer",
+      "dependentTasks": ["task-1"],
+      "requiredIntegrations": ["MES制造执行系统", "OEE看板系统", "IoT数据平台"]
+    },
+    {
+      "id": "task-12",
+      "title": "排产需求评估",
+      "type": "condition",
+      "prompt": "评估是否有排产优化需求触发：（1）新订单到达——需要评估产能和生成排产方案；（2）插单请求——需要评估对现有排程的影响；（3）设备故障/维护导致产能变化——需要重新排产；（4）物料齐套状态变化——之前缺料的订单现在可以排产。如果有排产需求，进入排产方案生成流程；如果无需求，继续常规监控。",
+      "agentRef": "production-line-optimizer",
+      "dependentTasks": ["task-10", "task-11"],
+      "requiredIntegrations": ["订单管理系统", "MES制造执行系统"]
+    },
+    {
+      "id": "task-13",
+      "title": "排产方案生成与优化",
+      "type": "agent",
+      "prompt": "基于排产需求，综合四要素约束生成优化排产方案：（1）订单约束——各订单产品型号、数量、交期、优先级；（2）产能约束——各设备可用时间、标准CT、设备健康度预测的可靠性；（3）换线约束——产品切换矩阵中的换线时间，按SMED原则优化相似产品连续排产；（4）物料约束——BOM物料齐套率检查，未齐套物料确认到料时间。应用约束满足算法生成2-3个可选方案，计算各方案的交期满足率、设备利用率、总换线时间，进行方案对比。标注推荐方案及选择理由、各方案风险点。提交给生产计划员/生产经理人工审批确认。",
+      "agentRef": "production-line-optimizer",
+      "dependentTasks": ["task-12"],
+      "requiredIntegrations": ["APS排程系统", "MES制造执行系统", "物料管理系统", "设备健康度数据"]
+    },
+    {
+      "id": "task-14",
+      "title": "设备状态查询响应",
+      "type": "agent",
+      "prompt": "响应操作人员和管理人员的自然语言设备状态查询请求。解析查询意图（目标设备、查询参数、时间范围、查询类型），验证用户权限（操作工/班组长/工程师/管理员对应不同查询范围）。从IoT数据平台获取实时或历史数据，以清晰易懂的格式返回：设备名称/编号、参数当前值、正常范围、状态标识（正常/注意/异常）。对异常数值主动提示可能原因和建议动作。支持连续对话和追问。查询响应时间<3秒。越权查询拒绝并提示需要更高权限。",
+      "agentRef": "smart-equipment-assistant",
+      "dependentTasks": [],
+      "requiredIntegrations": ["IoT数据平台", "用户权限管理系统", "设备台账系统"]
+    },
+    {
+      "id": "task-15",
+      "title": "故障排查智能指导",
+      "type": "agent",
+      "prompt": "当操作人员报告设备故障或异常时，提供智能排查指导。首先进行安全风险评估——如涉及烟雾/泄漏/异味/电气火花，立即建议停机断电撤离并通知安全人员。无安全风险时，根据设备型号和故障代码/异常描述，从故障知识库中匹配排查方案。生成结构化排查步骤（每步具体操作+预期结果+下一步指引），按可能性从高到低排序。如排查完成后问题仍未解决，自动将信息转发给设备维护Scope的故障诊断专家，附带已排查步骤摘要。记录排查结果用于知识库优化。",
+      "agentRef": "smart-equipment-assistant",
+      "dependentTasks": [],
+      "requiredIntegrations": ["故障知识库", "设备操作手册库", "CMMS维护管理系统"]
+    },
+    {
+      "id": "task-16",
+      "title": "数据质量监控与告警",
+      "type": "agent",
+      "prompt": "持续监控IoT传感器网络的数据质量状态。检测传感器离线（数据中断>60秒）、数据漂移（基线偏移但无物理原因）、采集延迟（时间戳异常）等数据质量问题。对数据质量低于95%的传感器生成数据质量告警，通知IoT运维团队排查。维护数据质量看板：各传感器在线率、数据完整率、数据时效性。对长期离线的传感器（>24小时）升级告警级别。记录数据质量事件用于设备健康度评估中的数据可信度权重调整。",
+      "agentRef": "iot-monitoring-analyst",
+      "dependentTasks": ["task-1"],
+      "requiredIntegrations": ["IoT设备管理平台", "运维告警系统"]
+    }
+  ],
+  "variables": [
+    {
+      "variableId": "var-1",
+      "name": "deviceId",
+      "variableType": "string",
+      "description": "目标设备的唯一编号，用于定位具体设备的传感器数据和健康度信息",
+      "required": true
+    },
+    {
+      "variableId": "var-2",
+      "name": "healthScoreThreshold",
+      "variableType": "number",
+      "description": "设备健康度告警阈值，默认60分（低于此分触发告警级）和40分（低于此分触发紧急级）",
+      "required": true
+    },
+    {
+      "variableId": "var-3",
+      "name": "anomalyDetectionWindow",
+      "variableType": "number",
+      "description": "异常检测时间窗口大小（秒），用于确定连续异常确认的数据点数量",
+      "required": true
+    },
+    {
+      "variableId": "var-4",
+      "name": "rulPredictionHorizon",
+      "variableType": "number",
+      "description": "RUL预测时间范围（天），默认7天，用于识别短期内有故障风险的设备",
+      "required": true
+    },
+    {
+      "variableId": "var-5",
+      "name": "productionLineId",
+      "variableType": "string",
+      "description": "目标产线编号，用于瓶颈分析和OEE计算",
+      "required": true
+    },
+    {
+      "variableId": "var-6",
+      "name": "shiftInfo",
+      "variableType": "object",
+      "description": "当前班次信息（日期、班别、起止时间），用于瓶颈分析的数据范围确定",
+      "required": true
+    },
+    {
+      "variableId": "var-7",
+      "name": "alertResponseTimeout",
+      "variableType": "number",
+      "description": "告警响应超时时间（分钟），紧急级默认5分钟，告警级默认30分钟",
+      "required": true
+    },
+    {
+      "variableId": "var-8",
+      "name": "oeeTarget",
+      "variableType": "object",
+      "description": "OEE目标值配置，A类设备>=85%，B类设备>=75%",
+      "required": true
+    },
+    {
+      "variableId": "var-9",
+      "name": "modelAccuracyThreshold",
+      "variableType": "number",
+      "description": "预测模型准确率达标阈值，默认80%，低于此值触发模型重训练",
+      "required": true
+    },
+    {
+      "variableId": "var-10",
+      "name": "userRole",
+      "variableType": "string",
+      "description": "查询用户的权限角色（operator/leader/engineer/admin），用于设备状态查询的权限验证",
+      "required": false
+    }
+  ]
+}

@@ -1,0 +1,192 @@
+{
+  "title": "销售培训与AI陪练工作流",
+  "description": "覆盖新人入职培训、日常AI陪练、个性化策略推送、话术库运营和培训效果追踪的完整销售赋能工作流",
+  "tasks": [
+    {
+      "id": "task-1",
+      "title": "新人入职注册与系统初始化",
+      "type": "action",
+      "prompt": "为新入职销售人员创建培训系统账号，关联CRM个人信息（姓名、团队、直属主管、入职日期），设置初始状态为'待测评'。发送培训系统使用指南至学员企业微信/钉钉。确认学员已成功登录系统。输出学员初始化确认记录，包含账号ID、关联信息和登录状态。",
+      "agentRef": "competency-assessment-coach",
+      "dependentTasks": [],
+      "requiredIntegrations": ["CRM系统", "企业微信/钉钉"]
+    },
+    {
+      "id": "task-2",
+      "title": "基线能力测评执行",
+      "type": "agent",
+      "prompt": "为新入职学员执行基线能力测评：依次进行5大核心场景的初始陪练（客户开场白15分钟、需求挖掘20分钟、产品演示20分钟、异议处理20分钟、促单技巧15分钟），所有场景使用Level 1（友善型客户）难度。记录每个场景的完整对话数据和原始指标。测评过程中保持角色一致性和场景真实度，不因是首次测评而降低评判标准。",
+      "agentRef": "scenario-simulation-engine",
+      "dependentTasks": ["task-1"],
+      "requiredIntegrations": ["向量知识库"]
+    },
+    {
+      "id": "task-3",
+      "title": "基线能力评分与报告生成",
+      "type": "agent",
+      "prompt": "对新人基线测评的5个场景对话数据进行多维度评分分析。每个场景按照5维度100分制评分（话术专业度30分、需求挖掘深度20分、异议处理能力20分、节奏把控15分、情绪管理15分）。生成基线能力报告，包含：五维雷达图数据、各场景得分明细、TOP3优势维度和TOP3薄弱维度识别、与团队新人平均水平的对比。基于短板分析制定首周必修训练计划，按照薄弱维度优先级排列训练顺序。",
+      "agentRef": "competency-assessment-coach",
+      "dependentTasks": ["task-2"],
+      "requiredIntegrations": []
+    },
+    {
+      "id": "task-4",
+      "title": "判断是否需要专项辅导",
+      "type": "condition",
+      "prompt": "检查基线测评结果：如果任何场景得分低于30分（合格线的一半），则判定该学员需要专项辅导模式——将该场景拆解为子技能进行单独训练，并通知直属主管安排导师一对一指导。如果所有场景得分≥30分，则按照正常首周训练计划执行。输出判定结果和对应的后续路径。",
+      "agentRef": "competency-assessment-coach",
+      "dependentTasks": ["task-3"],
+      "requiredIntegrations": []
+    },
+    {
+      "id": "task-5",
+      "title": "日常陪练场景推荐",
+      "type": "agent",
+      "prompt": "基于学员当前能力画像和近期训练记录，计算并推荐本次最适合的训练场景。推荐逻辑：优先选择学员最薄弱且对业绩影响最大的维度对应场景；如果学员近期有即将拜访的重要客户，优先推荐匹配该客户行业/角色的场景。确定推荐场景的难度级别（基于该场景历史得分决定）。允许学员覆盖推荐选择自己想练的场景。输出推荐场景配置（场景类型+难度+客户角色参数）。",
+      "agentRef": "competency-assessment-coach",
+      "dependentTasks": ["task-3"],
+      "requiredIntegrations": ["CRM系统"]
+    },
+    {
+      "id": "task-6",
+      "title": "AI陪练对话执行",
+      "type": "agent",
+      "prompt": "根据场景配置启动AI陪练对话。扮演设定的客户角色（行业背景、职位、性格、痛点），与学员进行多轮对话。严格维持角色一致性——不跳出角色给提示、不主动降低难度。对话过程中根据学员表现动态调整信任度和客户配合度。控制在设定时长内完成（15-30分钟）。如学员连续3轮无法有效推进，给予角色内的微妙线索但不直接提示。对话结束后输出完整对话记录包（含时间戳、轮次编号、说听比统计、关键转折点标记）。",
+      "agentRef": "scenario-simulation-engine",
+      "dependentTasks": ["task-5"],
+      "requiredIntegrations": ["向量知识库"]
+    },
+    {
+      "id": "task-7",
+      "title": "陪练表现评分分析",
+      "type": "agent",
+      "prompt": "对本次陪练的完整对话数据进行5维度定量评分。每个维度扣分必须引用对话原文作为依据。计算总分并与学员历史得分对比。生成评分报告：总分+各维度明细+TOP3亮点（引用原文说明好在哪里）+TOP3待提升点（每个点包含：问题描述、原文引用、扣分原因、改进方向、至少2条参考话术）。同时输出下次训练的难度调整建议：得分≥80建议升级，<40建议降级，中间维持并微调训练重点。",
+      "agentRef": "competency-assessment-coach",
+      "dependentTasks": ["task-6"],
+      "requiredIntegrations": []
+    },
+    {
+      "id": "task-8",
+      "title": "判断评分结果与路径调整",
+      "type": "condition",
+      "prompt": "基于本次评分结果做路径决策：(1)得分≥80分 → 标记该场景可升级难度，检查是否解锁进阶场景的条件（至少3个基础场景达Level 3）；(2)得分60-79分 → 维持当前路径，更新训练重点；(3)得分40-59分 → 维持但推送基础补强材料；(4)得分<40分 → 记录为不达标，检查是否连续3次<40分触发专项辅导；(5)学员多次偏离主题被终止 → 标记需人工review。输出路径调整决策和下一步行动。",
+      "agentRef": "competency-assessment-coach",
+      "dependentTasks": ["task-7"],
+      "requiredIntegrations": []
+    },
+    {
+      "id": "task-9",
+      "title": "周度个性化策略推送生成",
+      "type": "agent",
+      "prompt": "每周一执行全员个性化策略推送。为每位销售独立生成推送内容：(1)拉取该销售近7天业绩数据（赢单/丢单/商机推进情况）和本周日程（重要客户拜访安排）；(2)按三层优先级判定推送主题——第一优先级是本周有重要客户拜访（推送该客户应对策略），第二优先级是上周有丢单（推送丢单环节的改进话术），第三优先级是能力短板强化（推送薄弱维度训练建议）；(3)从话术知识库检索匹配的参考话术和案例；(4)生成推送内容（控制500字以内，包含具体行动建议和参考话术）；(5)通过企业微信/钉钉发送。追踪打开率，连续2周未打开的通知主管。",
+      "agentRef": "knowledge-strategy-curator",
+      "dependentTasks": ["task-1"],
+      "requiredIntegrations": ["CRM系统", "企业微信/钉钉", "向量知识库"]
+    },
+    {
+      "id": "task-10",
+      "title": "月度赢单录音话术提取",
+      "type": "agent",
+      "prompt": "每月初执行话术库更新流程：(1)从CRM获取上月赢单录音列表，优先选择大单和竞品胜出案例（目标筛选≥20个候选录音）；(2)对录音进行AI转录和关键片段提取——重点识别异议处理突破点、需求挖掘金句、促单关键话术；(3)将提取的片段转化为标准化话术卡片（含分类标签、适用场景、客户角色、难度级别、话术正文、变体、注意事项、来源信息）；(4)执行合规审查——检查是否存在过度承诺、贬低竞品、隐私泄露等风险，标记并剔除违规内容；(5)通过审核的话术生成向量嵌入并入库。目标：每月新增≥10条合格话术。输出入库话术清单和合规审查报告。",
+      "agentRef": "knowledge-strategy-curator",
+      "dependentTasks": ["task-1"],
+      "requiredIntegrations": ["CRM系统", "向量知识库", "语音转录服务"]
+    },
+    {
+      "id": "task-11",
+      "title": "竞品话术紧急更新判断",
+      "type": "condition",
+      "prompt": "监控竞品动态变化信号（新功能发布、定价调整、重大市场活动）。当检测到竞品变化时评估影响程度：高影响（直接影响我方核心价值主张，48小时内必须更新应对话术）、中影响（影响部分场景，1周内更新）、低影响（不影响现有话术，纳入下月常规更新）。输出影响评估结论和响应优先级。",
+      "agentRef": "knowledge-strategy-curator",
+      "dependentTasks": ["task-10"],
+      "requiredIntegrations": ["竞品监控系统"]
+    },
+    {
+      "id": "task-12",
+      "title": "新陪练场景剧本开发",
+      "type": "agent",
+      "prompt": "每月基于近期丢单案例开发新的陪练场景剧本（目标≥2个/月）。执行步骤：(1)从近期丢单案例中选择最具训练价值的场景（客户类型有代表性、丢单原因可通过训练改善）；(2)设计完整场景剧本——客户画像（行业、职位、性格、痛点、预算、竞品使用情况）、对话走向设计（开场状态、转折点、理想路径、常见陷阱）、难度参数配置；(3)设定该场景的评估标准和权重分布；(4)邀请至少2位资深销售进行内部测试；(5)根据测试反馈调整后正式上线，标注适用人群和推荐训练时机。输出新场景剧本完整文档和测试记录。",
+      "agentRef": "knowledge-strategy-curator",
+      "dependentTasks": ["task-10"],
+      "requiredIntegrations": ["CRM系统", "向量知识库"]
+    },
+    {
+      "id": "task-13",
+      "title": "月度培训效果报告生成",
+      "type": "agent",
+      "prompt": "每月25日启动月度培训效果报告生成：(1)汇总本月全员训练数据——人均训练时长和次数、各场景达标率、各维度平均分趋势、新人ramp-up进度；(2)评分趋势分析——团队整体趋势和个人进步/退步识别；(3)对比分析——训练活跃者vs不活跃者的业绩差异；(4)识别进步最大的人员（正向激励）和停滞不前的人员（需关注）；(5)生成月度报告含可视化图表数据、关键发现和行动建议。报告分发给培训管理者和各团队主管。",
+      "agentRef": "competency-assessment-coach",
+      "dependentTasks": ["task-7"],
+      "requiredIntegrations": ["CRM系统"]
+    },
+    {
+      "id": "task-14",
+      "title": "季度评分与业绩相关性分析",
+      "type": "agent",
+      "prompt": "每季度末执行评分模型有效性验证：(1)提取全体销售近一季度的所有评分数据和对应的CRM业绩数据（赢率、客单价、销售周期）；(2)计算5个评分维度分别与赢率、客单价、销售周期的皮尔逊相关系数；(3)识别高相关性维度（r>0.3，对业绩影响最大）和低相关性维度（r<0.1，可能需要调整）；(4)分析某维度评分提升但业绩无改善的异常情况，评估该维度评分标准的有效性；(5)输出相关性分析报告，包含各维度相关系数、趋势对比、评分权重调整建议。如发现评分模型整体有效性下降（平均相关系数<0.2），标记为需紧急review。",
+      "agentRef": "competency-assessment-coach",
+      "dependentTasks": ["task-13"],
+      "requiredIntegrations": ["CRM系统"]
+    },
+    {
+      "id": "task-15",
+      "title": "话术库季度全量Review",
+      "type": "agent",
+      "prompt": "每季度末执行话术库全量健康度审计：(1)统计每条话术的使用数据——被引用次数、使用后赢单率、学员反馈评分；(2)标记待淘汰话术——使用率<5%且无正面效果反馈且超过6个月未更新；(3)验证竞品相关话术的准确性——核对竞品最新产品功能和定价是否与话术中描述一致；(4)检查合规审查记录完整性——确认所有在库话术都有合规审查通过记录；(5)生成季度知识库健康度报告（总量、新增、淘汰、活跃率、效果分布、待更新清单）。将过时或低效话术标记为deprecated，观察1个月后确认下架。",
+      "agentRef": "knowledge-strategy-curator",
+      "dependentTasks": ["task-10"],
+      "requiredIntegrations": ["向量知识库"]
+    }
+  ],
+  "variables": [
+    {
+      "variableId": "var-1",
+      "name": "traineeId",
+      "variableType": "string",
+      "description": "学员唯一标识，关联CRM系统中的销售人员ID",
+      "required": true
+    },
+    {
+      "variableId": "var-2",
+      "name": "scenarioType",
+      "variableType": "string",
+      "description": "陪练场景类型：opening(开场白)/discovery(需求挖掘)/demo(产品演示)/objection(异议处理)/closing(促单)",
+      "required": true
+    },
+    {
+      "variableId": "var-3",
+      "name": "difficultyLevel",
+      "variableType": "number",
+      "description": "场景难度级别，1-5级，1为最简单（友善型客户），5为最难（多角色复杂场景）",
+      "required": true
+    },
+    {
+      "variableId": "var-4",
+      "name": "teamId",
+      "variableType": "string",
+      "description": "学员所属销售团队标识，用于团队级别的数据分析和对比",
+      "required": true
+    },
+    {
+      "variableId": "var-5",
+      "name": "pushChannel",
+      "variableType": "string",
+      "description": "策略推送渠道：wechat_work(企业微信)/dingtalk(钉钉)/email(邮件)",
+      "required": true
+    },
+    {
+      "variableId": "var-6",
+      "name": "scoringThreshold",
+      "variableType": "number",
+      "description": "场景合格线分数，默认为60分，新人首周强制使用此标准",
+      "required": false
+    },
+    {
+      "variableId": "var-7",
+      "name": "reportingPeriod",
+      "variableType": "string",
+      "description": "报告周期：weekly(周报)/monthly(月报)/quarterly(季报)/annual(年报)",
+      "required": false
+    }
+  ]
+}

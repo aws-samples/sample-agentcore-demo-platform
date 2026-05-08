@@ -1,0 +1,208 @@
+{
+  "title": "多模态内容创作全流程",
+  "description": "从业务需求接入到内容多语言多渠道发布归档的完整内容创作工作流，覆盖需求评估、Brief制定、多模态创作、品牌审核、本地化适配和终审发布全部环节",
+  "tasks": [
+    {
+      "id": "task-1",
+      "title": "需求接入与完整度评估",
+      "type": "agent",
+      "prompt": "接收业务方提交的内容创作需求，对需求进行完整度评估。检查需求是否包含五大必要要素：目标受众、核心信息、调性要求、目标渠道、输出规格。如需求缺失超过1个要素，生成结构化澄清问题列表退回业务方补充。如需求完整，判断需求类型（常规内容/新品牌方向/紧急需求）并记录评估结论。输出需求评估报告，包含完整度评分、需求类型判定和路由建议。",
+      "agentRef": "brand-content-strategist",
+      "dependentTasks": [],
+      "requiredIntegrations": ["需求管理系统"]
+    },
+    {
+      "id": "task-2",
+      "title": "需求类型路由决策",
+      "type": "condition",
+      "prompt": "根据需求评估结果进行路由决策：如果需求不完整（缺失>1要素），退回业务方补充，流程暂停等待；如果是常规内容需求，直接进入Brief制定；如果是新品牌方向，需要先确认品牌规范后再进入Brief制定；如果是紧急需求，走快速通道进入简化Brief制定。",
+      "agentRef": "brand-content-strategist",
+      "dependentTasks": ["task-1"],
+      "requiredIntegrations": []
+    },
+    {
+      "id": "task-3",
+      "title": "品牌规范确认（新方向）",
+      "type": "agent",
+      "prompt": "针对新品牌方向或新市场的内容需求，执行品牌规范确认流程。从品牌资产库中加载适用的品牌规范版本，确认调性指南、VI规范和禁用元素清单是否覆盖本次创作需求。如现有规范不足以覆盖，标注需要补充的规范维度，创建品牌规范补充工单。确认完成后输出品牌规范引用清单和适用参数。",
+      "agentRef": "brand-content-strategist",
+      "dependentTasks": ["task-2"],
+      "requiredIntegrations": ["品牌资产库"]
+    },
+    {
+      "id": "task-4",
+      "title": "创作Brief结构化制定",
+      "type": "agent",
+      "prompt": "根据评估通过的需求和品牌规范，制定结构化创作Brief。Brief须包含：taskId、任务类型、优先级、截止时间、目标受众画像、核心信息点（≤3个）、调性关键词、品牌规范版本引用、渠道规格参数（尺寸/格式/时长/字数限制）、交付物要求（数量/格式/是否多版本）。如需要A/B测试，明确标注变量控制维度。输出完整的JSON格式Brief文档。",
+      "agentRef": "brand-content-strategist",
+      "dependentTasks": ["task-3"],
+      "requiredIntegrations": ["品牌资产库", "营销日历系统"]
+    },
+    {
+      "id": "task-5",
+      "title": "多模态内容创作执行",
+      "type": "agent",
+      "prompt": "接收创作Brief，根据任务类型执行多模态内容创作。文案类：选择合适的创作框架（AIDA/PAS/FABE），按品牌调性指南撰写，确保推荐词覆盖且无禁用词。图像类：根据品牌VI规范构建AI生成Prompt，选择最优模型生成候选图，筛选后进行后处理（色彩校正/Logo叠加/字体排版）。视频类：撰写分镜脚本，准备素材，合成成片并添加品牌标准元素（片头片尾/字幕/水印）。如Brief要求多版本，产出差异化版本并标注变量差异。所有产出须遵循品牌规范约束。",
+      "agentRef": "multimodal-creator",
+      "dependentTasks": ["task-4"],
+      "requiredIntegrations": ["AI生成模型API", "品牌素材库", "版权音乐库"]
+    },
+    {
+      "id": "task-6",
+      "title": "品牌合规自检",
+      "type": "agent",
+      "prompt": "对创作完成的内容执行品牌合规自检。加载品牌规范参数，按内容类型执行对应检查维度：文案类检查禁用词/推荐词覆盖/语气匹配/广告法合规/核心信息覆盖；图像类检查色彩ΔE偏差(<3)/字体合规/Logo规范/禁用元素；视频类检查片头片尾/字幕样式/Logo水印/技术参数。输出自检评分（1-10）和逐项检查报告。如评分<8分，尝试自动修正（禁用词替换/色彩微调/Logo位置校正），修正后重新评分。最终输出自检结论：可提交/需优化/需重做。",
+      "agentRef": "multimodal-creator",
+      "dependentTasks": ["task-5"],
+      "requiredIntegrations": ["品牌资产库"]
+    },
+    {
+      "id": "task-7",
+      "title": "自检结果判定",
+      "type": "condition",
+      "prompt": "根据品牌合规自检结果决定下一步流程：如果自检评分≥8分且无硬性问题，进入品牌一致性内审；如果自检评分6-7.9分且自动优化后仍不达标，标注问题点后提交内审（附说明）；如果自检评分<6分或存在严重硬性问题（禁用词/Logo严重违规），退回重新创作。",
+      "agentRef": "multimodal-creator",
+      "dependentTasks": ["task-6"],
+      "requiredIntegrations": []
+    },
+    {
+      "id": "task-8",
+      "title": "品牌一致性内审",
+      "type": "agent",
+      "prompt": "作为品牌内容策略师，对提交的创作产出进行品牌一致性审核。加载品牌规范和创作Brief，执行多维度评估：文案类评估语气匹配度(25%)/用词合规性(20%)/句式风格(15%)/核心信息传达(25%)/受众适配度(15%)；图像类评估色彩合规/字体合规/Logo使用/布局规范/禁用元素/整体视觉调性。计算加权总分。≥8分通过，5-7.9分标注具体问题点并提供修改指导后退回，<5分驳回要求重做。输出完整审核报告，包含总评分、各维度分项、问题标注和修改建议。",
+      "agentRef": "brand-content-strategist",
+      "dependentTasks": ["task-7"],
+      "requiredIntegrations": ["品牌资产库"]
+    },
+    {
+      "id": "task-9",
+      "title": "内审结果路由",
+      "type": "condition",
+      "prompt": "根据品牌一致性内审结果进行路由：如果审核通过（≥8分），内容进入多语言/多渠道适配阶段；如果需要修改（5-7.9分），退回多模态创作执行师修改，并检查是否已修改超过3次——如果是则升级至人工创意总监决策；如果严重不合规（<5分），退回要求重新创作。",
+      "agentRef": "brand-content-strategist",
+      "dependentTasks": ["task-8"],
+      "requiredIntegrations": []
+    },
+    {
+      "id": "task-10",
+      "title": "多语言本地化翻译与文化适配",
+      "type": "agent",
+      "prompt": "接收品牌内审通过的原始内容，执行多语言本地化。确认源语言和目标语言列表，分析内容中的文化特定元素。根据内容类型选择翻译策略：信息型采用直译+润色，营销型采用创译（保留情感意图），法律型采用精确翻译。执行文化适配处理：颜色象征/数字禁忌/手势/动物/计量单位/日期格式/货币符号。完成翻译后执行回译校验，确保语义保留率≥95%。逐项确认文化适配checklist。输出各语言版本（原文-译文对照）+ 回译校验结果 + 文化适配确认。",
+      "agentRef": "localization-adapter",
+      "dependentTasks": ["task-9"],
+      "requiredIntegrations": ["翻译引擎", "术语库", "文化知识库"]
+    },
+    {
+      "id": "task-11",
+      "title": "文化合规检查",
+      "type": "agent",
+      "prompt": "对本地化完成的内容执行文化合规检查。加载目标市场的文化敏感度矩阵，逐项检查：宗教敏感性/政治敏感性/性别文化/颜色象征/数字禁忌/动物象征/手势肢体语言/饮食文化。对发现的问题进行风险分级：🔴严重（触犯宗教/政治禁忌）→立即拦截；🟡中等（文化不适当但不构成冒犯）→须修改；🟢轻微（非最佳实践）→建议修改不阻断。输出文化合规报告，包含各检查项结果、风险标注、修改建议和审核结论。",
+      "agentRef": "localization-adapter",
+      "dependentTasks": ["task-10"],
+      "requiredIntegrations": ["文化知识库"]
+    },
+    {
+      "id": "task-12",
+      "title": "跨渠道格式适配",
+      "type": "agent",
+      "prompt": "将内容适配为各目标平台的最优呈现形式。加载目标平台规格库（尺寸/格式/时长/字数限制/特殊规则）。执行格式转换：图片裁切到目标比例+调整分辨率+格式压缩；文案精简/扩充到目标字数+调整语言风格+添加平台特定元素（话题标签/emoji/CTA）；视频画面比例转换+时长剪辑+字幕位置调整。针对各平台内容生态进行策略调整（微信长文深度叙事/抖音前3秒Hook/小红书笔记体/Instagram视觉优先）。对每个适配版本执行平台规格自动校验，100%通过方可提交。输出各平台版本+规格校验报告+发布建议。",
+      "agentRef": "localization-adapter",
+      "dependentTasks": ["task-11"],
+      "requiredIntegrations": ["平台规格库", "图像处理引擎", "视频编辑引擎"]
+    },
+    {
+      "id": "task-13",
+      "title": "本地化质量决策",
+      "type": "condition",
+      "prompt": "根据语种成熟度和内容风险等级决定审核模式：如果是首次进入的新语种市场，必须提交母语reviewer全量审核；如果是成熟语种且非高风险内容，采用抽检模式（20%抽检率）；如果是高风险内容（法律/医疗/政治相关），无论语种均全量审核。同时检查文化合规检查结果：如有严重文化风险则拦截退回重做，如有中等风险则修改后继续。",
+      "agentRef": "localization-adapter",
+      "dependentTasks": ["task-12"],
+      "requiredIntegrations": []
+    },
+    {
+      "id": "task-14",
+      "title": "终审与发布决策",
+      "type": "agent",
+      "prompt": "作为品牌内容策略师，对所有适配版本（多语言×多渠道）进行终审。重点审核：1）多语言版本是否保持品牌核心调性（不因本地化而稀释）；2）各平台版本的品牌核心要素完整性（Logo/色彩/字体/调性）；3）跨版本一致性（同一Campaign的不同版本间风格统一）。逐一确认每个版本的品牌一致性评分≥8.5/10。输出终审报告和发布决策：全部通过→批量发布；部分不通过→标注问题退回适配专家修改。",
+      "agentRef": "brand-content-strategist",
+      "dependentTasks": ["task-13"],
+      "requiredIntegrations": ["品牌资产库"]
+    },
+    {
+      "id": "task-15",
+      "title": "内容发布执行",
+      "type": "action",
+      "prompt": "执行内容批量发布。根据终审通过的版本清单和发布计划，将对应内容推送到各目标平台。发布操作包括：确认发布时间（按最佳发布时段）、上传内容文件、填写平台元数据（标题/描述/标签/话题）、设置发布状态。记录每个版本的发布状态和平台返回信息。如发布失败，记录失败原因并触发重试。",
+      "agentRef": "brand-content-strategist",
+      "dependentTasks": ["task-14"],
+      "requiredIntegrations": ["内容发布系统", "各平台API"]
+    },
+    {
+      "id": "task-16",
+      "title": "版本归档与记录",
+      "type": "document",
+      "prompt": "将所有已发布版本写入内容管理系统进行归档。执行以下操作：1）为每个发布版本打标签锁定（v{主版本}.{修订号}-{语言}-{平台}格式）；2）保存完整修改历史链（Brief→初稿→修改版→终稿→各适配版本）；3）生成版本对比记录（与Brief要求的达成对照）；4）关联到内容日历和营销Campaign；5）如有A/B测试版本，建立效果追踪链接。输出归档确认记录和版本关系图。",
+      "agentRef": "brand-content-strategist",
+      "dependentTasks": ["task-15"],
+      "requiredIntegrations": ["内容管理系统CMS", "营销日历系统"]
+    }
+  ],
+  "variables": [
+    {
+      "variableId": "var-1",
+      "name": "contentRequest",
+      "variableType": "object",
+      "description": "业务方提交的原始内容创作需求，包含需求描述、参考案例、期望产出等信息",
+      "required": true
+    },
+    {
+      "variableId": "var-2",
+      "name": "brandName",
+      "variableType": "string",
+      "description": "适用的品牌名称，用于从品牌资产库中加载对应的品牌规范",
+      "required": true
+    },
+    {
+      "variableId": "var-3",
+      "name": "targetChannels",
+      "variableType": "array",
+      "description": "目标发布渠道列表，如['微信公众号','抖音','小红书','Instagram']",
+      "required": true
+    },
+    {
+      "variableId": "var-4",
+      "name": "targetLanguages",
+      "variableType": "array",
+      "description": "目标语言列表，如['zh_CN','en_US','ja_JP']，用于多语言本地化",
+      "required": false
+    },
+    {
+      "variableId": "var-5",
+      "name": "contentType",
+      "variableType": "string",
+      "description": "内容类型，可选值：copywriting(文案)/visual(图像)/video(视频)/integrated(综合)",
+      "required": true
+    },
+    {
+      "variableId": "var-6",
+      "name": "priority",
+      "variableType": "string",
+      "description": "任务优先级，可选值：high(高)/medium(中)/low(低)/urgent(紧急)",
+      "required": true
+    },
+    {
+      "variableId": "var-7",
+      "name": "abTestRequired",
+      "variableType": "boolean",
+      "description": "是否需要A/B测试多版本产出",
+      "required": false
+    },
+    {
+      "variableId": "var-8",
+      "name": "deadline",
+      "variableType": "string",
+      "description": "内容交付截止时间，ISO 8601格式",
+      "required": true
+    }
+  ]
+}

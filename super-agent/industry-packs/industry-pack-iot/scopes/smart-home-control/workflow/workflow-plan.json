@@ -1,0 +1,204 @@
+{
+  "title": "智能家居设备控制流程",
+  "description": "从用户自然语言指令输入到设备执行反馈的完整控制流程，包含意图解析、设备调度、状态同步和自动化规则的协调执行",
+  "tasks": [
+    {
+      "id": "task-1",
+      "title": "接收并解析用户输入",
+      "type": "agent",
+      "prompt": "接收用户的自然语言输入（语音ASR文本/键入文字/图片OCR结果），执行文本预处理（语气词去除、ASR纠错、标点规范化），然后进行意图分类（control/query/setting/cancel），计算分类置信度。对输入执行实体抽取，识别目标设备、操作类型和参数值。如果单条输入包含多个操作目标，执行多意图拆分并标注依赖关系。输出标准化意图结构列表，每个意图包含target_device、action_type、parameters、confidence和security_sensitive标记。",
+      "agentRef": "intent-parser",
+      "dependentTasks": [],
+      "requiredIntegrations": ["asr-engine", "device-registry"]
+    },
+    {
+      "id": "task-2",
+      "title": "判断意图是否明确",
+      "type": "condition",
+      "prompt": "评估意图解析的置信度分数。如果所有意图的置信度均≥0.7且设备实体已确定，判定为'意图明确'，流转到设备可达性检查。如果任何意图的置信度<0.7或存在无法确定的设备指代，判定为'需要澄清'，流转到澄清对话节点。",
+      "agentRef": "intent-parser",
+      "dependentTasks": ["task-1"],
+      "requiredIntegrations": []
+    },
+    {
+      "id": "task-3",
+      "title": "发起用户澄清对话",
+      "type": "agent",
+      "prompt": "针对意图不明确的部分，生成澄清问题。提供最可能的2-3个解释选项供用户选择，格式为自然语言问句（如'您是想关卧室的灯，还是客厅的灯？'）。等待用户回复后重新解析。最多进行2轮澄清，2轮后仍无法确定则礼貌告知用户并建议更明确的表达方式，终止本次控制流程。",
+      "agentRef": "intent-parser",
+      "dependentTasks": ["task-2"],
+      "requiredIntegrations": ["user-interaction-channel"]
+    },
+    {
+      "id": "task-4",
+      "title": "检查设备可达性",
+      "type": "agent",
+      "prompt": "查询设备注册表和实时状态，确认意图列表中所有目标设备的在线状态。对每个目标设备执行：1)确认设备ID存在于注册表中；2)通过Device Shadow查询当前online_status；3)在线设备标记为可执行；4)离线设备记录最后在线时间，检查同类型备选设备是否可用。输出设备可达性报告，包含每个设备的在线状态和不可达设备的建议替代方案。",
+      "agentRef": "state-monitor",
+      "dependentTasks": ["task-2"],
+      "requiredIntegrations": ["device-shadow-service"]
+    },
+    {
+      "id": "task-5",
+      "title": "判断设备是否全部在线",
+      "type": "condition",
+      "prompt": "根据设备可达性报告判断：如果所有目标设备均在线，流转到指令冲突检测。如果部分设备离线但存在可用替代设备，将替代设备信息附加后流转到指令冲突检测。如果关键设备离线且无替代，生成设备不可用提示返回给用户，包含最后在线时间和检查建议，终止对应设备的控制流程。",
+      "agentRef": "state-monitor",
+      "dependentTasks": ["task-4"],
+      "requiredIntegrations": []
+    },
+    {
+      "id": "task-6",
+      "title": "检测指令冲突",
+      "type": "agent",
+      "prompt": "对意图列表执行冲突检测：1)检测意图间的直接冲突（同一设备矛盾操作）；2)检测语义冲突（逻辑矛盾如开暖气同时开窗）；3)检测与当前正在执行的指令的冲突；4)检测资源冲突（电力负载超限）。应用优先级规则：安全>用户实时>场景推荐>自动化>远程。输出冲突检测结果，无冲突时直接通过，有冲突时给出冲突描述和建议解决方案。",
+      "agentRef": "device-dispatcher",
+      "dependentTasks": ["task-5"],
+      "requiredIntegrations": []
+    },
+    {
+      "id": "task-7",
+      "title": "判断是否存在需用户确认的冲突",
+      "type": "condition",
+      "prompt": "根据冲突检测结果判断：如果无冲突或冲突已通过优先级规则自动解决，流转到参数映射与指令下发。如果存在无法自动解决的冲突（非安全类冲突且优先级相同），将冲突描述和选项提交用户确认，等待用户决策后继续。超时30秒未响应则取消本次操作。",
+      "agentRef": "device-dispatcher",
+      "dependentTasks": ["task-6"],
+      "requiredIntegrations": ["user-interaction-channel"]
+    },
+    {
+      "id": "task-8",
+      "title": "参数映射与指令下发",
+      "type": "agent",
+      "prompt": "对每个确认执行的意图：1)查询目标设备能力模型验证参数范围，越界参数clip到边界值；2)将通用参数转换为设备特定编码格式（如温度值→品牌编码）；3)选择通信协议和通道（WiFi/Zigbee/BLE/Matter）；4)按依赖关系编排执行顺序，并行无依赖指令、串行有依赖指令；5)下发控制指令并等待设备ACK确认（超时500ms）；6)超时未确认则重试1次；7)汇总所有设备执行结果。",
+      "agentRef": "device-dispatcher",
+      "dependentTasks": ["task-7"],
+      "requiredIntegrations": ["protocol-gateway", "device-codec-service"]
+    },
+    {
+      "id": "task-9",
+      "title": "处理执行失败",
+      "type": "condition",
+      "prompt": "评估指令下发结果：如果全部成功（所有设备ACK），流转到状态更新与用户反馈。如果部分失败，评估失败设备是否影响其他依赖设备的执行：不影响则继续执行其余操作并记录失败设备；影响则执行受影响指令的回滚（恢复到执行前状态），将失败信息汇入最终结果。如果全部失败，记录故障日志并通知用户所有设备均无法响应。",
+      "agentRef": "device-dispatcher",
+      "dependentTasks": ["task-8"],
+      "requiredIntegrations": []
+    },
+    {
+      "id": "task-10",
+      "title": "更新设备状态并反馈用户",
+      "type": "agent",
+      "prompt": "1)根据执行结果更新Device Shadow中相关设备的运行参数和状态；2)生成状态变更事件发布到事件总线（供自动化引擎和其他订阅方消费）；3)生成用户可理解的执行结果摘要，格式如：全部成功→'已帮您{操作}{设备}，当前{状态描述}'，部分失败→'已完成{成功列表}，{失败设备}暂时无法响应，{建议措施}'；4)记录完整执行日志用于后续分析。",
+      "agentRef": "state-monitor",
+      "dependentTasks": ["task-9"],
+      "requiredIntegrations": ["event-bus", "user-interaction-channel"]
+    },
+    {
+      "id": "task-11",
+      "title": "自动化规则条件评估",
+      "type": "agent",
+      "prompt": "持续订阅设备状态变更事件和传感器数据流，对所有活跃的条件触发规则进行实时评估。收到数据事件后：1)通过倒排索引定位关联规则；2)评估条件表达式的布尔值；3)条件从false变为true时启动防抖计时器（默认60秒）；4)防抖期间持续验证条件是否持续满足；5)防抖通过且不在冷却期内→确认触发。输出触发事件包含规则ID和触发时的环境数据快照。",
+      "agentRef": "automation-engine",
+      "dependentTasks": [],
+      "requiredIntegrations": ["event-bus"]
+    },
+    {
+      "id": "task-12",
+      "title": "执行触发的自动化规则",
+      "type": "agent",
+      "prompt": "接收到规则触发确认后：1)验证规则仍处于启用状态且目标设备可用；2)读取规则定义的action列表转换为标准化意图格式；3)标记意图来源为automation；4)将意图提交给设备调度控制器执行（复用指令下发流程）；5)记录执行结果到规则执行历史；6)启动冷却计时器防止短时间内重复触发；7)如果执行失败不自动重试，记录失败原因供用户查看。",
+      "agentRef": "automation-engine",
+      "dependentTasks": ["task-11"],
+      "requiredIntegrations": ["device-dispatcher-api"]
+    },
+    {
+      "id": "task-13",
+      "title": "异常检测与告警处理",
+      "type": "agent",
+      "prompt": "持续监控设备运行数据执行异常检测：1)评估阈值规则（功率超载/温度过高/传感器越界）；2)评估模式规则（心跳丢包率上升/设备频繁重启）；3)评估关联规则（同回路多设备异常）。检测到异常时：P0紧急→立即推送电话+短信+APP+执行安全预案（自动断电/关阀）；P1重要→即时APP推送+建议措施；P2提示→记录并汇入每日摘要。告警去重：10分钟内同设备同类告警不重复推送。",
+      "agentRef": "state-monitor",
+      "dependentTasks": [],
+      "requiredIntegrations": ["notification-service", "safety-actuator"]
+    },
+    {
+      "id": "task-14",
+      "title": "生成执行分析报告",
+      "type": "document",
+      "prompt": "基于规则执行历史数据生成分析报告，包含：1)本周规则触发频率TOP10；2)执行成功率统计（按规则/按设备维度）；3)低效规则识别（有效率<60%或30天未触发的规则列表）；4)用户覆盖率分析（哪些规则结果经常被用户手动修改）；5)优化建议（参数调整/规则合并/规则删除建议）；6)能耗影响评估。报告格式清晰，附带数据可视化描述。",
+      "agentRef": "automation-engine",
+      "dependentTasks": ["task-12"],
+      "requiredIntegrations": ["analytics-data-store"]
+    }
+  ],
+  "variables": [
+    {
+      "variableId": "var-1",
+      "name": "userRawInput",
+      "variableType": "string",
+      "description": "用户原始输入文本（语音ASR转写/键入文字/OCR结果）",
+      "required": true
+    },
+    {
+      "variableId": "var-2",
+      "name": "inputSource",
+      "variableType": "string",
+      "description": "输入来源类型：voice/text/ocr/api",
+      "required": true
+    },
+    {
+      "variableId": "var-3",
+      "name": "userId",
+      "variableType": "string",
+      "description": "当前操作用户的唯一标识",
+      "required": true
+    },
+    {
+      "variableId": "var-4",
+      "name": "userLocation",
+      "variableType": "string",
+      "description": "用户当前所在房间/区域标识",
+      "required": false
+    },
+    {
+      "variableId": "var-5",
+      "name": "sessionContext",
+      "variableType": "object",
+      "description": "当前对话会话上下文，包含最近3轮对话历史",
+      "required": false
+    },
+    {
+      "variableId": "var-6",
+      "name": "structuredIntents",
+      "variableType": "array",
+      "description": "解析后的结构化意图列表，每个意图包含设备ID、操作类型、参数和置信度",
+      "required": true
+    },
+    {
+      "variableId": "var-7",
+      "name": "executionResult",
+      "variableType": "object",
+      "description": "设备控制执行结果汇总，包含每设备的成功/失败状态和耗时",
+      "required": true
+    },
+    {
+      "variableId": "var-8",
+      "name": "deviceStates",
+      "variableType": "object",
+      "description": "目标设备的实时状态快照（在线状态、当前参数、健康度）",
+      "required": true
+    },
+    {
+      "variableId": "var-9",
+      "name": "automationRules",
+      "variableType": "array",
+      "description": "当前活跃的自动化规则列表及其状态",
+      "required": false
+    },
+    {
+      "variableId": "var-10",
+      "name": "alertNotification",
+      "variableType": "object",
+      "description": "异常检测告警通知内容，包含告警级别、描述和建议措施",
+      "required": false
+    }
+  ]
+}

@@ -1,0 +1,206 @@
+{
+  "title": "广告投放与智能优化全流程",
+  "description": "跨平台广告智能投放管理的全流程工作流，涵盖策略制定、预算分配、受众定向、实时监控、效果优化和异常处理的完整闭环。通过四个Agent协同实现投放效率最大化。",
+  "tasks": [
+    {
+      "id": "task-1",
+      "title": "接收营销目标与总预算",
+      "type": "action",
+      "prompt": "接收并解析营销目标输入信息，包括：营销目标类型（品牌曝光/线索获取/电商转化）、目标KPI（ROAS目标值、CPA上限）、总预算金额、投放周期、目标市场/行业、品牌限制条件。验证输入完整性，缺失关键信息时标记并请求补充。将结构化的营销目标信息传递给投放策略制定环节。",
+      "agentRef": "delivery-strategist",
+      "dependentTasks": [],
+      "requiredIntegrations": ["CRM系统", "营销计划管理平台"]
+    },
+    {
+      "id": "task-2",
+      "title": "制定跨渠道投放策略",
+      "type": "agent",
+      "prompt": "基于营销目标和总预算，制定完整的跨渠道投放策略方案。具体包括：1）根据营销目标类型选择最适合的广告平台组合（Google Ads/Meta Ads/TikTok Ads/Amazon Ads）；2）基于历史效果数据确定各平台预算分配比例；3）为每个平台设计出价策略（目标CPA/目标ROAS/最大化转化量）并设定出价基线；4）定义受众定向框架和方向；5）设定效果评估时间节点。输出结构化的投放策略文档，包含平台组合、预算比例、出价策略、受众框架和风险评估。",
+      "agentRef": "delivery-strategist",
+      "dependentTasks": ["task-1"],
+      "requiredIntegrations": ["Google Ads API", "Meta Marketing API", "TikTok Marketing API", "Amazon Advertising API"]
+    },
+    {
+      "id": "task-3",
+      "title": "分配各平台预算并设置消耗节奏",
+      "type": "agent",
+      "prompt": "根据投放策略制定的预算分配方案，执行各广告平台的预算配置。具体操作：1）将总预算按比例分配到各平台广告账户；2）为每个平台设计日内消耗节奏计划（Pacing Strategy），根据各时段转化效率差异化分配——高转化时段（午间、晚间黄金时段）分配更多预算；3）设置预算安全阈值（日消耗达70%预警，达90%限速）；4）配置预算耗尽前的保护机制。确保预算利用率>95%的同时避免异常超支。",
+      "agentRef": "budget-controller",
+      "dependentTasks": ["task-2"],
+      "requiredIntegrations": ["Google Ads API", "Meta Marketing API", "TikTok Marketing API", "Amazon Advertising API"]
+    },
+    {
+      "id": "task-4",
+      "title": "创建和更新受众定向",
+      "type": "agent",
+      "prompt": "基于投放策略中的受众框架，在各广告平台创建精准的受众定向。具体操作：1）分析历史转化数据提取高价值受众特征（人口属性、兴趣标签、行为序列）；2）在各平台创建自定义受众（CRM客户列表、网站访客、App用户）；3）基于高价值种子用户创建Lookalike相似受众（精准层1-3%、平衡层3-5%）；4）配置受众排除列表（已转化用户、低质量来源）；5）确保各受众包规模≥1万人以满足起量要求。输出各平台的受众定向配置详情和预估覆盖规模。",
+      "agentRef": "audience-targeting",
+      "dependentTasks": ["task-2"],
+      "requiredIntegrations": ["Google Ads API", "Meta Marketing API", "TikTok Marketing API", "CRM系统"]
+    },
+    {
+      "id": "task-5",
+      "title": "执行投放计划上线前检查",
+      "type": "agent",
+      "prompt": "在广告计划正式上线前执行全面的预检查清单：1）确认所有广告素材在目标平台审核状态为'已通过'；2）测试所有落地页的可用性——加载速度（桌面<3秒，移动<5秒）、跨设备兼容性、CTA功能正常；3）验证转化追踪代码安装正确——通过Tag Assistant确认Pixel/SDK正常回传数据；4）Double-check预算设置——金额正确、类型正确（日预算/总预算）、各平台总和不超上限；5）确认广告投放时段设置符合策略。所有检查项通过后输出'可上线'确认，任何未通过项标记为阻塞并说明修复要求。",
+      "agentRef": "performance-monitor",
+      "dependentTasks": ["task-3", "task-4"],
+      "requiredIntegrations": ["Google Ads API", "Meta Marketing API", "Google Tag Manager", "落地页监控工具"]
+    },
+    {
+      "id": "task-6",
+      "title": "判断上线前检查是否通过",
+      "type": "condition",
+      "prompt": "判断投放计划上线前检查的结果：如果所有检查项（素材审核、落地页可用性、追踪代码、预算设置）全部通过，则进入'广告计划上线'流程；如果任何检查项未通过，则进入'修复问题'流程，标记具体未通过项并等待修复后重新检查。",
+      "agentRef": "performance-monitor",
+      "dependentTasks": ["task-5"],
+      "requiredIntegrations": []
+    },
+    {
+      "id": "task-7",
+      "title": "广告计划上线并启动实时监控",
+      "type": "agent",
+      "prompt": "确认上线前检查全部通过后，执行广告计划上线操作，同时启动7×24小时实时效果监控。具体操作：1）在各平台激活广告计划/广告组状态为'投放中'；2）记录上线时间并标记前3天为'学习期'；3）启动实时监控——每5分钟刷新核心指标（CTR、CVR、CPA、ROAS、消耗速度）；4）配置学习期宽松预警阈值（偏离50%为黄色，100%为红色）；5）生成上线确认通知并分发给所有相关Agent。输出上线状态确认和初始监控仪表盘。",
+      "agentRef": "performance-monitor",
+      "dependentTasks": ["task-6"],
+      "requiredIntegrations": ["Google Ads API", "Meta Marketing API", "TikTok Marketing API", "Amazon Advertising API"]
+    },
+    {
+      "id": "task-8",
+      "title": "每小时效果评估决策点",
+      "type": "condition",
+      "prompt": "每小时评估当前投放效果是否达标。评估标准：1）ROAS是否≥目标值（如3:1）；2）CPA是否≤目标上限；3）消耗进度是否与计划一致（偏差<30%）；4）无红色/紧急预警活跃。如果所有指标达标则判定为'效果正常，维持当前策略'；如果任一核心指标偏离目标>20%，判定为'效果偏离，需要优化'。",
+      "agentRef": "performance-monitor",
+      "dependentTasks": ["task-7"],
+      "requiredIntegrations": []
+    },
+    {
+      "id": "task-9",
+      "title": "效果异常诊断与优化决策",
+      "type": "agent",
+      "prompt": "当效果评估判定为'偏离'时，执行系统性异常诊断。按以下优先级排查：1）技术层面——追踪代码是否正常、平台是否有故障公告；2）素材层面——频次是否过高（>3次/周）、素材在线天数是否超14天（创意疲劳信号）；3）受众层面——受众池规模是否收缩、频次分布是否集中；4）竞争层面——CPM是否上涨、展现份额是否下降；5）落地页层面——CTR正常但CVR下降则检查落地页。锁定Top3可能根因（附概率），并为每个根因输出对应的优化动作：创意疲劳→通知创意Scope更换素材；受众饱和→触发受众扩展；竞争加剧→评估调价方案。",
+      "agentRef": "delivery-strategist",
+      "dependentTasks": ["task-8"],
+      "requiredIntegrations": ["数据分析平台", "竞品监测工具"]
+    },
+    {
+      "id": "task-10",
+      "title": "受众扩展与更新",
+      "type": "agent",
+      "prompt": "当诊断结果为'受众饱和'或效果监控发现频次过高（>3次/周）且CTR持续下降时，执行受众扩展策略。操作步骤：1）分析近期高转化用户特征变化，识别新的高价值人群特征；2）利用最新转化数据刷新Lookalike种子（纳入近30天新转化用户）；3）创建新的Lookalike受众（尝试不同扩展比例）；4）设计小预算测试方案（总预算5-10%），验证新受众效果；5）通过验证的受众逐步扩量（每3天+30%）。同时更新受众排除列表，将高频次低转化用户排除。",
+      "agentRef": "audience-targeting",
+      "dependentTasks": ["task-9"],
+      "requiredIntegrations": ["Google Ads API", "Meta Marketing API", "TikTok Marketing API", "CRM系统"]
+    },
+    {
+      "id": "task-11",
+      "title": "每日跨渠道预算再分配",
+      "type": "agent",
+      "prompt": "每日14:00执行跨渠道预算再分配评估。操作流程：1）计算各渠道近7天ROAS（近3天加权更高）；2）标注高效渠道（ROAS>目标值150%）和低效渠道（ROAS<目标值50%连续2天）；3）高效渠道追加预算（上限30%），追加来源优先从低效渠道削减的预算中调配；4）低效渠道连续2天不达标则削减50%；5）预估调配后的全局ROAS变化；6）确保各渠道预算不低于平台最低门槛。如单次调配涉及>总预算30%，标记为'需审批'等待投放策略Agent确认后执行。输出预算调配执行报告。",
+      "agentRef": "budget-controller",
+      "dependentTasks": ["task-7"],
+      "requiredIntegrations": ["Google Ads API", "Meta Marketing API", "TikTok Marketing API", "Amazon Advertising API"]
+    },
+    {
+      "id": "task-12",
+      "title": "异常消耗紧急处理",
+      "type": "agent",
+      "prompt": "当检测到预算异常消耗（10分钟内消耗>日预算20%）时，立即执行紧急保护：1）自动暂停异常消耗的广告计划/广告组；2）记录异常时间点、消耗金额、受影响的广告单元；3）初步排查原因——检查是否为恶意点击（异常高频点击+0转化+来源集中）、API重复提交、还是平台侧故障；4）即时通知投放策略Agent和人工运营团队；5）等待投放策略Agent确认后续处理方案（恢复/继续暂停/调整后恢复）。紧急暂停操作必须在检测到异常的5分钟内完成。",
+      "agentRef": "performance-monitor",
+      "dependentTasks": ["task-7"],
+      "requiredIntegrations": ["Google Ads API", "Meta Marketing API", "TikTok Marketing API", "告警通知系统"]
+    },
+    {
+      "id": "task-13",
+      "title": "判断是否恢复已暂停计划",
+      "type": "condition",
+      "prompt": "评估已暂停的异常广告计划是否可以恢复投放。判断条件：1）异常原因是否已明确且可解决；2）如为恶意点击——是否已配置排除规则；3）如为API故障——平台侧是否已修复；4）如为系统误判——数据是否回归正常。满足修复条件则恢复投放（可能带限速），不满足则继续暂停并等待进一步调查。",
+      "agentRef": "delivery-strategist",
+      "dependentTasks": ["task-12"],
+      "requiredIntegrations": []
+    },
+    {
+      "id": "task-14",
+      "title": "平台API故障降级处理",
+      "type": "agent",
+      "prompt": "当检测到广告平台API连续3次调用失败时，执行降级处理方案：1）确认故障范围——单平台还是多平台同时故障；2）对受影响平台的广告计划维持最后一次正常配置保持运行（不执行任何调整操作）；3）暂停所有针对该平台的出价调整、预算变更、受众更新操作；4）启用缓存数据维持监控仪表盘基本可用（标记数据为'缓存数据，可能不准确'）；5）即时告警人工运营团队介入；6）API恢复后校验数据完整性，补拉故障期间缺失数据，评估是否需要追溯调整。",
+      "agentRef": "performance-monitor",
+      "dependentTasks": ["task-7"],
+      "requiredIntegrations": ["Google Ads API", "Meta Marketing API", "TikTok Marketing API", "告警通知系统"]
+    },
+    {
+      "id": "task-15",
+      "title": "异常事件复盘与规则优化",
+      "type": "agent",
+      "prompt": "在每次红色/紧急预警事件关闭后24小时内完成复盘。复盘内容：1）还原完整事件时间线（发现→诊断→处理→恢复各环节的具体时间）；2）深度根因分析——区分直接原因和根本原因，评估该异常是否可预防；3）损失评估——计算异常期间的预算浪费和效率损失；4）响应评估——实际响应时间是否达标（<5分钟）、处理方案是否最优；5）改进措施——预警规则是否需要调整阈值、响应流程是否需要优化、是否需要新增自动化保护机制；6）更新预警规则库和异常案例库。输出结构化复盘报告。",
+      "agentRef": "delivery-strategist",
+      "dependentTasks": ["task-12", "task-14"],
+      "requiredIntegrations": ["知识库系统"]
+    }
+  ],
+  "variables": [
+    {
+      "variableId": "var-1",
+      "name": "marketingObjective",
+      "variableType": "string",
+      "description": "营销目标类型：brand_awareness（品牌曝光）、lead_generation（线索获取）、ecommerce_conversion（电商转化）",
+      "required": true
+    },
+    {
+      "variableId": "var-2",
+      "name": "totalBudget",
+      "variableType": "number",
+      "description": "总广告预算金额（元），用于跨渠道分配",
+      "required": true
+    },
+    {
+      "variableId": "var-3",
+      "name": "targetRoas",
+      "variableType": "number",
+      "description": "目标ROAS（广告支出回报率），如3表示3:1",
+      "required": true
+    },
+    {
+      "variableId": "var-4",
+      "name": "targetCpa",
+      "variableType": "number",
+      "description": "目标CPA（单次获客成本上限，元）",
+      "required": true
+    },
+    {
+      "variableId": "var-5",
+      "name": "campaignDuration",
+      "variableType": "string",
+      "description": "投放周期，格式为起止日期如'2024-01-15至2024-02-15'",
+      "required": true
+    },
+    {
+      "variableId": "var-6",
+      "name": "targetPlatforms",
+      "variableType": "string",
+      "description": "目标投放平台列表，逗号分隔如'Google Ads,Meta Ads,TikTok Ads'",
+      "required": true
+    },
+    {
+      "variableId": "var-7",
+      "name": "industryCategory",
+      "variableType": "string",
+      "description": "广告主所属行业类别，影响合规审核策略和竞争分析",
+      "required": true
+    },
+    {
+      "variableId": "var-8",
+      "name": "alertThresholdYellow",
+      "variableType": "number",
+      "description": "黄色预警阈值（偏离基线百分比），默认30",
+      "required": false
+    },
+    {
+      "variableId": "var-9",
+      "name": "alertThresholdRed",
+      "variableType": "number",
+      "description": "红色预警阈值（偏离基线百分比），默认50",
+      "required": false
+    }
+  ]
+}

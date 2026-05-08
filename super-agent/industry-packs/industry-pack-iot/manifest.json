@@ -1,0 +1,122 @@
+{
+  "version": "1.0.0",
+  "generatedAt": "2025-01-21T10:00:00.000Z",
+  "generator": "super-agent-batch-v2",
+  "industry": {
+    "id": "iot",
+    "name": "设备控制与IoT",
+    "icon": "🏠",
+    "color": "#2B7DE9"
+  },
+  "stats": {
+    "scopeCount": 4,
+    "agentCount": 13,
+    "skillCount": 41,
+    "workflowCount": 4,
+    "twinCount": 1,
+    "sopCount": 4
+  },
+  "scopes": [
+    {
+      "dirName": "smart-home-control",
+      "name": "智能家居控制",
+      "agents": [
+        "intent-parser",
+        "device-dispatcher",
+        "state-monitor",
+        "automation-engine"
+      ],
+      "skills": [
+        "natural-language-intent-parsing",
+        "context-disambiguation",
+        "multi-intent-decomposition",
+        "device-command-routing",
+        "protocol-adaptation",
+        "device-state-synchronization",
+        "anomaly-detection-alerting",
+        "device-lifecycle-management",
+        "concurrent-execution-orchestration",
+        "condition-evaluation-engine",
+        "rule-lifecycle-management",
+        "execution-history-analytics"
+      ],
+      "hasWorkflow": true,
+      "hasSop": true
+    },
+    {
+      "dirName": "scene-intelligence",
+      "name": "场景智能与主动感知",
+      "agents": [
+        "environment-perceiver",
+        "preference-learner",
+        "scene-reasoner"
+      ],
+      "skills": [
+        "sensor-data-fusion",
+        "environment-context-enrichment",
+        "behavior-pattern-recognition",
+        "preference-model-management",
+        "cold-start-strategy",
+        "scene-trigger-reasoning",
+        "multi-user-negotiation",
+        "anomaly-detection",
+        "energy-aware-optimization"
+      ],
+      "hasWorkflow": true,
+      "hasSop": true
+    },
+    {
+      "dirName": "vehicle-home-linkage",
+      "name": "车家互联与远程管理",
+      "agents": [
+        "geofence-trigger",
+        "remote-controller",
+        "energy-optimizer"
+      ],
+      "skills": [
+        "geofence-management",
+        "location-fusion",
+        "eta-calculation",
+        "remote-device-control",
+        "command-queue-management",
+        "access-authentication",
+        "peak-valley-scheduling",
+        "solar-storage-optimization",
+        "energy-report-generation"
+      ],
+      "hasWorkflow": true,
+      "hasSop": true
+    },
+    {
+      "dirName": "elderly-accessible-service",
+      "name": "适老化与无障碍服务",
+      "agents": [
+        "elder-interaction",
+        "health-safety-guardian",
+        "family-coordinator"
+      ],
+      "skills": [
+        "dialect-recognition",
+        "fuzzy-intent-understanding",
+        "elder-voice-feedback",
+        "fall-detection",
+        "health-anomaly-detection",
+        "medication-reminder",
+        "emergency-call",
+        "graded-notification",
+        "family-remote-care",
+        "periodic-report-generation",
+        "privacy-permission-management"
+      ],
+      "hasWorkflow": true,
+      "hasSop": true
+    }
+  ],
+  "digitalTwins": [
+    {
+      "dirName": "智能家居产品总监",
+      "name": "智能家居产品总监",
+      "role": "Head of Smart Home / IoT产品总监"
+    }
+  ]
+}
