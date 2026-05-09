@@ -1648,7 +1648,7 @@ export class WorkspaceManager {
    * Remove session workspace directories whose manifests are older than maxAgeMs.
    * Returns the number of directories removed.
    */
-  async pruneStaleWorkspaces(maxAgeMs: number = 2400 * 60 * 60 * 1000): Promise<number> {
+  async pruneStaleWorkspaces(maxAgeMs: number = 10 * 365 * 24 * 60 * 60 * 1000): Promise<number> {
     let removed = 0;
     const now = Date.now();
     try {

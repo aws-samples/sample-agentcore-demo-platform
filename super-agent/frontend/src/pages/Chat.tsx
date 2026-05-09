@@ -16,6 +16,7 @@ import { ChatProvider, ChatContext } from '@/services/ChatContext'
 import { AgentService } from '@/services/agentService'
 import { BusinessScopeService, type BusinessScope } from '@/services/businessScopeService'
 import { RestChatRoomService } from '@/services/api/restChatRoomService'
+import { RestChatService } from '@/services/api/restChatService'
 import type { QuickQuestion, Agent } from '@/types'
 import { getAvatarDisplayUrl, getAvatarFallback, shouldShowAvatarImage } from '@/utils/avatarUtils'
 import { restClient } from '@/services/api/restClient'
@@ -1852,7 +1853,7 @@ function ChatInterfaceContent() {
   const [showCreateRoom, setShowCreateRoom] = useState(false)
 
   const handleFileOpen = useCallback((path: string, name: string) => {
-    // Open file as a tab in the main content area
+    // Open file as a tab in the main content area (used by workspace panel)
     const tabId = `file:${path}`
     setFileTabs(prev => {
       const existing = prev.find(t => t.id === tabId)
@@ -1860,6 +1861,11 @@ function ChatInterfaceContent() {
       return [...prev, { id: tabId, name, path, kind: 'file' as const }]
     })
     setActiveTab(tabId)
+  }, [])
+
+  // Open file in left-right split view (used by chat artifact "查看" button)
+  const handleArtifactView = useCallback((path: string, name: string) => {
+    setPreviewingFile({ path, name })
   }, [])
 
   const handleCloseTab = useCallback((tabId: string, e: React.MouseEvent) => {
@@ -1920,11 +1926,11 @@ function ChatInterfaceContent() {
   useEffect(() => {
     const onArtifactView = (e: Event) => {
       const { path, name } = (e as CustomEvent).detail
-      if (path && name) handleFileOpen(path, name)
+      if (path && name) handleArtifactView(path, name)
     }
     window.addEventListener('artifact-view', onArtifactView)
     return () => window.removeEventListener('artifact-view', onArtifactView)
-  }, [handleFileOpen])
+  }, [handleArtifactView])
 
   const handleSelectSession = useCallback((sessionId: string) => {
     setFileTabs([])
@@ -2179,7 +2185,7 @@ function ChatInterfaceContent() {
                   isLoading={quickQuestionsLoading}
                 />
               ) : (
-                <MessageList messages={messages} isTyping={isSending} onArtifactView={handleFileOpen} onSendMessage={handleSendMessage} />
+                <MessageList messages={messages} isTyping={isSending} onArtifactView={handleArtifactView} onSendMessage={handleSendMessage} />
               )}
               <WorkspaceActions
                 sessionId={backendSessionId}
@@ -2342,11 +2348,11 @@ export function Chat() {
   const urlSession = params.get('session') || undefined
   const urlPrompt = params.get('prompt') || undefined
 
-  // If coming from showcase with a prompt, force a fresh session by NOT passing
-  // an initialSessionId — and clear the stored session so ChatProvider doesn't
-  // restore the old one.
-  if (urlPrompt && !urlSession) {
+  // If coming from showcase (has scope but no explicit session), force a fresh
+  // session by clearing the stored session so ChatProvider doesn't restore the old one.
+  if ((urlPrompt || urlScope) && !urlSession) {
     localStorage.removeItem('super-agent-chat-backend-session')
+    RestChatService.resetSession()
   }
 
   // Use a key based on scope+prompt+timestamp to force remount when navigating from Showcase

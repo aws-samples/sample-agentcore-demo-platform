@@ -9,6 +9,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { ArrowLeft, Clock, CheckCircle, XCircle, AlertCircle, ChevronRight } from 'lucide-react';
 import { useTranslation } from '@/i18n';
 import { RestApprovalService, type Checkpoint } from '@/services/api/restApprovalService';
+import { notifyApprovalsChanged } from '@/hooks/usePendingApprovals';
 
 type Tab = 'pending' | 'processed';
 
@@ -56,6 +57,7 @@ export function Approvals() {
       );
       setSelectedItem(null);
       setReason('');
+      notifyApprovalsChanged();
       void fetchData();
     } catch {
       // Error handled by service
@@ -75,6 +77,7 @@ export function Approvals() {
       );
       setSelectedItem(null);
       setReason('');
+      notifyApprovalsChanged();
       void fetchData();
     } catch {
       // Error handled by service

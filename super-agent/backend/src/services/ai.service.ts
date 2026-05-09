@@ -12,6 +12,62 @@ import { config } from '../config/index.js';
 // Model ID for Amazon Nova 2 Lite
 const NOVA_MODEL_ID = 'us.amazon.nova-2-lite-v1:0';
 
+// ---------------------------------------------------------------------------
+// JSON sanitization helper
+// ---------------------------------------------------------------------------
+
+/**
+ * Fix unescaped control characters and unescaped quotes inside JSON string values.
+ * Walks character by character tracking in-string state.
+ *
+ * This handles the common case where LLMs generate Chinese text containing
+ * unescaped ASCII double quotes (e.g. 你是一名"专业"的风险策略师) which breaks
+ * JSON.parse(). The heuristic: a real closing quote is followed by a JSON
+ * structural character (: , } ]), otherwise it's an interior quote that needs escaping.
+ */
+function fixUnescapedJsonChars(json: string): string {
+  const out: string[] = [];
+  let inString = false;
+  let escaped = false;
+  for (let i = 0; i < json.length; i++) {
+    const ch = json[i]!;
+    if (escaped) { out.push(ch); escaped = false; continue; }
+    if (ch === '\\' && inString) { out.push(ch); escaped = true; continue; }
+    if (ch === '"') {
+      if (!inString) {
+        inString = true;
+        out.push(ch);
+        continue;
+      }
+      // Inside a string — check if this is the real closing quote or unescaped interior quote.
+      let j = i + 1;
+      while (j < json.length && (json[j] === ' ' || json[j] === '\t' || json[j] === '\r' || json[j] === '\n')) j++;
+      const nextChar: string | undefined = json[j];
+      if (nextChar === ':' || nextChar === ',' || nextChar === '}' || nextChar === ']' || nextChar === undefined) {
+        inString = false;
+        out.push(ch);
+      } else {
+        out.push('\\"');
+      }
+      continue;
+    }
+    if (inString) {
+      const code = ch.charCodeAt(0);
+      if (code < 0x20) {
+        if (ch === '\n') { out.push('\\n'); continue; }
+        if (ch === '\r') { out.push('\\r'); continue; }
+        if (ch === '\t') { out.push('\\t'); continue; }
+        if (ch === '\b') { out.push('\\b'); continue; }
+        if (ch === '\f') { out.push('\\f'); continue; }
+        out.push('\\u' + code.toString(16).padStart(4, '0'));
+        continue;
+      }
+    }
+    out.push(ch);
+  }
+  return out.join('');
+}
+
 /**
  * Suggested tool with skill definition (inspired by Claude Skills format)
  */
@@ -185,7 +241,13 @@ function parseAgentRolesResponse(responseText: string): SuggestedAgentRole[] {
     return '';
   });
 
-  const parsed = JSON.parse(jsonStr);
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(jsonStr);
+  } catch {
+    // Attempt to fix unescaped quotes (common in Chinese text like 你是一名"专业"的策略师)
+    parsed = JSON.parse(fixUnescapedJsonChars(jsonStr));
+  }
   
   if (!Array.isArray(parsed)) {
     throw new Error('Response is not an array');
@@ -373,27 +435,33 @@ Return ONLY valid JSON (no markdown):
       return '';
     });
 
-    const parsed = JSON.parse(jsonStr);
-    const agent = parsed.suggested_agent;
+    let parsed: unknown;
+    try {
+      parsed = JSON.parse(jsonStr);
+    } catch {
+      // Attempt to fix unescaped quotes (common in Chinese text)
+      parsed = JSON.parse(fixUnescapedJsonChars(jsonStr));
+    }
+    const agent = (parsed as Record<string, unknown>).suggested_agent;
 
     return {
       suggested_agent: {
-        name: String(agent?.name || 'new-agent'),
-        display_name: String(agent?.display_name || 'New Agent'),
-        role: String(agent?.role || ''),
-        description: String(agent?.description || ''),
-        responsibilities: Array.isArray(agent?.responsibilities) ? agent.responsibilities.map(String) : [],
-        capabilities: Array.isArray(agent?.capabilities) ? agent.capabilities.map(String) : [],
-        system_prompt: String(agent?.system_prompt || ''),
-        suggested_tools: Array.isArray(agent?.suggested_tools) ? agent.suggested_tools.map((t: Record<string, unknown>) => ({
+        name: String((agent as Record<string, unknown>)?.name || 'new-agent'),
+        display_name: String((agent as Record<string, unknown>)?.display_name || 'New Agent'),
+        role: String((agent as Record<string, unknown>)?.role || ''),
+        description: String((agent as Record<string, unknown>)?.description || ''),
+        responsibilities: Array.isArray((agent as Record<string, unknown>)?.responsibilities) ? ((agent as Record<string, unknown>).responsibilities as unknown[]).map(String) : [],
+        capabilities: Array.isArray((agent as Record<string, unknown>)?.capabilities) ? ((agent as Record<string, unknown>).capabilities as unknown[]).map(String) : [],
+        system_prompt: String((agent as Record<string, unknown>)?.system_prompt || ''),
+        suggested_tools: Array.isArray((agent as Record<string, unknown>)?.suggested_tools) ? ((agent as Record<string, unknown>).suggested_tools as Record<string, unknown>[]).map((t: Record<string, unknown>) => ({
           name: String(t.name || ''),
           display_name: String(t.display_name || ''),
           description: String(t.description || ''),
           skill_md: String(t.skill_md || ''),
         })) : [],
       },
-      follow_up_questions: Array.isArray(parsed.follow_up_questions) ? parsed.follow_up_questions.map(String) : [],
-      confidence: typeof parsed.confidence === 'number' ? parsed.confidence : 0.5,
+      follow_up_questions: Array.isArray((parsed as Record<string, unknown>).follow_up_questions) ? ((parsed as Record<string, unknown>).follow_up_questions as unknown[]).map(String) : [],
+      confidence: typeof (parsed as Record<string, unknown>).confidence === 'number' ? (parsed as Record<string, unknown>).confidence as number : 0.5,
     };
   }
 

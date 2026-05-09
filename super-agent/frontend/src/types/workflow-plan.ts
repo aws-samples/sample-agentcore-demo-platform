@@ -103,6 +103,7 @@ export const patchOperationSchema = z.enum([
   'updateVariable',
   'deleteVariable',
   'reorderTasks',
+  'relayout',
 ]);
 
 export type PatchOperation = z.infer<typeof patchOperationSchema>;

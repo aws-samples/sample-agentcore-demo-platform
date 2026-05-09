@@ -14,7 +14,7 @@
  * This is a "fork" operation — the organization gets its own mutable copy.
  */
 
-import { readFile, readdir, stat } from 'fs/promises';
+import { readFile, readdir } from 'fs/promises';
 import { join, resolve } from 'path';
 import { existsSync } from 'fs';
 import { prisma } from '../config/database.js';
@@ -193,17 +193,88 @@ class PackDeployService {
       where: { organization_id: organizationId, name: scopeName, deleted_at: null },
     });
     if (existing) {
-      // Return existing scope instead of throwing — idempotent behavior
-      const existingAgents = await prisma.agents.count({
+      // Idempotent behavior — but check if workflow needs to be backfilled
+      const existingAgents = await prisma.agents.findMany({
         where: { organization_id: organizationId, business_scope_id: existing.id },
+        select: { id: true, name: true },
       });
+
+      let hasWorkflow = false;
+      let workflowId: string | undefined;
+
+      // Check if workflow already exists for this scope
+      const existingWorkflow = await prisma.workflows.findFirst({
+        where: { organization_id: organizationId, business_scope_id: existing.id },
+        select: { id: true },
+      });
+
+      if (existingWorkflow) {
+        hasWorkflow = true;
+        workflowId = existingWorkflow.id;
+      } else {
+        // Backfill: create workflow if workflow-plan.json exists but wasn't imported
+        const workflowPath = join(scopeDir, 'workflow', 'workflow-plan.json');
+        if (existsSync(workflowPath)) {
+          try {
+            const workflowPlan = JSON.parse(await readFile(workflowPath, 'utf-8'));
+
+            // Build agentRef → agentId mapping
+            const agentRefMap = new Map<string, string>();
+            for (const agent of existingAgents) {
+              agentRefMap.set(agent.name, agent.id);
+            }
+
+            const nodes = (workflowPlan.nodes || []).map((node: any) => {
+              const agentRef = node.metadata?.agentRef;
+              const resolvedAgentId = agentRef ? agentRefMap.get(agentRef) : undefined;
+              return {
+                id: node.id,
+                type: node.type || 'agent',
+                label: node.title,
+                description: node.prompt || '',
+                position: node.position || { x: 0, y: 0 },
+                agentId: resolvedAgentId || undefined,
+                metadata: node.metadata || {},
+                dependentTasks: node.dependentTasks || [],
+              };
+            });
+
+            const connections = (workflowPlan.edges || []).map((edge: any) => ({
+              id: `${edge.source}->${edge.target}`,
+              from: edge.source,
+              to: edge.target,
+            }));
+
+            const workflow = await workflowService.createWorkflow(
+              {
+                name: workflowPlan.title || `${scopeName} Workflow`,
+                version: '1.0.0',
+                business_scope_id: existing.id,
+                is_official: true,
+                nodes,
+                connections,
+              },
+              organizationId,
+              userId,
+            );
+
+            hasWorkflow = true;
+            workflowId = workflow.id;
+          } catch (err) {
+            console.warn(`[pack-deploy] Failed to backfill workflow for ${scopeDirName}:`, err);
+          }
+        }
+      }
+
       return {
         scopeId: existing.id,
         scopeName: existing.name,
-        agentCount: existingAgents,
+        agentCount: existingAgents.length,
         skillCount: 0,
         memoryCount: 0,
         hasSop: false,
+        hasWorkflow,
+        workflowId,
       };
     }
 
@@ -389,21 +460,27 @@ class PackDeployService {
           agentRefMap.set(agent.name, agent.id);
         }
 
-        // Transform nodes: resolve agentRef to agentId
+        // Transform nodes: resolve agentRef to agentId and map to frontend-expected format
         const nodes = (workflowPlan.nodes || []).map((node: any) => {
           const agentRef = node.metadata?.agentRef;
           const resolvedAgentId = agentRef ? agentRefMap.get(agentRef) : undefined;
           return {
-            ...node,
+            id: node.id,
+            type: node.type || 'agent',
+            label: node.title,
+            description: node.prompt || '',
+            position: node.position || { x: 0, y: 0 },
             agentId: resolvedAgentId || undefined,
+            metadata: node.metadata || {},
+            dependentTasks: node.dependentTasks || [],
           };
         });
 
-        // Edges are already in { source, target } format
+        // Edges mapped to frontend-expected format (from/to instead of source/target)
         const connections = (workflowPlan.edges || []).map((edge: any) => ({
           id: `${edge.source}->${edge.target}`,
-          source: edge.source,
-          target: edge.target,
+          from: edge.source,
+          to: edge.target,
         }));
 
         const workflow = await workflowService.createWorkflow(

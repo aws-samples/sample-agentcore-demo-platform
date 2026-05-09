@@ -48,7 +48,7 @@ const EXCLUDED_PATTERNS = [
   /^\.workspace-manifest\.json$/,
 ]
 
-const CONFIG_DIRS = new Set(['.claude', '.kiro', '.vscode', 'node_modules', '.git', 'memories', 'dist', 'build', 'documents'])
+const CONFIG_DIRS = new Set(['.claude', '.kiro', '.vscode', 'node_modules', '.git', 'memories', 'dist', 'build'])
 
 function inferType(name: string): ArtifactItem['type'] {
   const ext = name.split('.').pop()?.toLowerCase() || ''

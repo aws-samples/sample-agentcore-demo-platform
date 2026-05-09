@@ -171,10 +171,16 @@ const WORKFLOW_PATCH_SYSTEM_PROMPT = `You are a workflow modification assistant.
 - deleteVariable: Remove a variable
   { "op": "deleteVariable", "variableId": "var-1" }
 
+- relayout: Trigger automatic re-layout of all nodes based on their dependency relationships
+  { "op": "relayout" }
+
 ## Valid Task Types
 agent, action, condition, document, codeArtifact, humanApproval
 
 Note: Use "humanApproval" (not "condition") when the workflow requires a real person to review and approve/reject before continuing. Condition nodes are for automated programmatic branching only.
+
+## Layout & Positioning
+Node positions are automatically calculated based on dependency relationships (topological layers). You do NOT need to specify x/y coordinates. When the user asks to "rearrange", "re-layout", "reorganize", or "spread out" nodes, use the "relayout" operation. If the user wants to change the visual structure, modify the dependentTasks relationships between tasks — the layout engine will automatically reposition nodes accordingly.
 
 ## Rules
 1. Return a JSON array of patch operations (even for a single change).

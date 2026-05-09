@@ -30,6 +30,14 @@ export const translations: TranslationData = {
     en: 'Apps',
     cn: '应用'
   },
+  'nav.knowledge': {
+    en: 'Knowledge',
+    cn: '知识库'
+  },
+  'nav.support': {
+    en: 'Support',
+    cn: '客服'
+  },
   'nav.starred': {
     en: 'Showcase',
     cn: '企业Agent大赏'
@@ -4118,6 +4126,7 @@ export const translations: TranslationData = {
   'workflowEditor.executionHistory': { en: 'Execution History', cn: '执行历史' },
   'workflowEditor.noHistory': { en: 'No executions yet', cn: '暂无执行记录' },
   'workflowEditor.save': { en: 'Save', cn: '保存' },
+  'workflowEditor.relayout': { en: 'Auto Layout', cn: '自动布局' },
   'workflowEditor.run': { en: 'Run', cn: '运行' },
   'workflowEditor.stop': { en: 'Stop', cn: '停止' },
   'workflowEditor.executing': { en: 'Executing workflow...', cn: '执行工作流中...' },

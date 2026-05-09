@@ -2,13 +2,19 @@
  * usePendingApprovals hook
  * 
  * Polls for pending approval checkpoints every 30 seconds.
- * Provides the count for the navigation badge and the full list for the inbox.
+ * Also listens for 'approvals:changed' custom event for immediate refresh
+ * (fired after approve/reject actions).
  */
 
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { RestApprovalService, type Checkpoint } from '@/services/api/restApprovalService';
 
 const POLL_INTERVAL_MS = 30_000;
+
+/** Call this after approve/reject to immediately update the badge */
+export function notifyApprovalsChanged() {
+  window.dispatchEvent(new CustomEvent('approvals:changed'));
+}
 
 export function usePendingApprovals() {
   const [pendingCheckpoints, setPendingCheckpoints] = useState<Checkpoint[]>([]);
@@ -36,10 +42,15 @@ export function usePendingApprovals() {
       void fetchPending();
     }, POLL_INTERVAL_MS);
 
+    // Listen for immediate refresh events
+    const handleChanged = () => { void fetchPending(); };
+    window.addEventListener('approvals:changed', handleChanged);
+
     return () => {
       if (intervalRef.current) {
         clearInterval(intervalRef.current);
       }
+      window.removeEventListener('approvals:changed', handleChanged);
     };
   }, [fetchPending]);
 

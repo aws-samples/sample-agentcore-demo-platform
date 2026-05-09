@@ -22,6 +22,7 @@ import {
   PanelLeftOpen,
   PanelLeftClose,
   Pencil,
+  LayoutGrid,
 } from 'lucide-react';
 import { useTranslation } from '@/i18n';
 import { useWorkflows, useWorkflowExecution } from '@/services';
@@ -38,6 +39,7 @@ import type { CanvasNode, CanvasEdge, CanvasData, CanvasNodeType } from '@/types
 import type { NodeExecutionState } from '@/services/useWorkflowExecution';
 import type { Workflow as WorkflowType, WorkflowImportResult } from '@/types';
 import type { WorkflowVariable } from '@/types/workflow-plan';
+import { canvasDataToWorkflowPlan, workflowPlanToCanvasData } from '@/lib/workflow-plan';
 import { createCanvasNode } from '@/lib/canvas/nodes';
 import { getAuthToken } from '@/services/api/restClient';
 import { ExecutionDetailModal } from '@/components/ExecutionDetailModal';
@@ -410,6 +412,15 @@ export function WorkflowEditor() {
     await updateWorkflow(selectedWorkflow.id, updates);
     setIsDirty(false);
   }, [selectedWorkflow, canvasData, isDirty, updateWorkflow]);
+
+  // Handle auto-relayout — recalculate all node positions based on DAG structure
+  const handleRelayout = useCallback(() => {
+    if (canvasData.nodes.length === 0) return;
+    const plan = canvasDataToWorkflowPlan(canvasData, selectedWorkflow?.name || 'Workflow');
+    const newCanvasData = workflowPlanToCanvasData(plan);
+    setCanvasData(newCanvasData);
+    setIsDirty(true);
+  }, [canvasData, selectedWorkflow]);
 
   // Handle run workflow — stream V2 execution into copilot chat
   const [isRunningV2, setIsRunningV2] = useState(false);
@@ -1025,6 +1036,14 @@ export function WorkflowEditor() {
                     title={t('workflowEditor.deleteWorkflow')}
                   >
                     <Trash2 className="w-4 h-4" />
+                  </button>
+                  <button
+                    onClick={handleRelayout}
+                    disabled={canvasData.nodes.length === 0 || isRunningV2}
+                    className="flex items-center gap-2 px-3 py-1.5 bg-gray-800 hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed text-gray-300 rounded-md transition-colors text-sm"
+                    title={t('workflowEditor.relayout')}
+                  >
+                    <LayoutGrid className="w-4 h-4" />
                   </button>
                   <button
                     onClick={handleSave}

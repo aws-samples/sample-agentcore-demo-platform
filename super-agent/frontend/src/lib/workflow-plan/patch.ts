@@ -140,6 +140,11 @@ export function applyPatch(plan: WorkflowPlan, patch: WorkflowPatch): PatchResul
         result.tasks = reorderedTasks;
         break;
 
+      case 'relayout':
+        // No-op: the plan is returned unchanged, and the frontend will
+        // recalculate positions via workflowPlanToCanvasData's calculateLayout()
+        break;
+
       default:
         return { success: false, error: `Unknown operation: ${patch.op}` };
     }

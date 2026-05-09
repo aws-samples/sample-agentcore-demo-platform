@@ -137,6 +137,79 @@ function buildSystemPrompt(language?: string): string {
 }
 
 // ---------------------------------------------------------------------------
+// JSON sanitization helpers
+// ---------------------------------------------------------------------------
+
+/**
+ * Fix unescaped control characters and unescaped quotes inside JSON string values.
+ * Walks character by character tracking in-string state.
+ *
+ * This handles the common case where LLMs generate Chinese text containing
+ * unescaped ASCII double quotes (e.g. 你是一名"专业"的风险策略师) which breaks
+ * JSON.parse(). The heuristic: a real closing quote is followed by a JSON
+ * structural character (: , } ]), otherwise it's an interior quote that needs escaping.
+ */
+function fixUnescapedJsonChars(json: string): string {
+  const out: string[] = [];
+  let inString = false;
+  let escaped = false;
+  for (let i = 0; i < json.length; i++) {
+    const ch = json[i]!;
+    if (escaped) { out.push(ch); escaped = false; continue; }
+    if (ch === '\\' && inString) { out.push(ch); escaped = true; continue; }
+    if (ch === '"') {
+      if (!inString) {
+        inString = true;
+        out.push(ch);
+        continue;
+      }
+      // Inside a string — check if this is the real closing quote or unescaped interior quote.
+      // Heuristic: real closing quote is followed by JSON structural char (: , } ])
+      let j = i + 1;
+      while (j < json.length && (json[j] === ' ' || json[j] === '\t' || json[j] === '\r' || json[j] === '\n')) j++;
+      const nextChar: string | undefined = json[j];
+      if (nextChar === ':' || nextChar === ',' || nextChar === '}' || nextChar === ']' || nextChar === undefined) {
+        inString = false;
+        out.push(ch);
+      } else {
+        // Interior quote — escape it
+        out.push('\\"');
+      }
+      continue;
+    }
+    if (inString) {
+      const code = ch.charCodeAt(0);
+      if (code < 0x20) {
+        if (ch === '\n') { out.push('\\n'); continue; }
+        if (ch === '\r') { out.push('\\r'); continue; }
+        if (ch === '\t') { out.push('\\t'); continue; }
+        if (ch === '\b') { out.push('\\b'); continue; }
+        if (ch === '\f') { out.push('\\f'); continue; }
+        out.push('\\u' + code.toString(16).padStart(4, '0'));
+        continue;
+      }
+    }
+    out.push(ch);
+  }
+  return out.join('');
+}
+
+/**
+ * Attempt to parse a JSON string with automatic sanitization on failure.
+ * First tries raw JSON.parse; if that fails, applies fixUnescapedJsonChars
+ * and retries. Returns the parsed value or throws.
+ */
+function robustJsonParse(raw: string): unknown {
+  try {
+    return JSON.parse(raw);
+  } catch {
+    // Attempt sanitization and retry
+    const sanitized = fixUnescapedJsonChars(raw);
+    return JSON.parse(sanitized);
+  }
+}
+
+// ---------------------------------------------------------------------------
 // Validation helpers
 // ---------------------------------------------------------------------------
 
@@ -151,7 +224,7 @@ const MAX_REPAIR_ATTEMPTS = 2;
 function validateScopeConfigJson(raw: string): { ok: true; config: GeneratedScopeConfig } | { ok: false; error: string } {
   let parsed: unknown;
   try {
-    parsed = JSON.parse(raw);
+    parsed = robustJsonParse(raw);
   } catch (e) {
     return { ok: false, error: `Invalid JSON: ${e instanceof Error ? e.message : String(e)}` };
   }
@@ -480,10 +553,11 @@ export class ScopeGeneratorService {
     // Try to parse each candidate, return the first valid one
     for (const candidate of candidates) {
       try {
-        const parsed = JSON.parse(candidate);
-        if (parsed && typeof parsed === 'object' && parsed.scope && Array.isArray(parsed.agents)) {
+        const parsed = robustJsonParse(candidate);
+        if (parsed && typeof parsed === 'object' && (parsed as Record<string, unknown>).scope && Array.isArray((parsed as Record<string, unknown>).agents)) {
           console.log(`[scope-generator] Extracted valid config from text (${candidate.length} chars)`);
-          return candidate;
+          // Return the re-serialized JSON to ensure it's clean
+          return JSON.stringify(parsed);
         }
       } catch { /* not valid JSON */ }
     }
@@ -637,7 +711,14 @@ QUALITY CHECK — before outputting, verify:
       if (existsSync(configFilePath)) {
         const fileContent = await readFile(configFilePath, 'utf-8');
         console.log(`[twin-generator] scope-config.json found (${fileContent.length} bytes)`);
-        yield { type: 'scope_config' as ConversationEvent['type'], content: fileContent } as unknown as ConversationEvent;
+        // Re-serialize through robustJsonParse to fix any unescaped quotes in Chinese text
+        try {
+          const parsed = robustJsonParse(fileContent);
+          yield { type: 'scope_config' as ConversationEvent['type'], content: JSON.stringify(parsed) } as unknown as ConversationEvent;
+        } catch (e) {
+          console.warn(`[twin-generator] scope-config.json parse failed: ${e instanceof Error ? e.message : String(e)}, sending raw`);
+          yield { type: 'scope_config' as ConversationEvent['type'], content: fileContent } as unknown as ConversationEvent;
+        }
       } else {
         // Strategy 2: Extract JSON from the conversation text
         console.log('[twin-generator] scope-config.json not found, extracting from conversation text...');
@@ -669,8 +750,8 @@ QUALITY CHECK — before outputting, verify:
     const fenceMatch = text.match(/```(?:json)?\s*([\s\S]*?)```/);
     if (fenceMatch) {
       try {
-        const parsed = JSON.parse(fenceMatch[1]!.trim());
-        if (parsed.systemPrompt || parsed.skills) return JSON.stringify(parsed);
+        const parsed = robustJsonParse(fenceMatch[1]!.trim());
+        if ((parsed as Record<string, unknown>).systemPrompt || (parsed as Record<string, unknown>).skills) return JSON.stringify(parsed);
       } catch { /* not valid JSON */ }
     }
 
@@ -695,9 +776,9 @@ QUALITY CHECK — before outputting, verify:
     candidates.sort((a, b) => b.length - a.length);
     for (const candidate of candidates) {
       try {
-        const parsed = JSON.parse(candidate);
-        if (parsed.systemPrompt || parsed.skills || (parsed.scope && parsed.systemPrompt !== undefined)) {
-          return candidate;
+        const parsed = robustJsonParse(candidate);
+        if ((parsed as Record<string, unknown>).systemPrompt || (parsed as Record<string, unknown>).skills || ((parsed as Record<string, unknown>).scope && (parsed as Record<string, unknown>).systemPrompt !== undefined)) {
+          return JSON.stringify(parsed);
         }
       } catch { continue; }
     }
@@ -731,7 +812,7 @@ QUALITY CHECK — before outputting, verify:
       jsonStr = jsonStr.substring(firstBrace, lastBrace + 1);
     }
 
-    const parsed = JSON.parse(jsonStr);
+    const parsed = robustJsonParse(jsonStr);
 
     // Validate structure
     if (!parsed.scope || !parsed.agents || !Array.isArray(parsed.agents)) {
