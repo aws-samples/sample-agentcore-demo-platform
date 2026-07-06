@@ -34,6 +34,15 @@ const PORT = Number(process.env.PORT ?? 8080);
 const S3_REGION = process.env.WORKSPACE_S3_REGION ?? 'us-east-1';
 const s3 = new S3Client({ region: S3_REGION });
 
+// Number of /invocations requests currently being processed. This is the
+// single source of truth for whether the runtime is doing work: the agent runs
+// entirely within an /invocations request (SSE stream stays open until the
+// agent finishes), so there is no post-response background work to track.
+// /ping reports HealthyBusy while this is > 0 so the platform's 15-minute idle
+// timeout does not terminate a session mid-task, and Healthy when it returns to
+// 0 so an idle session is reclaimed promptly.
+let activeInvocations = 0;
+
 // ---------------------------------------------------------------------------
 // /invocations
 // ---------------------------------------------------------------------------
@@ -42,55 +51,64 @@ async function handleInvocations(
   req: http.IncomingMessage,
   res: http.ServerResponse,
 ): Promise<void> {
-  const chunks: Buffer[] = [];
-  for await (const chunk of req) chunks.push(chunk as Buffer);
-
-  let payload: AgentPayload;
+  // Mark the runtime busy for the entire duration of this request so /ping
+  // reports HealthyBusy and the session survives the 15-minute idle timeout
+  // while the agent is working. The finally block guarantees the count is
+  // decremented on success, error, or client disconnect.
+  activeInvocations++;
   try {
-    payload = JSON.parse(Buffer.concat(chunks).toString());
-  } catch {
-    res.writeHead(400, { 'Content-Type': 'application/json' });
-    res.end(JSON.stringify({ error: 'Invalid JSON payload' }));
-    return;
-  }
+    const chunks: Buffer[] = [];
+    for await (const chunk of req) chunks.push(chunk as Buffer);
 
-  const bucket = payload.workspace_s3_bucket;
-  const prefix = payload.workspace_s3_prefix;
-
-  // --- Restore full workspace from S3 → /workspace/ ---
-  if (bucket && prefix) {
+    let payload: AgentPayload;
     try {
-      const count = await restoreWorkspaceFromS3(s3, bucket, prefix);
-      console.log(`[index] Restored ${count} files from s3://${bucket}/${prefix}`);
+      payload = JSON.parse(Buffer.concat(chunks).toString());
+    } catch {
+      res.writeHead(400, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ error: 'Invalid JSON payload' }));
+      return;
+    }
+
+    const bucket = payload.workspace_s3_bucket;
+    const prefix = payload.workspace_s3_prefix;
+
+    // --- Restore full workspace from S3 → /workspace/ ---
+    if (bucket && prefix) {
+      try {
+        const count = await restoreWorkspaceFromS3(s3, bucket, prefix);
+        console.log(`[index] Restored ${count} files from s3://${bucket}/${prefix}`);
+      } catch (err) {
+        console.error('[index] Workspace restore failed:', err);
+      }
+    }
+
+    // --- SSE streaming response ---
+    // S3 sync is now handled by SDK hooks in agent-runner.ts:
+    //   PostToolUse (Write|Edit) → incremental file sync
+    //   Stop → full workspace sync (safety net)
+    res.writeHead(200, {
+      'Content-Type': 'text/event-stream',
+      'Cache-Control': 'no-cache',
+      'Connection': 'keep-alive',
+    });
+
+    try {
+      for await (const event of runAgent(payload)) {
+        res.write(`data: ${JSON.stringify(event)}\n\n`);
+      }
     } catch (err) {
-      console.error('[index] Workspace restore failed:', err);
+      const errorEvent: AgentEvent = {
+        type: 'error',
+        code: 'AGENT_EXECUTION_ERROR',
+        message: err instanceof Error ? err.message : String(err),
+      };
+      res.write(`data: ${JSON.stringify(errorEvent)}\n\n`);
     }
+
+    res.end();
+  } finally {
+    activeInvocations--;
   }
-
-  // --- SSE streaming response ---
-  // S3 sync is now handled by SDK hooks in agent-runner.ts:
-  //   PostToolUse (Write|Edit) → incremental file sync
-  //   Stop → full workspace sync (safety net)
-  res.writeHead(200, {
-    'Content-Type': 'text/event-stream',
-    'Cache-Control': 'no-cache',
-    'Connection': 'keep-alive',
-  });
-
-  try {
-    for await (const event of runAgent(payload)) {
-      res.write(`data: ${JSON.stringify(event)}\n\n`);
-    }
-  } catch (err) {
-    const errorEvent: AgentEvent = {
-      type: 'error',
-      code: 'AGENT_EXECUTION_ERROR',
-      message: err instanceof Error ? err.message : String(err),
-    };
-    res.write(`data: ${JSON.stringify(errorEvent)}\n\n`);
-  }
-
-  res.end();
 }
 
 // ---------------------------------------------------------------------------
@@ -99,9 +117,15 @@ async function handleInvocations(
 
 function handlePing(res: http.ServerResponse): void {
   res.writeHead(200, { 'Content-Type': 'application/json' });
+  // Report HealthyBusy while an invocation is in flight, Healthy otherwise.
+  //
+  // Do NOT add time_of_last_update here. The platform tracks status changes on
+  // its own; sending a timestamp that advances on every ping signals a
+  // continuous status change, which prevents the idle-session timeout from ever
+  // firing — sessions then persist until MaxLifetime and inflate cost. See:
+  // https://docs.aws.amazon.com/bedrock-agentcore/latest/devguide/runtime-long-run.html
   res.end(JSON.stringify({
-    status: 'Healthy',
-    time_of_last_update: Math.floor(Date.now() / 1000),
+    status: activeInvocations > 0 ? 'HealthyBusy' : 'Healthy',
   }));
 }
 
