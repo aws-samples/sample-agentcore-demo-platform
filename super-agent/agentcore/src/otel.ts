@@ -1,78 +1,121 @@
 /**
- * OpenTelemetry instrumentation for the Claude Agent SDK runtime, following the
- * SAES / AgentCore Evaluation OTEL contract (see CustomEval
- * .claude/skills/otel-eval-contract).
+ * OpenTelemetry instrumentation for the Claude Agent SDK runtime.
  *
- * Why hand-rolled: the Claude Agent SDK drives Bedrock through a bundled CLI
- * SUBPROCESS, so AgentCore's auto-instrumentation never sees the model calls —
- * nothing is captured for free. We satisfy the contract by hand:
- *   - one root span per invocation (= one trace per turn) carrying
- *     `session.id`, `gen_ai.prompt`, `gen_ai.completion`;
- *   - one OTEL event per turn with roled input/output message bodies (the shape
- *     SAES's role-aware recovery reads);
- *   - per tool call, Bedrock-Converse-shaped `toolUse`/`toolResult` event bodies
- *     so the tool supplement can recover the trajectory.
+ * AgentCore Evaluations natively supports the Claude Agent SDK: it selects its
+ * field-extraction mapper from a span's instrumentation SCOPE, and for this SDK
+ * that scope must be exactly `openinference.instrumentation.claude_agent_sdk`
+ * (see the "supported frameworks" devguide page). We therefore emit the OFFICIAL
+ * OpenInference span shape produced by
+ * `@arizeai/openinference-instrumentation-claude-agent-sdk` instead of the
+ * hand-rolled spans this module used to build.
  *
- * Export: when AGENT_OBSERVABILITY_ENABLED=true the AgentCore Runtime provides
- * an OTLP receiver (localhost:4318) that forwards to CloudWatch/X-Ray using the
- * OTEL_EXPORTER_OTLP_*_HEADERS (x-aws-log-group etc.) set on the container. We
- * export spans + logs over OTLP/HTTP-protobuf to that endpoint. When the flag is
- * off (local dev without a collector) instrumentation is a no-op unless a test
- * harness installs in-memory providers first.
+ * Two shims are required to run that library here, both applied by the tracer
+ * proxy in {@link makeScopeForcingProvider}:
+ *
+ *   1. SCOPE FORCING. AWS documents only the PYTHON instrumentation packages;
+ *      the npm port registers itself under the scope
+ *      `@arizeai/openinference-instrumentation-claude-agent-sdk`, which the
+ *      mapper does not recognize. The library resolves its tracer via
+ *      `tracerProvider.getTracer(name, version)`, so passing a proxy provider
+ *      that ignores the requested name and returns a tracer registered under
+ *      the AWS scope makes every emitted span carry the required scope.
+ *
+ *   2. session.id PINNING. The Python library preserves an existing session.id
+ *      (`_has_existing_session_id`); the JS port (0.2.17) does not — it writes
+ *      SESSION_ID unconditionally from the SDK's own per-run `session_id`.
+ *      Conversation continuity here comes from history injection, not native
+ *      `resume`, so the SDK's id differs every turn and each turn would become a
+ *      separate eval session. The proxy pins `session.id` to the backend chat
+ *      session id for the whole invocation.
+ *
+ * On top of the official attributes we mirror a small set of `gen_ai.*` keys the
+ * AgentCore GenAI console reads (agent-traces rendering + the SESSION-level
+ * token metrics). Those dashboards work today and the OpenInference attributes
+ * alone do not feed them.
+ *
+ * Export path: the AWS Distro for OpenTelemetry (ADOT) Node package is preloaded
+ * by the container entrypoint:
+ *
+ *   node --require @aws/aws-distro-opentelemetry-node-autoinstrumentation/register dist/index.js
+ *
+ * That CJS hook (loaded before this ESM app) installs the global TracerProvider
+ * and the SigV4-signed OTLP→CloudWatch pipeline, gated on
+ * AGENT_OBSERVABILITY_ENABLED + OTEL_*. There is no standalone OTLP collector on
+ * AgentCore Runtime and plain OTEL-JS exporters cannot SigV4-sign to CloudWatch,
+ * so we never build our own provider — this module only emits through the global
+ * OTEL API (a no-op provider when observability is off).
  */
 
 import {
   trace,
   context,
   propagation,
+  createContextKey,
   ROOT_CONTEXT,
   type Span,
   type Tracer,
+  type TracerProvider,
   type Context,
-  SpanStatusCode,
+  type Attributes,
+  type AttributeValue,
 } from '@opentelemetry/api';
-import { logs, type Logger } from '@opentelemetry/api-logs';
+import { ClaudeAgentSDKInstrumentation } from '@arizeai/openinference-instrumentation-claude-agent-sdk';
+import type { TokenUsage } from './types.js';
 
-// The managed AgentCore Evaluate API only accepts spans whose instrumentation
-// scope is on its allow-list; for the Claude Agent SDK that is exactly
-// `openinference.instrumentation.claude_agent_sdk`. Using any other scope name
-// makes Evaluate reject the session ("no spans with supported scope").
+/**
+ * The scope AgentCore Evaluations keys the Claude Agent SDK mapper on. Any other
+ * name makes Evaluate reject the session ("no spans with supported scope").
+ *
+ * Only the NAME is overridden. The scope VERSION is forwarded verbatim from
+ * whatever the instrumentation asks for (its own package version), so the span
+ * still truthfully identifies the library that produced it — the Python
+ * instrumentation reports its version the same way, and a scope with an empty
+ * version is indistinguishable from an unknown build when debugging.
+ */
 const SCOPE = 'openinference.instrumentation.claude_agent_sdk';
 const OBSERVABILITY_ENABLED = process.env.AGENT_OBSERVABILITY_ENABLED === 'true';
 
+/** Provider constant for the gen_ai.* / llm.* provider attributes. */
+const PROVIDER = 'anthropic';
+
+// --- OpenInference attribute keys we read or write. Inlined as string literals
+// so this module has no runtime dependency on the semantic-conventions package.
+const OI_SPAN_KIND = 'openinference.span.kind';
+const SESSION_ID = 'session.id';
+const INPUT_VALUE = 'input.value';
+const INPUT_MIME_TYPE = 'input.mime_type';
+const OUTPUT_VALUE = 'output.value';
+const TOOL_NAME = 'tool.name';
+const LLM_MODEL_NAME = 'llm.model_name';
+const LLM_TOKEN_COUNT_PROMPT = 'llm.token_count.prompt';
+const LLM_TOKEN_COUNT_COMPLETION = 'llm.token_count.completion';
+const LLM_TOKEN_COUNT_CACHE_READ = 'llm.token_count.prompt_details.cache_read';
+const LLM_TOKEN_COUNT_CACHE_WRITE = 'llm.token_count.prompt_details.cache_write';
+
 /**
- * Observability setup is NOT done here. The AWS Distro for OpenTelemetry (ADOT)
- * Node package is preloaded via the container entrypoint:
- *
- *   node --require @aws/aws-distro-opentelemetry-node-autoinstrumentation/register dist/index.js
- *
- * That CJS `register` hook (loaded before this ESM app) installs the global
- * TracerProvider + LoggerProvider and the SigV4-signed OTLP export pipeline that
- * delivers to CloudWatch (the /aws/bedrock-agentcore/runtimes/<id> log group),
- * reading AGENT_OBSERVABILITY_ENABLED + OTEL_* from the environment.
- *
- * Why not a self-built NodeTracerProvider: there is no standalone OTLP collector
- * on AgentCore Runtime ("ADOT Collector not supported for agent observability")
- * and plain OTEL-JS exporters can't SigV4-sign to CloudWatch. ADOT's register
- * provides both. It's CJS (works via --require) so it coexists with our ESM app
- * and the ESM-only Claude Agent SDK.
- *
- * This module therefore only EMITS spans/events through the global OTEL API,
- * which resolves to whatever provider `register` installed (or a no-op provider
- * when observability is disabled / register wasn't preloaded).
+ * Per-invocation state. Carried on the OTEL Context rather than in a module
+ * global so concurrent invocations in one container cannot cross-contaminate.
  */
+interface InvocationState {
+  /** Backend chat session id — pinned onto every span's session.id. */
+  sessionId: string;
+  /**
+   * The raw user turn. The prompt actually handed to the SDK also replays the
+   * conversation history (see buildContextualPrompt), which would make
+   * `input.value` a whole transcript; evaluators should judge THIS turn, which
+   * is also what the spans carried before the switch to the official library.
+   */
+  prompt: string;
+  /** The library's AGENT span, captured when it is created. */
+  agentSpan?: Span;
+}
+
+const INVOCATION_KEY = createContextKey('super-agent.invocation');
+
 export async function initOtel(): Promise<void> {
   if (OBSERVABILITY_ENABLED) {
-    console.log('[otel] Observability enabled — emitting spans/events via the ADOT global provider');
+    console.log(`[otel] Observability enabled — emitting OpenInference spans as scope ${SCOPE}`);
   }
-}
-
-function getTracer(): Tracer {
-  return trace.getTracer(SCOPE);
-}
-
-function getLogger(): Logger {
-  return logs.getLogger(SCOPE);
 }
 
 /**
@@ -80,16 +123,12 @@ function getLogger(): Logger {
  *
  * AgentCore's platform emits its own `AgentCore.Runtime.Invoke` span and can
  * forward the W3C `traceparent` (and X-Ray `X-Amzn-Trace-Id`) into the
- * container. Without extracting it, our root span starts a NEW trace, so one
- * turn shows as two disconnected traces (platform span + our span) under the
- * same session. Extracting it makes our `agent.invocation` a CHILD of the
- * platform span — one connected trace per turn (the console groups a session's
- * work into one trace this way).
- *
- * ADOT's `register` hook installs the global propagator (W3C + X-Ray), so
- * `propagation.extract` understands both header formats. Returns undefined when
- * no usable trace context is present (→ caller starts a fresh root, today's
- * behavior). Never throws.
+ * container. Without extracting it the AGENT span starts a NEW trace, so one
+ * turn shows as two disconnected traces (platform span + ours) under the same
+ * session. ADOT's `register` hook installs the global propagator (W3C + X-Ray),
+ * so `propagation.extract` understands both formats. Returns undefined when no
+ * usable trace context is present (→ the AGENT span becomes its own root).
+ * Never throws.
  */
 export function parentContextFromHeaders(headers: Record<string, unknown> | undefined): Context | undefined {
   if (!OBSERVABILITY_ENABLED || !headers) return undefined;
@@ -110,235 +149,274 @@ export function parentContextFromHeaders(headers: Record<string, unknown> | unde
   }
 }
 
-/** Emit an OTEL log record (used as an "event" — the contract's event bodies). */
-function emitEvent(name: string, body: unknown, span?: Span): void {
-  try {
-    const ctx = span?.spanContext();
-    getLogger().emit({
-      // event.name marks this log record as a semantic event.
-      attributes: { 'event.name': name },
-      body: body as never,
-      ...(ctx ? { traceId: ctx.traceId, spanId: ctx.spanId } : {}),
-    });
-  } catch {
-    /* telemetry must never throw into the agent path */
-  }
-}
+// ---------------------------------------------------------------------------
+// Span wrapper: pins session.id / input.value and mirrors gen_ai.* keys
+// ---------------------------------------------------------------------------
 
 /**
- * Handle to the active invocation span so tool calls and the final answer can
- * attach to it. Returned by beginInvocation; caller must call end().
- */
-export interface InvocationTrace {
-  /**
-   * Record a tool call as a child span. Called when the tool_use block is seen
-   * (root span still active). `callId` is the SDK's tool_use id — pass it so a
-   * later tool_result can be matched via recordToolResult. `result` is usually
-   * '' at this point (results arrive later / out of band).
-   */
-  recordTool(name: string, input: unknown, result: unknown, callId?: string): void;
-  /** Attach a tool's result to its already-recorded span (matched by callId). */
-  recordToolResult(callId: string, result: unknown): void;
-  /**
-   * Finalize with the assistant's final answer + optional model / token usage.
-   * When a model and/or usage is present, ALSO emits a terminal `chat {model}`
-   * child span carrying the token counters + model — the LLM client span the
-   * AgentCore GenAI console reads model + token metrics from. The invoke_agent
-   * span alone does not populate those columns.
-   */
-  end(answer: string, opts?: { isError?: boolean; model?: string; numTurns?: number; tokenUsage?: Record<string, number> }): void;
-}
-
-/** Provider constant for the gen_ai.system / gen_ai.provider.name attributes. */
-const PROVIDER = 'anthropic';
-
-/**
- * Stamp the four aws/spans token counters the AgentCore console sums. These
- * `gen_ai.usage.*` keys drive the SESSION/space-level token metrics
- * (ApplicationSignals InputTokens/OutputTokens); the platform's span processor
- * also derives `aws.genai.token_count_total` from them. The SDK's
- * `cache_creation_input_tokens` maps to the convention's `cache_write` counter.
- * `usage` is our TokenUsage shape (see types.ts). Missing values default to 0.
+ * Wrap a freshly started span so that:
+ *   - `session.id` always reports the backend chat session id (the JS library
+ *     would otherwise overwrite it with the SDK's per-run id — see the module
+ *     header), and on the AGENT span `input.value` always reports the raw user
+ *     turn rather than the history-replay prompt;
+ *   - each OpenInference attribute the AgentCore console needs under a
+ *     `gen_ai.*` name is mirrored as it is written.
  *
- * NOTE on the trace-detail "Tokens" column: it stays 0 for our spans and that
- * is expected/unavoidable here. That per-trace rollup only counts spans the
- * console recognizes as LLM `chat` calls, and recognition is gated on the
- * instrumentation SCOPE. Our scope `openinference.instrumentation
- * .claude_agent_sdk` is not on AWS's recognized list (strands.telemetry.tracer
- * / *.langchain), so our chat span is excluded from the rollup no matter which
- * token keys it carries. We keep this scope because the managed Evaluate API
- * (GoalSuccessRate) requires it. Use the SESSION/space token metrics for usage
- * — those work. See git history / the OTEL investigation for the full analysis.
- */
-function stampUsage(span: Span, usage: Record<string, number>): void {
-  span.setAttribute('gen_ai.usage.input_tokens', Math.trunc(usage.input_tokens ?? 0));
-  span.setAttribute('gen_ai.usage.output_tokens', Math.trunc(usage.output_tokens ?? 0));
-  span.setAttribute('gen_ai.usage.cache_read_input_tokens', Math.trunc(usage.cache_read_input_tokens ?? 0));
-  span.setAttribute('gen_ai.usage.cache_write_input_tokens', Math.trunc(usage.cache_creation_input_tokens ?? 0));
-}
-
-/**
- * Emit one terminal `chat {model}` LLM span as a child of the invocation.
+ * The span's kind is not known at creation: `OITracer.startSpan` strips
+ * `options.attributes` and re-applies them through `setAttributes`, so
+ * `openinference.span.kind` arrives on the first write. We therefore classify
+ * lazily and stamp the kind-specific baseline into that same write.
  *
- * The Claude Agent SDK drives Bedrock through a subprocess, so no per-LLM-call
- * span is captured for free — but the AgentCore GenAI console reads its model
- * and token columns from a span with `gen_ai.operation.name=chat`. Without this
- * span the dashboard shows no model / no tokens even though invoke_agent carries
- * them. The SDK reports usage once per query (ResultMessage.usage, summed across
- * turns), so this is a single honest aggregate span per turn. No-op when neither
- * model nor usage is present.
+ * Returns the same span object (mutated). The library wraps it in an OISpan, so
+ * every attribute it sets funnels through these two methods.
  */
-function emitChatSpan(
-  sessionId: string,
-  parentCtx: Context,
-  opts?: { model?: string; numTurns?: number; tokenUsage?: Record<string, number> },
-): void {
-  if (!opts?.model && !opts?.tokenUsage) return;
-  try {
-    const model = opts.model ?? 'unknown';
-    const chatSpan = getTracer().startSpan(`chat ${model}`, undefined, parentCtx);
-    chatSpan.setAttribute('gen_ai.operation.name', 'chat');
-    chatSpan.setAttribute('gen_ai.system', PROVIDER);
-    chatSpan.setAttribute('gen_ai.provider.name', PROVIDER);
-    chatSpan.setAttribute('gen_ai.request.model', model);
-    chatSpan.setAttribute('session.id', sessionId);
-    if (opts.tokenUsage) stampUsage(chatSpan, opts.tokenUsage);
-    if (opts.numTurns != null) chatSpan.setAttribute('gen_ai.agent.num_turns', Math.trunc(opts.numTurns));
-    chatSpan.setStatus({ code: SpanStatusCode.OK });
-    chatSpan.end();
-  } catch { /* telemetry must never throw into the agent path */ }
-}
-
-/**
- * Start a root span for one agent invocation (= one trace per turn) and stamp
- * the three contract attributes. Returns a no-op handle when observability is
- * off. Never throws — telemetry failures must not affect the agent.
- */
-export function beginInvocation(sessionId: string, prompt: string, parentCtx?: Context): InvocationTrace {
-  if (!OBSERVABILITY_ENABLED) return NOOP_TRACE;
-
-  let span: Span;
-  let rootCtx: ReturnType<typeof trace.setSpan>;
-  try {
-    // If the caller extracted a parent context from the inbound headers (the
-    // platform's AgentCore.Runtime.Invoke span), start our root INSIDE it so the
-    // whole turn is one connected trace. Otherwise start a fresh root (the span
-    // gets its own trace — the pre-propagation behavior).
-    const startCtx = parentCtx ?? context.active();
-    span = getTracer().startSpan('agent.invocation', undefined, startCtx);
-    rootCtx = trace.setSpan(startCtx, span);
-
-    // --- Agent Traces UI rendering (gen_ai.* semantic conventions) ---
-    // gen_ai.operation.name categorizes the span so the UI renders it as an
-    // agent invocation and shows input/output; without it the span is a bare
-    // skeleton. input/output.messages carry the content the UI displays.
-    span.setAttribute('gen_ai.operation.name', 'invoke_agent');
-    span.setAttribute('gen_ai.provider.name', 'anthropic');
-    span.setAttribute('gen_ai.agent.name', 'super-agent');
-    span.setAttribute('gen_ai.input.messages', JSON.stringify([{ role: 'user', content: [{ type: 'text', text: prompt }] }]));
-
-    span.setAttribute('session.id', sessionId);          // contract item 1
-    span.setAttribute('gen_ai.prompt', prompt);          // contract item 2
-
-    // --- OpenInference attributes (managed Evaluate API's claude_agent_sdk
-    // mapper reads these; without them Evaluate rejects the session). ---
-    span.setAttribute('openinference.span.kind', 'AGENT');
-    span.setAttribute('input.value', prompt);
-    span.setAttribute('llm.input_messages.0.message.role', 'user');
-    span.setAttribute('llm.input_messages.0.message.content', prompt);
-  } catch {
-    return NOOP_TRACE;
-  }
-
-    // Open tool spans awaiting their result (keyed by the SDK tool_use id).
-    // Kept open so a later tool_result can attach; closed in end() otherwise.
-    const openToolSpans = new Map<string, Span>();
-    // Guard against a double end() (e.g. a retry path calling end() twice on the
-    // same handle): the first end() finalizes; later ones are ignored so we never
-    // re-close the span, overwrite good token totals with zeros, or emit a
-    // duplicate chat span.
-    let ended = false;
-  return {
-    recordTool(name, input, result, callId) {
-      try {
-        // A real CHILD span (parented to the invocation via rootCtx) so the tool
-        // call shows as its own step in the trace UI. execute_tool + gen_ai.tool.*
-        // are what the UI/eval read; input/output.value mirror it for OpenInference.
-        const inputText = typeof input === 'string' ? input : JSON.stringify(input);
-        const resultText = result == null || result === '' ? '' : (typeof result === 'string' ? result : JSON.stringify(result));
-        const id = callId || `tooluse_${Math.random().toString(16).slice(2, 18)}`;
-        const toolSpan = getTracer().startSpan(`execute_tool ${name}`, undefined, rootCtx);
-        toolSpan.setAttribute('gen_ai.operation.name', 'execute_tool');
-        // Child spans don't inherit the root's attributes; stamp session.id here
-        // too so tool spans are queryable by session and group correctly for
-        // SESSION-level evaluation (trace UI groups by traceId regardless).
-        toolSpan.setAttribute('session.id', sessionId);
-        toolSpan.setAttribute('gen_ai.tool.name', name);
-        toolSpan.setAttribute('gen_ai.tool.call.id', id);
-        toolSpan.setAttribute('gen_ai.tool.call.arguments', inputText);
-        toolSpan.setAttribute('openinference.span.kind', 'TOOL');
-        toolSpan.setAttribute('tool.name', name);
-        toolSpan.setAttribute('input.value', inputText);
-        if (resultText) {
-          toolSpan.setAttribute('gen_ai.tool.call.result', resultText);
-          toolSpan.setAttribute('output.value', resultText);
-        }
-        emitEvent('gen_ai.tool.request', { content: [{ toolUse: { toolUseId: id, name, input } }] }, span);
-        if (resultText) {
-          emitEvent('gen_ai.tool.result', { content: [{ toolResult: { toolUseId: id, content: [{ text: resultText }] } }] }, span);
-          toolSpan.setStatus({ code: SpanStatusCode.OK });
-          toolSpan.end();
-        } else {
-          // Leave open for a possible recordToolResult; end() closes it if not.
-          openToolSpans.set(id, toolSpan);
-        }
-      } catch { /* ignore */ }
-    },
-    recordToolResult(callId, result) {
-      try {
-        const toolSpan = openToolSpans.get(callId);
-        if (!toolSpan) return;
-        const resultText = typeof result === 'string' ? result : JSON.stringify(result);
-        toolSpan.setAttribute('gen_ai.tool.call.result', resultText);
-        toolSpan.setAttribute('output.value', resultText);
-        toolSpan.setStatus({ code: SpanStatusCode.OK });
-        toolSpan.end();
-        openToolSpans.delete(callId);
-        emitEvent('gen_ai.tool.result', { content: [{ toolResult: { toolUseId: callId, content: [{ text: resultText }] } }] }, span);
-      } catch { /* ignore */ }
-    },
-    end(answer, opts) {
-      if (ended) return;
-      ended = true;
-      try {
-        // Close any tool spans whose result never arrived.
-        for (const ts of openToolSpans.values()) {
-          try { ts.setStatus({ code: SpanStatusCode.OK }); ts.end(); } catch { /* ignore */ }
-        }
-        openToolSpans.clear();
-        // Agent Traces UI output content.
-        span.setAttribute('gen_ai.output.messages', JSON.stringify([{ role: 'assistant', content: [{ type: 'text', text: answer }] }]));
-        span.setAttribute('gen_ai.completion', answer);   // contract item 3
-        span.setAttribute('output.value', answer);        // OpenInference
-        span.setAttribute('llm.output_messages.0.message.role', 'assistant');
-        span.setAttribute('llm.output_messages.0.message.content', answer);
-        // Stamp model + usage on the invoke_agent span too (queryable there),
-        // and emit the dedicated `chat` LLM span the console reads for its
-        // model/token columns.
-        if (opts?.model) span.setAttribute('gen_ai.request.model', opts.model);
-        if (opts?.numTurns != null) span.setAttribute('gen_ai.agent.num_turns', opts.numTurns);
-        if (opts?.tokenUsage) stampUsage(span, opts.tokenUsage);
-        span.setStatus({ code: opts?.isError ? SpanStatusCode.ERROR : SpanStatusCode.OK });
-        emitChatSpan(sessionId, rootCtx, opts);
-      } catch { /* ignore */ } finally {
-        try { span.end(); } catch { /* ignore */ }
-      }
-    },
+function pinAndMirror(span: Span, state: InvocationState | undefined): Span {
+  // Only the ORIGINAL single-key setter is captured. The SDK's own
+  // `setAttributes` is implemented as a loop over `this.setAttribute`, so
+  // delegating a batch to it would re-enter our override and recurse forever.
+  const setOne = span.setAttribute.bind(span);
+  const emit = (attrs: Attributes): void => {
+    for (const [key, value] of Object.entries(attrs)) {
+      if (value !== undefined) setOne(key, value);
+    }
   };
+
+  /** undefined until the library declares openinference.span.kind. */
+  let isAgent: boolean | undefined;
+
+  /** Kind-specific baseline, emitted once the kind is known. */
+  const baseline = (): Attributes => {
+    const attrs: Attributes = { 'gen_ai.operation.name': isAgent ? 'invoke_agent' : 'execute_tool' };
+    if (isAgent) {
+      attrs['gen_ai.agent.name'] = 'super-agent';
+      if (state) {
+        attrs[INPUT_VALUE] = state.prompt;
+        attrs[INPUT_MIME_TYPE] = 'text/plain';
+      }
+    }
+    return attrs;
+  };
+
+  /** Substitute pinned values; the library must not win these two keys. */
+  const pin = (key: string, value: AttributeValue): AttributeValue => {
+    if (!state) return value;
+    if (key === SESSION_ID) return state.sessionId;
+    if (key === INPUT_VALUE && isAgent) return state.prompt;
+    return value;
+  };
+
+  /**
+   * `gen_ai.*` equivalents of the OpenInference keys. The Agent Traces UI reads
+   * gen_ai.operation.name / prompt / completion; the SESSION token metrics
+   * (ApplicationSignals InputTokens/OutputTokens) sum gen_ai.usage.*.
+   */
+  const mirror = (key: string, value: AttributeValue, out: Attributes): void => {
+    switch (key) {
+      case INPUT_VALUE:
+        if (isAgent) {
+          out['gen_ai.prompt'] = value;
+          out['gen_ai.input.messages'] = JSON.stringify([{ role: 'user', content: [{ type: 'text', text: String(value) }] }]);
+        } else {
+          out['gen_ai.tool.call.arguments'] = value;
+        }
+        break;
+      case OUTPUT_VALUE:
+        if (isAgent) {
+          out['gen_ai.completion'] = value;
+          out['gen_ai.output.messages'] = JSON.stringify([{ role: 'assistant', content: [{ type: 'text', text: String(value) }] }]);
+        } else {
+          out['gen_ai.tool.call.result'] = value;
+        }
+        break;
+      case LLM_MODEL_NAME:
+        out['gen_ai.request.model'] = value;
+        break;
+      case LLM_TOKEN_COUNT_PROMPT:
+        out['gen_ai.usage.input_tokens'] = value;
+        break;
+      case LLM_TOKEN_COUNT_COMPLETION:
+        out['gen_ai.usage.output_tokens'] = value;
+        break;
+      case TOOL_NAME:
+        out['gen_ai.tool.name'] = value;
+        break;
+      default:
+        break;
+    }
+  };
+
+  /** Adopt the declared kind; returns the baseline to emit, if newly learned. */
+  const classify = (kind: AttributeValue | undefined): Attributes => {
+    if (isAgent != null || kind == null) return {};
+    isAgent = kind === 'AGENT';
+    return baseline();
+  };
+
+  span.setAttribute = (key: string, value: AttributeValue): Span => {
+    const out: Attributes = key === OI_SPAN_KIND ? classify(value) : {};
+    const pinned = pin(key, value);
+    out[key] = pinned;
+    mirror(key, pinned, out);
+    emit(out);
+    return span;
+  };
+
+  span.setAttributes = (attributes: Attributes): Span => {
+    // Classify first: the kind decides how input.value/output.value are pinned
+    // and mirrored, and it may arrive in this very batch.
+    const out: Attributes = classify(attributes[OI_SPAN_KIND] as AttributeValue | undefined);
+    for (const [key, value] of Object.entries(attributes)) {
+      if (value == null) continue;
+      const pinned = pin(key, value);
+      out[key] = pinned;
+      mirror(key, pinned, out);
+    }
+    emit(out);
+    return span;
+  };
+
+  // Kind-independent baseline. session.id must be on TOOL spans too: child spans
+  // inherit nothing, and SESSION-level evaluation groups by this key.
+  const initial: Attributes = {
+    'gen_ai.provider.name': PROVIDER,
+    'gen_ai.system': PROVIDER,
+    'llm.provider': PROVIDER,
+    'llm.system': PROVIDER,
+  };
+  if (state) initial[SESSION_ID] = state.sessionId;
+  emit(initial);
+  return span;
 }
 
-const NOOP_TRACE: InvocationTrace = {
-  recordTool() { /* no-op */ },
-  recordToolResult() { /* no-op */ },
-  end() { /* no-op */ },
-};
+// ---------------------------------------------------------------------------
+// The instrumentation singleton
+// ---------------------------------------------------------------------------
+
+/**
+ * Proxy TracerProvider that (a) forces the AWS-required scope and (b) hands back
+ * spans wrapped by {@link pinAndMirror}. Per-invocation state is read from the
+ * Context the library passes to `startSpan` (falling back to the active one), so
+ * nothing is shared through module globals.
+ */
+function makeScopeForcingProvider(): TracerProvider {
+  // Only the scope NAME is replaced; `version` is the version the caller
+  // requested (the instrumentation's own), so the span reports which build
+  // emitted it.
+  const makeTracer = (version?: string): Tracer => ({
+    startSpan(name, options, ctx) {
+      const activeCtx = ctx ?? context.active();
+      const state = activeCtx.getValue(INVOCATION_KEY) as InvocationState | undefined;
+      const span = trace.getTracer(SCOPE, version).startSpan(name, options, activeCtx);
+      const wrapped = pinAndMirror(span, state);
+      // The AGENT span is the first span of an invocation and the only one whose
+      // name is the library's query wrapper constant; record it so finalize()
+      // can stamp the counters the library does not read.
+      if (state && !state.agentSpan) state.agentSpan = wrapped;
+      return wrapped;
+    },
+    // The Claude Agent SDK v1 instrumentation only calls startSpan. Delegate
+    // (unwrapped) for interface completeness; the three overloads can't be
+    // forwarded variadically without a cast.
+    startActiveSpan: ((...args: unknown[]) => {
+      const inner = trace.getTracer(SCOPE, version).startActiveSpan as (...a: unknown[]) => unknown;
+      return inner(...args);
+    }) as Tracer['startActiveSpan'],
+  });
+
+  return { getTracer: (_name: string, version?: string) => makeTracer(version) };
+}
+
+let instrumented = false;
+
+/**
+ * Patch the Claude Agent SDK module with the official OpenInference
+ * instrumentation and return the patched exports.
+ *
+ * The SDK ships as native ESM (`"type": "module"`, `sdk.mjs`) whose namespace
+ * exports cannot be reassigned, so `manuallyInstrument` returns a patched COPY
+ * and leaves the original namespace untouched — callers MUST use the returned
+ * object. `enabled: false` keeps InstrumentationBase from also registering
+ * require-in-the-middle hooks, which cannot intercept ESM imports anyway.
+ *
+ * Idempotent, and a pass-through when observability is disabled.
+ */
+export function instrumentClaudeAgentSdk<T extends object>(sdkModule: T): T {
+  if (!OBSERVABILITY_ENABLED || instrumented) return sdkModule;
+  try {
+    const instrumentation = new ClaudeAgentSDKInstrumentation({
+      instrumentationConfig: { enabled: false },
+      tracerProvider: makeScopeForcingProvider(),
+    });
+    const patched = instrumentation.manuallyInstrument(sdkModule as never) as T;
+    instrumented = true;
+    console.log('[otel] Claude Agent SDK instrumented (OpenInference AGENT/TOOL spans)');
+    return patched;
+  } catch (err) {
+    // Telemetry must never break the agent: fall back to the unpatched SDK.
+    console.warn('[otel] Failed to instrument Claude Agent SDK:', err);
+    return sdkModule;
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Per-invocation handle
+// ---------------------------------------------------------------------------
+
+export interface Invocation {
+  /**
+   * The Context that `query()` and its `[Symbol.asyncIterator]()` must both be
+   * invoked inside. The library captures `context.active()` at both points — for
+   * the AGENT span's parent, for the tool spans' parent, and for our
+   * per-invocation state — so the caller must enter it explicitly rather than
+   * relying on async-context propagation across generator yields.
+   */
+  readonly ctx: Context;
+  /**
+   * Stamp the counters the library does not read. Must be called while the
+   * AGENT span is still open — i.e. on the `result` message, before the SDK
+   * generator reports done (that is when the library ends the span). The library
+   * itself covers prompt/completion/total tokens and llm.cost.total.
+   */
+  finalize(opts: { numTurns?: number; tokenUsage?: TokenUsage }): void;
+}
+
+/**
+ * Open an invocation scope for one turn. Does NOT start a span — the official
+ * instrumentation starts the AGENT span when iteration begins. Never throws.
+ */
+export function beginInvocation(sessionId: string, prompt: string, parentCtx?: Context): Invocation {
+  const noop: Invocation = { ctx: parentCtx ?? context.active(), finalize() { /* no-op */ } };
+  if (!OBSERVABILITY_ENABLED) return noop;
+  try {
+    const state: InvocationState = { sessionId, prompt };
+    const ctx = (parentCtx ?? context.active()).setValue(INVOCATION_KEY, state);
+    return {
+      ctx,
+      finalize({ numTurns, tokenUsage }) {
+        const span = state.agentSpan;
+        if (!span) return;
+        try {
+          const attrs: Attributes = {};
+          if (numTurns != null) attrs['gen_ai.agent.num_turns'] = Math.trunc(numTurns);
+          if (tokenUsage) {
+            const cacheRead = Math.trunc(tokenUsage.cache_read_input_tokens || 0);
+            const cacheWrite = Math.trunc(tokenUsage.cache_creation_input_tokens || 0);
+            // OpenInference detail counters (the library only reads in/out).
+            attrs[LLM_TOKEN_COUNT_CACHE_READ] = cacheRead;
+            attrs[LLM_TOKEN_COUNT_CACHE_WRITE] = cacheWrite;
+            // The four gen_ai.usage.* counters the AgentCore console sums for
+            // its SESSION/space token metrics. The SDK's
+            // cache_creation_input_tokens maps to the convention's cache_write.
+            attrs['gen_ai.usage.input_tokens'] = Math.trunc(tokenUsage.input_tokens || 0);
+            attrs['gen_ai.usage.output_tokens'] = Math.trunc(tokenUsage.output_tokens || 0);
+            attrs['gen_ai.usage.cache_read_input_tokens'] = cacheRead;
+            attrs['gen_ai.usage.cache_write_input_tokens'] = cacheWrite;
+          }
+          if (Object.keys(attrs).length) span.setAttributes(attrs);
+        } catch { /* telemetry must never throw into the agent path */ }
+      },
+    };
+  } catch {
+    return noop;
+  }
+}

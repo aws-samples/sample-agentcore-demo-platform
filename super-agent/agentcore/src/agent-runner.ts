@@ -8,13 +8,22 @@
  *   - Stop hook: full diff sync to S3 as safety net
  */
 
-import { query } from '@anthropic-ai/claude-agent-sdk'; 
+import * as claudeAgentSdk from '@anthropic-ai/claude-agent-sdk';
+import { context } from '@opentelemetry/api';
 import { S3Client, PutObjectCommand } from '@aws-sdk/client-s3';
 import { syncWorkspaceToS3 } from './workspace-sync.js';
 import fs from 'fs';
 import { execSync } from 'child_process';
 import type { AgentPayload, AgentEvent, ContentBlock } from './types.js';
-import { beginInvocation, parentContextFromHeaders, type InvocationTrace } from './otel.js';
+import { beginInvocation, instrumentClaudeAgentSdk, parentContextFromHeaders, type Invocation } from './otel.js';
+
+// Patch the SDK once at module load with the official OpenInference
+// instrumentation, which produces the AGENT/TOOL spans AgentCore Evaluations
+// reads. The SDK is native ESM, so its namespace exports cannot be reassigned:
+// `manuallyInstrument` returns a patched COPY and we must call query() through
+// that copy — importing `query` directly would bypass instrumentation entirely.
+// Falls back to the unpatched namespace when observability is off.
+const { query } = instrumentClaudeAgentSdk(claudeAgentSdk);
 
 const DEFAULT_TOOLS = [
   'Bash', 'Read', 'Write', 'Edit', 'Glob', 'Grep',
@@ -279,13 +288,14 @@ export async function* runAgent(
   payload: AgentPayload,
   requestHeaders?: Record<string, unknown>,
 ): AsyncGenerator<AgentEvent> {
-  // One OTEL invocation trace per turn. Created up front so PreToolUse/PostToolUse
-  // hooks (registered below) can attach tool spans to it. Session correlation
-  // uses the AgentCore session id (chat_session_id / session_id from backend).
-  // If the platform forwarded a trace context (traceparent/X-Amzn-Trace-Id),
-  // parent our root span on it so the platform's AgentCore.Runtime.Invoke span
-  // and our spans form ONE connected trace (the console groups a session's work
-  // into one trace this way) instead of two disconnected roots.
+  // One OTEL invocation scope per turn. The AGENT span itself is started by the
+  // OpenInference instrumentation when the SDK stream is first iterated; this
+  // only establishes the Context that carries the session id + raw user turn.
+  // Session correlation uses the AgentCore session id (chat_session_id /
+  // session_id from the backend). If the platform forwarded a trace context
+  // (traceparent / X-Amzn-Trace-Id), the AGENT span is parented on it so the
+  // platform's AgentCore.Runtime.Invoke span and ours form ONE connected trace
+  // (the console groups a session's work this way) instead of two roots.
   const otelSessionId = payload.chat_session_id ?? payload.session_id ?? 'unknown-session';
   const parentCtx = parentContextFromHeaders(requestHeaders);
   const inv = beginInvocation(otelSessionId, payload.prompt, parentCtx);
@@ -350,114 +360,39 @@ export async function* runAgent(
     baseOptions.mcpServers = payload.mcp_servers;
   }
 
-  // Register hooks: OTEL tool tracing (every tool) + S3 sync (Write/Edit).
-  //
-  // Tool spans are captured via PreToolUse/PostToolUse hooks rather than the
-  // assistant event stream, because the SDK does NOT surface every tool_use as
-  // an assistant-content block (multi-turn runs dropped ~1-2 tools that way).
-  // Hooks fire for EVERY tool with tool_name/tool_input/tool_use_id (Pre) and
-  // tool_response (Post) — 100% coverage, authoritative.
+  // Register our S3-sync hooks. Tool TRACING hooks are no longer registered
+  // here: the OpenInference instrumentation injects its own PreToolUse /
+  // PostToolUse / PostToolUseFailure matchers into these same options, and its
+  // `mergeHooks` is ADDITIVE (`[...existing, ...ours]` per event), so the hooks
+  // below survive untouched. Its hooks give us what ours could not: TOOL spans
+  // that close with ERROR status + a recorded exception when a tool fails.
   const bucket = payload.workspace_s3_bucket;
   const prefix = payload.workspace_s3_prefix;
-  const preToolHooks: unknown[] = [];
-  const postToolMatchers: unknown[] = [];
-
-  if (inv) {
-    preToolHooks.push(async (input: any) => {
-      try {
-        inv.recordTool(input?.tool_name ?? 'unknown', input?.tool_input, '', input?.tool_use_id);
-      } catch { /* telemetry must not break the tool */ }
-      return {};
-    });
-    postToolMatchers.push({
-      matcher: '.*',
-      hooks: [async (input: any) => {
-        try {
-          if (input?.tool_use_id) inv.recordToolResult(input.tool_use_id, input?.tool_response ?? '');
-        } catch { /* ignore */ }
-        return {};
-      }],
-    });
-  }
-  if (bucket && prefix) {
-    postToolMatchers.push({ matcher: 'Write|Edit', hooks: [createFileChangeHook(bucket, prefix)] });
-  }
-
   const hooks: Record<string, unknown[]> = {};
-  if (preToolHooks.length) hooks.PreToolUse = [{ matcher: '.*', hooks: preToolHooks }];
-  if (postToolMatchers.length) hooks.PostToolUse = postToolMatchers;
-  if (bucket && prefix) hooks.Stop = [{ hooks: [createStopHook(bucket, prefix)] }];
-  if (Object.keys(hooks).length) {
+  if (bucket && prefix) {
+    hooks.PostToolUse = [{ matcher: 'Write|Edit', hooks: [createFileChangeHook(bucket, prefix)] }];
+    hooks.Stop = [{ hooks: [createStopHook(bucket, prefix)] }];
     baseOptions.hooks = hooks;
-    console.log(`[agent-runner] Hooks registered (tracing=${!!inv}, s3sync=${!!(bucket && prefix)})`);
+    console.log('[agent-runner] Hooks registered (s3sync=true)');
   }
 
-  // OTEL: one root span per invocation (= one trace per turn), carrying the
-  // SAES/AgentCore-Evaluation contract fields. Session correlation uses the
-  // AgentCore session id (chat_session_id / session_id from the backend).
-  //
   // Conversation continuity comes from history injection (buildContextualPrompt
   // replays payload.history), NOT Claude Code's native `resume`. We deliberately
   // do NOT attempt resume first: AgentCore microVMs are frequently recycled
   // between turns, so `resume: <session_id>` almost always fails with "Claude
   // Code process exited with code 1", and the old try/resume-then-fallback path
   // (a) wasted a full failed invocation per turn and (b) polluted telemetry —
-  // the failed run's runTraced.finally called inv.end() (error, 0 tokens) and
-  // closed the single root span, so the successful fallback's real token usage
-  // never landed on `agent.invocation` (it showed 0 every multi-turn turn).
-  // History injection is one clean run: one agent.invocation span with the
-  // correct model + token totals, one chat span. See git history for the
-  // resume path if native session continuity is ever needed again.
+  // the failed run closed the single root span first, so the successful
+  // fallback's real token usage never landed on it (it showed 0 every multi-turn
+  // turn). History injection is one clean run: one AGENT span with the correct
+  // model + token totals. See git history for the resume path if native session
+  // continuity is ever needed again.
+  //
+  // Note the SDK sees the history-replay prompt while the AGENT span's
+  // `input.value` reports only the raw user turn (pinned in otel.ts) — that is
+  // what evaluators should judge.
   const prompt = buildContextualPrompt(payload);
-  yield* runTraced(inv, runWithOptions(prompt, baseOptions));
-}
-
-/**
- * Wrap an agent event stream with the OTEL invocation trace `inv`. Tool spans
- * are recorded by PreToolUse/PostToolUse hooks (see runAgent) — NOT here — so
- * every tool call is captured regardless of whether it surfaces as an assistant
- * content block. This wrapper only observes the final answer + token usage from
- * the `result` event and finalizes the root span. Pass-through: yields every
- * event unchanged.
- */
-async function* runTraced(
-  inv: InvocationTrace,
-  stream: AsyncGenerator<AgentEvent>,
-): AsyncGenerator<AgentEvent> {
-  let finalAnswer = '';
-  let isError = false;
-  let model: string | undefined;
-  let numTurns: number | undefined;
-  let tokenUsage: Record<string, number> | undefined;
-  try {
-    for await (const event of stream) {
-      // The model id surfaces on assistant events (msg.message.model); capture
-      // the latest so the invoke_agent / chat spans can report it.
-      if (event.type === 'assistant' && event.model) model = event.model;
-      if (event.type === 'result') {
-        if (typeof event.result === 'string') finalAnswer = event.result;
-        if (event.is_error) isError = true;
-        if (event.num_turns != null) numTurns = event.num_turns;
-        if (event.token_usage) {
-          // Forward the full usage (incl. cache read/write) so the chat span
-          // carries all four counters the console sums — not just in/out.
-          tokenUsage = {
-            input_tokens: event.token_usage.input_tokens,
-            output_tokens: event.token_usage.output_tokens,
-            cache_read_input_tokens: event.token_usage.cache_read_input_tokens,
-            cache_creation_input_tokens: event.token_usage.cache_creation_input_tokens,
-          };
-        }
-      }
-      yield event;
-    }
-  } catch (err) {
-    isError = true;
-    finalAnswer = finalAnswer || `error: ${err instanceof Error ? err.message : String(err)}`;
-    throw err;
-  } finally {
-    inv.end(finalAnswer, { isError, model, numTurns, tokenUsage });
-  }
+  yield* runWithOptions(inv, prompt, baseOptions);
 }
 
 // ---------------------------------------------------------------------------
@@ -465,79 +400,109 @@ async function* runTraced(
 // ---------------------------------------------------------------------------
 
 async function* runWithOptions(
+  inv: Invocation,
   prompt: string,
   options: Record<string, unknown>,
 ): AsyncGenerator<AgentEvent> {
-  for await (const message of query({ prompt, options })) {
-    const msg = message as Record<string, unknown>;
+  // Enter the invocation context for BOTH `query()` and the iterator's creation:
+  // the instrumentation captures `context.active()` at each of those points —
+  // once for the parent of the AGENT span (and our pinned session id), once for
+  // the parent of the tool spans. An implicit `for await` would call
+  // [Symbol.asyncIterator]() outside the context, so take the iterator by hand.
+  const iterator = context.with(inv.ctx, () => {
+    const stream = query({ prompt, options }) as AsyncIterable<unknown>;
+    return stream[Symbol.asyncIterator]();
+  });
 
-    if (msg.type === 'system' && msg.subtype === 'init') {
-      yield {
-        type: 'session_start',
-        session_id: msg.session_id as string,
-      };
-      continue;
-    }
+  // Mirrors `for await`: always release the underlying stream if the consumer
+  // stops early or throws, so the instrumentation closes the AGENT span and any
+  // in-flight TOOL spans instead of leaking them.
+  let exhausted = false;
+  try {
+    for (;;) {
+      const step = await iterator.next();
+      if (step.done) { exhausted = true; break; }
+      const msg = step.value as Record<string, unknown>;
 
-    if (msg.type === 'assistant') {
-      const rawContent = (msg.message as Record<string, unknown>)?.content;
-      const model = (msg.message as Record<string, unknown>)?.model as string | undefined;
-      const blocks = Array.isArray(rawContent)
-        ? rawContent.map(mapContentBlock)
-        : [];
-      yield {
-        type: 'assistant',
-        content: blocks,
-        session_id: msg.session_id as string | undefined,
-        model,
-      };
-      continue;
-    }
-
-    if (msg.type === 'result') {
-      const resultMsg = msg as Record<string, unknown>;
-      // Extract token usage from SDK result message
-      const usage = resultMsg.usage as Record<string, number> | undefined;
-      const modelUsage = resultMsg.modelUsage as Record<string, Record<string, number>> | undefined;
-      let tokenUsage: import('./types.js').TokenUsage | undefined;
-
-      if (usage) {
-        tokenUsage = {
-          input_tokens: usage.input_tokens ?? 0,
-          output_tokens: usage.output_tokens ?? 0,
-          cache_read_input_tokens: usage.cache_read_input_tokens ?? 0,
-          cache_creation_input_tokens: usage.cache_creation_input_tokens ?? 0,
-          total_cost_usd: (resultMsg.total_cost_usd as number) ?? 0,
+      if (msg.type === 'system' && msg.subtype === 'init') {
+        yield {
+          type: 'session_start',
+          session_id: msg.session_id as string,
         };
-      } else if (modelUsage) {
-        // Aggregate from per-model usage
-        let inputTokens = 0, outputTokens = 0, cacheRead = 0, cacheCreation = 0, cost = 0;
-        for (const mu of Object.values(modelUsage)) {
-          inputTokens += mu.inputTokens ?? 0;
-          outputTokens += mu.outputTokens ?? 0;
-          cacheRead += mu.cacheReadInputTokens ?? 0;
-          cacheCreation += mu.cacheCreationInputTokens ?? 0;
-          cost += mu.costUSD ?? 0;
-        }
-        tokenUsage = {
-          input_tokens: inputTokens,
-          output_tokens: outputTokens,
-          cache_read_input_tokens: cacheRead,
-          cache_creation_input_tokens: cacheCreation,
-          total_cost_usd: cost,
-        };
+        continue;
       }
 
-      yield {
-        type: 'result',
-        session_id: msg.session_id as string | undefined,
-        duration_ms: msg.duration_ms as number | undefined,
-        num_turns: msg.num_turns as number | undefined,
-        is_error: msg.is_error as boolean | undefined,
-        result: msg.result as string | undefined,
-        token_usage: tokenUsage,
-      };
-      continue;
+      if (msg.type === 'assistant') {
+        const rawContent = (msg.message as Record<string, unknown>)?.content;
+        const model = (msg.message as Record<string, unknown>)?.model as string | undefined;
+        const blocks = Array.isArray(rawContent)
+          ? rawContent.map(mapContentBlock)
+          : [];
+        yield {
+          type: 'assistant',
+          content: blocks,
+          session_id: msg.session_id as string | undefined,
+          model,
+        };
+        continue;
+      }
+
+      if (msg.type === 'result') {
+        const resultMsg = msg as Record<string, unknown>;
+        // Extract token usage from SDK result message
+        const usage = resultMsg.usage as Record<string, number> | undefined;
+        const modelUsage = resultMsg.modelUsage as Record<string, Record<string, number>> | undefined;
+        let tokenUsage: import('./types.js').TokenUsage | undefined;
+
+        if (usage) {
+          tokenUsage = {
+            input_tokens: usage.input_tokens ?? 0,
+            output_tokens: usage.output_tokens ?? 0,
+            cache_read_input_tokens: usage.cache_read_input_tokens ?? 0,
+            cache_creation_input_tokens: usage.cache_creation_input_tokens ?? 0,
+            total_cost_usd: (resultMsg.total_cost_usd as number) ?? 0,
+          };
+        } else if (modelUsage) {
+          // Aggregate from per-model usage
+          let inputTokens = 0, outputTokens = 0, cacheRead = 0, cacheCreation = 0, cost = 0;
+          for (const mu of Object.values(modelUsage)) {
+            inputTokens += mu.inputTokens ?? 0;
+            outputTokens += mu.outputTokens ?? 0;
+            cacheRead += mu.cacheReadInputTokens ?? 0;
+            cacheCreation += mu.cacheCreationInputTokens ?? 0;
+            cost += mu.costUSD ?? 0;
+          }
+          tokenUsage = {
+            input_tokens: inputTokens,
+            output_tokens: outputTokens,
+            cache_read_input_tokens: cacheRead,
+            cache_creation_input_tokens: cacheCreation,
+            total_cost_usd: cost,
+          };
+        }
+
+        // Stamp the counters the instrumentation does not read (cache tokens +
+        // the gen_ai.usage.* mirrors) NOW: the AGENT span is still open on the
+        // result message and the library ends it on the next `next()`.
+        inv.finalize({ numTurns: msg.num_turns as number | undefined, tokenUsage });
+
+        yield {
+          type: 'result',
+          session_id: msg.session_id as string | undefined,
+          duration_ms: msg.duration_ms as number | undefined,
+          num_turns: msg.num_turns as number | undefined,
+          is_error: msg.is_error as boolean | undefined,
+          result: msg.result as string | undefined,
+          token_usage: tokenUsage,
+        };
+        continue;
+      }
+    }
+  } finally {
+    // On early exit (consumer break / error), tell the SDK stream we're done.
+    // The instrumentation's return() ends the AGENT span + in-flight TOOL spans.
+    if (!exhausted) {
+      try { await iterator.return?.(undefined); } catch { /* best effort */ }
     }
   }
 }
