@@ -7,6 +7,8 @@
 import { FastifyInstance, FastifyRequest, FastifyReply } from 'fastify';
 import { documentService } from '../services/document.service.js';
 import { authenticate, requireModifyAccess } from '../middleware/auth.js';
+import { requirePermission } from '../authorization/auth.middleware.js';
+import { documentOwner } from '../authorization/ownership.js';
 import {
   createDocumentSchema,
   updateDocumentSchema,
@@ -355,7 +357,11 @@ export async function documentRoutes(fastify: FastifyInstance): Promise<void> {
     async (request: FastifyRequest<CreateDocumentRequest>, reply: FastifyReply) => {
       const data = validateSchema(createDocumentSchema, request.body);
 
-      const document = await documentService.createDocument(data, request.user!.orgId);
+      const document = await documentService.createDocument(
+        data,
+        request.user!.orgId,
+        request.user!.id
+      );
 
       return reply.status(201).send(document);
     }
@@ -493,7 +499,7 @@ export async function documentRoutes(fastify: FastifyInstance): Promise<void> {
   fastify.delete<DeleteDocumentRequest>(
     '/:id',
     {
-      preHandler: [authenticate, requireModifyAccess],
+      preHandler: [authenticate, requirePermission('documents:delete', documentOwner)],
       schema: {
         description: 'Delete a document',
         tags: ['Documents'],

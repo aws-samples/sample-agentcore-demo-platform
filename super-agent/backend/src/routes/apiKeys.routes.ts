@@ -7,6 +7,8 @@ import { FastifyInstance, FastifyRequest, FastifyReply } from 'fastify';
 import { z } from 'zod';
 import { apiKeyService } from '../services/apiKey.service.js';
 import { authenticate, requireModifyAccess } from '../middleware/auth.js';
+import { requirePermission } from '../authorization/auth.middleware.js';
+import { apiKeyOwner } from '../authorization/ownership.js';
 
 // ============================================================================
 // Schemas
@@ -225,7 +227,7 @@ export async function apiKeysRoutes(fastify: FastifyInstance): Promise<void> {
   fastify.delete<ApiKeyIdRequest>(
     '/api-keys/:keyId',
     {
-      preHandler: [authenticate, requireModifyAccess],
+      preHandler: [authenticate, requirePermission('api_keys:delete', apiKeyOwner)],
       schema: {
         description: 'Delete API key',
         tags: ['API Keys'],

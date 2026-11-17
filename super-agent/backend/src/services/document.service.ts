@@ -142,9 +142,14 @@ export class DocumentService {
    *
    * @param data - The document data
    * @param organizationId - The organization ID
+   * @param userId - The uploading user, recorded as the document owner
    * @returns The created document
    */
-  async createDocument(data: CreateDocumentInput, organizationId: string): Promise<DocumentEntity> {
+  async createDocument(
+    data: CreateDocumentInput,
+    organizationId: string,
+    userId: string | null = null
+  ): Promise<DocumentEntity> {
     // Validate required fields
     if (!data.title || data.title.trim() === '') {
       throw AppError.validation('Document title is required');
@@ -167,6 +172,7 @@ export class DocumentService {
         file_type: data.file_type ?? null,
         file_path: data.file_path.trim(),
         status: data.status ?? 'processing',
+        created_by: userId,
       },
       organizationId
     );

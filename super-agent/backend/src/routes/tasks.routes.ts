@@ -7,6 +7,8 @@
 import { FastifyInstance, FastifyRequest, FastifyReply } from 'fastify';
 import { taskService } from '../services/task.service.js';
 import { authenticate, requireModifyAccess } from '../middleware/auth.js';
+import { requirePermission } from '../authorization/auth.middleware.js';
+import { taskOwner } from '../authorization/ownership.js';
 import {
   createTaskSchema,
   updateTaskSchema,
@@ -415,7 +417,7 @@ export async function taskRoutes(fastify: FastifyInstance): Promise<void> {
   fastify.delete<DeleteTaskRequest>(
     '/:id',
     {
-      preHandler: [authenticate, requireModifyAccess],
+      preHandler: [authenticate, requirePermission('tasks:delete', taskOwner)],
       schema: {
         description: 'Delete a task',
         tags: ['Tasks'],

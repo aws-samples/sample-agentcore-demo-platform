@@ -21,8 +21,12 @@ import {
 // ─── Types ───────────────────────────────────────────────────────────────────
 
 export interface AuthorizationContext {
-  /** The user ID of the resource owner (for ownership-restricted permissions). */
-  resourceOwnerId?: string;
+  /**
+   * The user ID of the resource owner (for ownership-restricted permissions).
+   * `null` means the resource has no recorded owner (or could not be found);
+   * only ownership-bypass roles may then act on it.
+   */
+  resourceOwnerId?: string | null;
   /** Optional org ID to verify the resource belongs to the user's org. */
   resourceOrgId?: string;
 }
@@ -41,19 +45,18 @@ export class AuthorizationService {
     // Check base role permission
     if (!rolePermissions.has(permission)) return false;
 
-    // If the permission is ownership-restricted and the user's role doesn't
-    // bypass ownership checks, verify they own the resource.
-    if (
-      OWNER_ONLY_PERMISSIONS.has(permission) &&
-      !OWNERSHIP_BYPASS_ROLES.has(user.role) &&
-      ctx?.resourceOwnerId !== undefined
-    ) {
-      return user.id === ctx.resourceOwnerId;
-    }
-
     // Verify resource belongs to the user's org (if provided)
     if (ctx?.resourceOrgId !== undefined && ctx.resourceOrgId !== user.orgId) {
       return false;
+    }
+
+    // If the permission is ownership-restricted and the user's role doesn't
+    // bypass ownership checks, verify they own the resource. Fail closed: a
+    // caller that supplies no owner (undefined) or a resource with no owner
+    // (null) is denied, so a forgotten ownership lookup cannot grant access.
+    if (OWNER_ONLY_PERMISSIONS.has(permission) && !OWNERSHIP_BYPASS_ROLES.has(user.role)) {
+      const ownerId = ctx?.resourceOwnerId;
+      return typeof ownerId === 'string' && ownerId === user.id;
     }
 
     return true;
