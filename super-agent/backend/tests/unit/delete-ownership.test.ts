@@ -67,13 +67,21 @@ const deleteSpies = {
   tasks: vi.spyOn(taskService, 'deleteTask').mockResolvedValue(true),
   documents: vi.spyOn(documentService, 'deleteDocument').mockResolvedValue(true),
   api_keys: vi.spyOn(apiKeyService, 'deleteApiKey').mockResolvedValue(undefined),
+  api_keys_revoke: vi.spyOn(apiKeyService, 'revokeApiKey').mockResolvedValue(undefined),
 };
 
 const cases = [
-  { model: 'workflows', url: `/api/workflows/${RESOURCE}`, ok: 204 },
-  { model: 'tasks', url: `/api/tasks/${RESOURCE}`, ok: 204 },
-  { model: 'documents', url: `/api/documents/${RESOURCE}`, ok: 204 },
-  { model: 'api_keys', url: `/api/api-keys/${RESOURCE}`, ok: 200 },
+  { model: 'workflows', spy: 'workflows', method: 'DELETE', url: `/api/workflows/${RESOURCE}`, ok: 204 },
+  { model: 'tasks', spy: 'tasks', method: 'DELETE', url: `/api/tasks/${RESOURCE}`, ok: 204 },
+  { model: 'documents', spy: 'documents', method: 'DELETE', url: `/api/documents/${RESOURCE}`, ok: 204 },
+  { model: 'api_keys', spy: 'api_keys', method: 'DELETE', url: `/api/api-keys/${RESOURCE}`, ok: 200 },
+  {
+    model: 'api_keys',
+    spy: 'api_keys_revoke',
+    method: 'POST',
+    url: `/api/api-keys/${RESOURCE}/revoke`,
+    ok: 200,
+  },
 ] as const;
 
 const user = (id: string, role: string, orgId = ORG) =>
@@ -99,49 +107,49 @@ beforeEach(() => {
   for (const k of Object.keys(rows)) delete rows[k];
 });
 
-describe.each(cases)('DELETE $url', ({ model, url, ok }) => {
-  const del = (u: string) => app.inject({ method: 'DELETE', url, headers: { 'x-test-user': u } });
+describe.each(cases)('$method $url', ({ model, spy, method, url, ok }) => {
+  const del = (u: string) => app.inject({ method, url, headers: { 'x-test-user': u } });
 
   it('lets a member delete their own resource', async () => {
     rows[model] = { id: RESOURCE, organization_id: ORG, owner: VICTIM };
     const res = await del(user(VICTIM, 'member'));
     expect(res.statusCode).toBe(ok);
-    expect(deleteSpies[model]).toHaveBeenCalledTimes(1);
+    expect(deleteSpies[spy]).toHaveBeenCalledTimes(1);
   });
 
   it("refuses a member deleting another member's resource", async () => {
     rows[model] = { id: RESOURCE, organization_id: ORG, owner: VICTIM };
     const res = await del(user(ATTACKER, 'member'));
     expect(res.statusCode).toBe(403);
-    expect(deleteSpies[model]).not.toHaveBeenCalled();
+    expect(deleteSpies[spy]).not.toHaveBeenCalled();
   });
 
   it('refuses a member deleting a resource with no recorded owner', async () => {
     rows[model] = { id: RESOURCE, organization_id: ORG, owner: null };
     const res = await del(user(ATTACKER, 'member'));
     expect(res.statusCode).toBe(403);
-    expect(deleteSpies[model]).not.toHaveBeenCalled();
+    expect(deleteSpies[spy]).not.toHaveBeenCalled();
   });
 
   it('refuses a member whose org does not hold the resource, even with a matching user id', async () => {
     rows[model] = { id: RESOURCE, organization_id: OTHER_ORG, owner: VICTIM };
     const res = await del(user(VICTIM, 'member'));
     expect(res.statusCode).toBe(403);
-    expect(deleteSpies[model]).not.toHaveBeenCalled();
+    expect(deleteSpies[spy]).not.toHaveBeenCalled();
   });
 
   it.each(['admin', 'owner'])("lets an org %s delete another member's resource", async (role) => {
     rows[model] = { id: RESOURCE, organization_id: ORG, owner: VICTIM };
     const res = await del(user(ADMIN, role));
     expect(res.statusCode).toBe(ok);
-    expect(deleteSpies[model]).toHaveBeenCalledTimes(1);
+    expect(deleteSpies[spy]).toHaveBeenCalledTimes(1);
   });
 
   it('refuses a viewer', async () => {
     rows[model] = { id: RESOURCE, organization_id: ORG, owner: VICTIM };
     const res = await del(user(VICTIM, 'viewer'));
     expect(res.statusCode).toBe(403);
-    expect(deleteSpies[model]).not.toHaveBeenCalled();
+    expect(deleteSpies[spy]).not.toHaveBeenCalled();
   });
 });
 

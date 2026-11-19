@@ -180,12 +180,12 @@ export async function apiKeysRoutes(fastify: FastifyInstance): Promise<void> {
 
   /**
    * POST /api/api-keys/:keyId/revoke
-   * Revoke an API key (soft disable)
+   * Revoke an API key (soft disable). Same owner rule as delete.
    */
   fastify.post<ApiKeyIdRequest>(
     '/api-keys/:keyId/revoke',
     {
-      preHandler: [authenticate, requireModifyAccess],
+      preHandler: [authenticate, requirePermission('api_keys:delete', apiKeyOwner)],
       schema: {
         description: 'Revoke API key',
         tags: ['API Keys'],
