@@ -392,12 +392,14 @@ model documents {
   file_type       String?
   file_path       String
   status          String   @default("processing")
+  created_by      String?  @db.Uuid
   created_at      DateTime @default(now()) @db.Timestamptz
   updated_at      DateTime @default(now()) @updatedAt @db.Timestamptz
 
   organization organizations @relation(fields: [organization_id], references: [id], onDelete: Cascade)
 
   @@index([organization_id])
+  @@index([created_by])
   @@index([category])
   @@index([status])
   @@index([file_type])

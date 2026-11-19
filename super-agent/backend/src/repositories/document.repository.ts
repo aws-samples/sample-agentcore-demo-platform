@@ -19,6 +19,7 @@ export interface DocumentEntity {
   file_type: string | null;
   file_path: string;
   status: 'indexed' | 'processing' | 'error';
+  created_by: string | null;
   created_at: Date;
   updated_at: Date;
 }

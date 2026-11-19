@@ -10,6 +10,8 @@ import { workflowGeneratorService } from '../services/workflow-generator.service
 import { workflowExecutorV2, type WorkflowV2Plan, type WorkflowProgressEvent } from '../services/workflow-executor-v2.js';
 import { agentService } from '../services/agent.service.js';
 import { authenticate, requireModifyAccess } from '../middleware/auth.js';
+import { requirePermission } from '../authorization/auth.middleware.js';
+import { workflowOwner } from '../authorization/ownership.js';
 import type { ConversationEvent } from '../services/claude-agent.service.js';
 import {
   createWorkflowSchema,
@@ -420,7 +422,7 @@ export async function workflowRoutes(fastify: FastifyInstance): Promise<void> {
   fastify.delete<DeleteWorkflowRequest>(
     '/:id',
     {
-      preHandler: [authenticate, requireModifyAccess],
+      preHandler: [authenticate, requirePermission('workflows:delete', workflowOwner)],
       schema: {
         description: 'Delete a workflow',
         tags: ['Workflows'],
